@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getRuns } from "@/lib/api";
 import type { Run } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/card";
@@ -5,12 +6,15 @@ import { Badge } from "@/components/badge";
 
 export const dynamic = "force-dynamic";
 
+const PAGE_SIZE = 20;
+
 export default async function RunsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ agent?: string; status?: string }>;
+  searchParams: Promise<{ agent?: string; status?: string; page?: string }>;
 }) {
-  const { agent, status } = await searchParams;
+  const { agent, status, page: pageParam } = await searchParams;
+  const currentPage = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   let runs: Run[] = [];
   let error: string | null = null;
 
@@ -20,7 +24,22 @@ export default async function RunsPage({
     error = e instanceof Error ? e.message : "Failed to fetch runs";
   }
 
+  const totalPages = Math.max(1, Math.ceil(runs.length / PAGE_SIZE));
+  const paginatedRuns = runs.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
+
   const statuses = ["pending", "running", "completed", "failed"] as const;
+
+  function buildUrl(params: Record<string, string | undefined>) {
+    const search = new URLSearchParams();
+    if (params.status) search.set("status", params.status);
+    if (params.agent) search.set("agent", params.agent);
+    if (params.page && params.page !== "1") search.set("page", params.page);
+    const qs = search.toString();
+    return `/runs${qs ? `?${qs}` : ""}`;
+  }
 
   return (
     <div className="space-y-8">
@@ -41,7 +60,7 @@ export default async function RunsPage({
 
       <div className="flex gap-2">
         <a
-          href="/runs"
+          href={buildUrl({ agent })}
           className={`rounded-md px-3 py-1 text-sm transition-colors ${
             !status
               ? "bg-secondary text-foreground"
@@ -53,7 +72,7 @@ export default async function RunsPage({
         {statuses.map((s) => (
           <a
             key={s}
-            href={`/runs?status=${s}${agent ? `&agent=${agent}` : ""}`}
+            href={buildUrl({ status: s, agent })}
             className={`rounded-md px-3 py-1 text-sm transition-colors ${
               status === s
                 ? "bg-secondary text-foreground"
@@ -74,10 +93,15 @@ export default async function RunsPage({
         </CardHeader>
         <CardContent>
           {runs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No runs found</p>
+            <p className="text-sm text-muted-foreground">
+              No runs yet. Use the CLI to start one:
+              <code className="ml-2 text-foreground">
+                clawops run start --agent &lt;id&gt; --task &quot;my task&quot;
+              </code>
+            </p>
           ) : (
             <div className="space-y-3">
-              {runs.map((run) => (
+              {paginatedRuns.map((run) => (
                 <div
                   key={run.id}
                   className="rounded-md border border-border p-4 space-y-2"
@@ -87,7 +111,12 @@ export default async function RunsPage({
                     <Badge variant={run.status}>{run.status}</Badge>
                   </div>
                   <div className="flex gap-4 text-xs text-muted-foreground">
-                    <span>Agent: {run.agentId}</span>
+                    <Link
+                      href={`/agents/${run.agentId}`}
+                      className="hover:text-foreground transition-colors"
+                    >
+                      Agent: {run.agentId}
+                    </Link>
                     <span>
                       Started: {new Date(run.startedAt).toLocaleString()}
                     </span>
@@ -116,6 +145,38 @@ export default async function RunsPage({
           )}
         </CardContent>
       </Card>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2">
+          {currentPage > 1 && (
+            <a
+              href={buildUrl({
+                status,
+                agent,
+                page: String(currentPage - 1),
+              })}
+              className="rounded-md bg-secondary px-3 py-1 text-sm transition-colors hover:bg-secondary/80"
+            >
+              Previous
+            </a>
+          )}
+          <span className="text-sm text-muted-foreground">
+            Page {currentPage} of {totalPages}
+          </span>
+          {currentPage < totalPages && (
+            <a
+              href={buildUrl({
+                status,
+                agent,
+                page: String(currentPage + 1),
+              })}
+              className="rounded-md bg-secondary px-3 py-1 text-sm transition-colors hover:bg-secondary/80"
+            >
+              Next
+            </a>
+          )}
+        </div>
+      )}
     </div>
   );
 }

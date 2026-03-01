@@ -18,7 +18,7 @@ export default async function DashboardPage() {
 
   const onlineCount = agents.filter((a) => a.status === "online").length;
   const runningCount = runs.filter((r) => r.status === "running").length;
-  const recentRuns = runs.slice(0, 10);
+  const recentRuns = runs.slice(0, 5);
 
   return (
     <div className="space-y-8">
