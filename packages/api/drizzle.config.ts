@@ -5,6 +5,6 @@ export default defineConfig({
   out: "./drizzle",
   dialect: "sqlite",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "clawops.db",
+    url: process.env.DB_PATH ?? "./clawops.db",
   },
 });
