@@ -1,4 +1,4 @@
-const API_URL = process.env.CLAWOPS_API_URL ?? "http://localhost:3001";
+import { getApiUrl } from "./config.js";
 
 interface ApiError {
   error: string;
@@ -8,7 +8,8 @@ export async function request<T>(
   path: string,
   options?: RequestInit,
 ): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
+  const apiUrl = getApiUrl();
+  const res = await fetch(`${apiUrl}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
