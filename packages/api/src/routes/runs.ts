@@ -1,30 +1,24 @@
 import type { FastifyInstance } from "fastify";
 import { eq, and, type SQL } from "drizzle-orm";
-import { z } from "zod";
 import { db } from "../db/index.js";
 import { runs, agents } from "../db/schema.js";
-
-const createRunSchema = z.object({
-  agentId: z.string().uuid(),
-  task: z.string().min(1),
-});
-
-const updateRunSchema = z.object({
-  status: z.enum(["pending", "running", "completed", "failed"]).optional(),
-  output: z.string().optional(),
-  error: z.string().optional(),
-});
-
-const listRunsQuerySchema = z.object({
-  agent: z.string().uuid().optional(),
-  status: z.enum(["pending", "running", "completed", "failed"]).optional(),
-});
+import {
+  createRunSchema,
+  updateRunSchema,
+  runIdParamSchema,
+  listRunsQuerySchema,
+} from "../schemas/runs.js";
+import { agentIdParamSchema } from "../schemas/agents.js";
 
 export async function runRoutes(app: FastifyInstance) {
   app.get("/api/runs", async (request, reply) => {
     const parsed = listRunsQuerySchema.safeParse(request.query);
     if (!parsed.success) {
-      return reply.status(400).send({ error: parsed.error.flatten() });
+      return reply.status(400).send({
+        error: "Validation Error",
+        message: parsed.error.issues.map((i) => i.message).join("; "),
+        statusCode: 400,
+      });
     }
 
     const conditions: SQL[] = [];
@@ -48,7 +42,11 @@ export async function runRoutes(app: FastifyInstance) {
   app.post("/api/runs", async (request, reply) => {
     const parsed = createRunSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.status(400).send({ error: parsed.error.flatten() });
+      return reply.status(400).send({
+        error: "Validation Error",
+        message: parsed.error.issues.map((i) => i.message).join("; "),
+        statusCode: 400,
+      });
     }
 
     const [agent] = await db
@@ -57,7 +55,11 @@ export async function runRoutes(app: FastifyInstance) {
       .where(eq(agents.id, parsed.data.agentId));
 
     if (!agent) {
-      return reply.status(404).send({ error: "Agent not found" });
+      return reply.status(404).send({
+        error: "Not Found",
+        message: "Agent not found",
+        statusCode: 404,
+      });
     }
 
     const [run] = await db
@@ -75,9 +77,22 @@ export async function runRoutes(app: FastifyInstance) {
   app.patch<{ Params: { id: string } }>(
     "/api/runs/:id",
     async (request, reply) => {
+      const paramsParsed = runIdParamSchema.safeParse(request.params);
+      if (!paramsParsed.success) {
+        return reply.status(400).send({
+          error: "Validation Error",
+          message: paramsParsed.error.issues.map((i) => i.message).join("; "),
+          statusCode: 400,
+        });
+      }
+
       const parsed = updateRunSchema.safeParse(request.body);
       if (!parsed.success) {
-        return reply.status(400).send({ error: parsed.error.flatten() });
+        return reply.status(400).send({
+          error: "Validation Error",
+          message: parsed.error.issues.map((i) => i.message).join("; "),
+          statusCode: 400,
+        });
       }
 
       const updates: Record<string, unknown> = {};
@@ -95,11 +110,15 @@ export async function runRoutes(app: FastifyInstance) {
       const [run] = await db
         .update(runs)
         .set(updates)
-        .where(eq(runs.id, request.params.id))
+        .where(eq(runs.id, paramsParsed.data.id))
         .returning();
 
       if (!run) {
-        return reply.status(404).send({ error: "Run not found" });
+        return reply.status(404).send({
+          error: "Not Found",
+          message: "Run not found",
+          statusCode: 404,
+        });
       }
 
       return run;
@@ -108,11 +127,20 @@ export async function runRoutes(app: FastifyInstance) {
 
   app.get<{ Params: { id: string } }>(
     "/api/agents/:id/runs",
-    async (request) => {
+    async (request, reply) => {
+      const paramsParsed = agentIdParamSchema.safeParse(request.params);
+      if (!paramsParsed.success) {
+        return reply.status(400).send({
+          error: "Validation Error",
+          message: paramsParsed.error.issues.map((i) => i.message).join("; "),
+          statusCode: 400,
+        });
+      }
+
       return db
         .select()
         .from(runs)
-        .where(eq(runs.agentId, request.params.id));
+        .where(eq(runs.agentId, paramsParsed.data.id));
     },
   );
 }
