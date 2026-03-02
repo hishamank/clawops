@@ -1,14 +1,77 @@
 import Fastify from "fastify";
-import { runMigrations } from "@clawops/core";
+import swagger from "@fastify/swagger";
+import swaggerUi from "@fastify/swagger-ui";
+import { db, runMigrations } from "@clawops/core";
+import { getAgentByApiKey } from "@clawops/agents";
+import { hashApiKey } from "@clawops/domain";
+import { taskRoutes } from "./routes/tasks.js";
+import { ideaRoutes } from "./routes/ideas.js";
 
 const port = Number(process.env["PORT"] || 3001);
 const host = process.env["HOST"] || "0.0.0.0";
 
 const app = Fastify({ logger: true });
 
-app.get("/health", async () => {
+// ── Swagger ────────────────────────────────────────────────────────────────
+
+await app.register(swagger, {
+  openapi: {
+    info: {
+      title: "ClawOps API",
+      version: "0.1.0",
+      description: "Operations layer for AI agent teams",
+    },
+    components: {
+      securitySchemes: {
+        apiKey: {
+          type: "apiKey",
+          name: "x-api-key",
+          in: "header",
+        },
+      },
+    },
+    security: [{ apiKey: [] }],
+  },
+});
+
+await app.register(swaggerUi, { routePrefix: "/docs" });
+
+// ── Auth hook ──────────────────────────────────────────────────────────────
+
+const publicPaths = new Set(["/health", "/docs", "/docs/"]);
+
+app.addHook("onRequest", async (req, reply) => {
+  if (
+    publicPaths.has(req.url) ||
+    req.url.startsWith("/docs/")
+  ) {
+    return;
+  }
+
+  const key = req.headers["x-api-key"];
+  if (typeof key !== "string" || key.length === 0) {
+    return reply.status(401).send({ error: "Missing API key", code: "UNAUTHORIZED" });
+  }
+
+  const hashed = hashApiKey(key);
+  const agent = getAgentByApiKey(db, hashed);
+  if (!agent) {
+    return reply.status(401).send({ error: "Invalid API key", code: "UNAUTHORIZED" });
+  }
+});
+
+// ── Health ──────────────────────────────────────────────────────────────────
+
+app.get("/health", { schema: { tags: ["system"], summary: "Health check" } }, async () => {
   return { status: "ok" };
 });
+
+// ── Routes ─────────────────────────────────────────────────────────────────
+
+await app.register(taskRoutes);
+await app.register(ideaRoutes);
+
+// ── Start ──────────────────────────────────────────────────────────────────
 
 async function start(): Promise<void> {
   try {
