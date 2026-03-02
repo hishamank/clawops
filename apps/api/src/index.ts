@@ -1,96 +1,54 @@
 import Fastify from "fastify";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
-import rateLimit from "@fastify/rate-limit";
-import { db, runMigrations } from "@clawops/core";
-import { getAgentByApiKey } from "@clawops/agents";
-import { hashApiKey } from "@clawops/domain";
-import { projectRoutes } from "./routes/projects.js";
-import { analyticsRoutes } from "./routes/analytics.js";
-import { notificationRoutes } from "./routes/notifications.js";
-import { authRoutes } from "./routes/auth.js";
-
-declare module "fastify" {
-  interface FastifyRequest {
-    agentId?: string;
-  }
-}
+import { runMigrations } from "@clawops/core";
+import { authMiddleware } from "./auth.js";
+import { agentRoutes } from "./routes/agents.js";
+import { habitRoutes } from "./routes/habits.js";
 
 const port = Number(process.env["PORT"] || 3001);
 const host = process.env["HOST"] || "0.0.0.0";
 
 const app = Fastify({ logger: true });
 
-app.decorateRequest("agentId", undefined);
-
-// ── Swagger ────────────────────────────────────────────────────────────────
-
-await app.register(swagger, {
-  openapi: {
-    info: {
-      title: "ClawOps API",
-      version: "0.1.0",
-      description: "Operations layer for AI agent teams",
-    },
-    components: {
-      securitySchemes: {
-        apiKey: {
-          type: "apiKey",
-          name: "x-api-key",
-          in: "header",
-        },
-      },
-    },
-    security: [{ apiKey: [] }],
-  },
-});
-
-await app.register(swaggerUi, { routePrefix: "/docs" });
-
-// ── Public routes ──────────────────────────────────────────────────────────
-
-app.get("/health", { schema: { tags: ["system"], summary: "Health check" } }, async () => {
+app.get("/health", async () => {
   return { status: "ok" };
 });
-
-await app.register(authRoutes); // /auth/* — no key required
-
-// ── Protected scope: rate limit applied before auth (prevents brute force) ─
-
-await app.register(async (protectedApp) => {
-  await protectedApp.register(rateLimit, {
-    max: 100,
-    timeWindow: "1 minute",
-    keyGenerator: (req) => req.ip,
-  });
-
-  // Auth check after rate limiting — attaches agentId to request
-  protectedApp.addHook("onRequest", async (req, reply) => {
-    const key = req.headers["x-api-key"];
-    if (typeof key !== "string" || key.length === 0) {
-      return reply.status(401).send({ error: "Missing API key", code: "UNAUTHORIZED" });
-    }
-
-    const hashed = hashApiKey(key);
-    const agent = getAgentByApiKey(db, hashed);
-    if (!agent) {
-      return reply.status(401).send({ error: "Invalid API key", code: "UNAUTHORIZED" });
-    }
-
-    req.agentId = agent.id;
-  });
-
-  await protectedApp.register(projectRoutes);
-  await protectedApp.register(analyticsRoutes);
-  await protectedApp.register(notificationRoutes);
-});
-
-// ── Start ──────────────────────────────────────────────────────────────────
 
 async function start(): Promise<void> {
   try {
     runMigrations();
     app.log.info("Migrations applied");
+
+    await app.register(swagger, {
+      openapi: {
+        info: {
+          title: "ClawOps API",
+          version: "0.1.0",
+          description: "Operations layer for AI agent teams",
+        },
+      },
+    });
+
+    await app.register(swaggerUi, {
+      routePrefix: "/docs",
+    });
+
+    // Auth middleware — skip /health and /docs
+    app.addHook("onRequest", async (request, reply) => {
+      const url = request.url;
+      if (
+        url === "/health" ||
+        url.startsWith("/docs") ||
+        url.startsWith("/docs/")
+      ) {
+        return;
+      }
+      await authMiddleware(request, reply);
+    });
+
+    await app.register(agentRoutes);
+    await app.register(habitRoutes);
 
     await app.listen({ port, host });
     app.log.info(`ClawOps API listening on ${host}:${port}`);

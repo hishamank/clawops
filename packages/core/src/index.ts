@@ -8,3 +8,4 @@ export {
   parseJsonObject,
   toJsonObject,
 } from "./helpers.js";
+export { eq, desc, and, gte } from "drizzle-orm";
