@@ -5,6 +5,10 @@ const ALPHABET =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-";
 const ID_LENGTH = 21;
 
+const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1 };
+const KEY_LEN = 32;
+const SALT_LEN = 16;
+
 export function generateId(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(ID_LENGTH));
   let id = "";
@@ -15,12 +19,18 @@ export function generateId(): string {
 }
 
 export function hashApiKey(key: string): string {
-  return crypto.createHash("sha256").update(key).digest("hex");
+  const salt = crypto.randomBytes(SALT_LEN);
+  const hash = crypto.scryptSync(key, salt, KEY_LEN, SCRYPT_PARAMS);
+  return `${salt.toString("hex")}:${hash.toString("hex")}`;
 }
 
-export function verifyApiKey(key: string, hash: string): boolean {
-  const computed = hashApiKey(key);
-  return crypto.timingSafeEqual(Buffer.from(computed), Buffer.from(hash));
+export function verifyApiKey(key: string, stored: string): boolean {
+  const [saltHex, hashHex] = stored.split(":");
+  if (!saltHex || !hashHex) return false;
+  const salt = Buffer.from(saltHex, "hex");
+  const expected = Buffer.from(hashHex, "hex");
+  const computed = crypto.scryptSync(key, salt, KEY_LEN, SCRYPT_PARAMS);
+  return crypto.timingSafeEqual(computed, expected);
 }
 
 export function formatCost(cost: number): string {
