@@ -9,11 +9,11 @@ import {
 } from "@clawops/core";
 import type { ProjectStatus, MilestoneStatus } from "@clawops/domain";
 
-export async function createProject(
+export function createProject(
   db: DB,
   input: { name: string; description?: string; status?: ProjectStatus; prd?: string; ideaId?: string },
-): Promise<Project> {
-  const project = await db
+): Project {
+  const project = db
     .insert(projects)
     .values({
       name: input.name,
