@@ -1,20 +1,14 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { db, events } from "@clawops/core";
+import type { DB } from "@clawops/core";
 import { createTask, getTask, listTasks, updateTask, completeTask } from "@clawops/tasks";
 import { createNotification } from "@clawops/notifications";
+import { TaskStatus, TaskPriority, Source } from "@clawops/domain";
 
-const taskStatusEnum = z.enum([
-  "backlog",
-  "todo",
-  "in-progress",
-  "review",
-  "done",
-  "cancelled",
-]);
-
-const taskPriorityEnum = z.enum(["low", "medium", "high", "urgent"]);
-const taskSourceEnum = z.enum(["human", "agent", "cli", "script"]);
+const taskStatusEnum = z.nativeEnum(TaskStatus);
+const taskPriorityEnum = z.nativeEnum(TaskPriority);
+const taskSourceEnum = z.nativeEnum(Source);
 
 // ── Schemas ────────────────────────────────────────────────────────────────
 
@@ -61,11 +55,12 @@ const idParams = z.object({ id: z.string().min(1) });
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function writeEvent(
+  dbHandle: DB,
   action: string,
   entityId: string,
   meta: Record<string, unknown>,
 ): void {
-  db.insert(events)
+  dbHandle.insert(events)
     .values({
       action,
       entityType: "task",
@@ -73,6 +68,10 @@ function writeEvent(
       meta: JSON.stringify(meta),
     })
     .run();
+}
+
+function inTransaction<T>(fn: () => T): T {
+  return db.$client.transaction(fn)();
 }
 
 // ── Plugin ─────────────────────────────────────────────────────────────────
@@ -90,11 +89,11 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
           properties: {
             title: { type: "string" },
             description: { type: "string" },
-            status: { type: "string", enum: taskStatusEnum.options },
-            priority: { type: "string", enum: taskPriorityEnum.options },
+            status: { type: "string", enum: Object.values(TaskStatus) },
+            priority: { type: "string", enum: Object.values(TaskPriority) },
             assigneeId: { type: "string" },
             projectId: { type: "string" },
-            source: { type: "string", enum: taskSourceEnum.options },
+            source: { type: "string", enum: Object.values(Source) },
             dueDate: { type: "string", format: "date-time" },
           },
           required: ["title"],
@@ -104,11 +103,14 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     },
     async (req, reply) => {
       const body = createTaskBody.parse(req.body);
-      const task = createTask(db, {
-        ...body,
-        dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
+      const task = inTransaction(() => {
+        const t = createTask(db, {
+          ...body,
+          dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
+        });
+        writeEvent(db, "task.created", t.id, { title: t.title });
+        return t;
       });
-      writeEvent("task.created", task.id, { title: task.title });
       return reply.status(201).send(task);
     },
   );
@@ -123,10 +125,10 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
         querystring: {
           type: "object",
           properties: {
-            status: { type: "string", enum: taskStatusEnum.options },
+            status: { type: "string", enum: Object.values(TaskStatus) },
             assigneeId: { type: "string" },
             projectId: { type: "string" },
-            priority: { type: "string", enum: taskPriorityEnum.options },
+            priority: { type: "string", enum: Object.values(TaskPriority) },
           },
         },
         response: { 200: { type: "array", items: { type: "object", additionalProperties: true } } },
@@ -186,24 +188,35 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
           properties: {
             title: { type: "string" },
             description: { type: "string" },
-            status: { type: "string", enum: taskStatusEnum.options },
-            priority: { type: "string", enum: taskPriorityEnum.options },
+            status: { type: "string", enum: Object.values(TaskStatus) },
+            priority: { type: "string", enum: Object.values(TaskPriority) },
             assigneeId: { type: "string" },
             projectId: { type: "string" },
             dueDate: { type: "string", format: "date-time" },
           },
         },
-        response: { 200: { type: "object", additionalProperties: true } },
+        response: {
+          200: { type: "object", additionalProperties: true },
+          404: {
+            type: "object",
+            properties: { error: { type: "string" } },
+          },
+        },
       },
     },
-    async (req) => {
+    async (req, reply) => {
       const { id } = idParams.parse(req.params);
       const body = updateTaskBody.parse(req.body);
-      const task = updateTask(db, id, {
-        ...body,
-        dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
+      const task = inTransaction(() => {
+        const t = updateTask(db, id, {
+          ...body,
+          dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
+        });
+        if (!t) return null;
+        writeEvent(db, "task.updated", t.id, { fields: Object.keys(body) });
+        return t;
       });
-      writeEvent("task.updated", task.id, { fields: Object.keys(body) });
+      if (!task) return reply.code(404).send({ error: "Task not found" });
       return task;
     },
   );
@@ -241,23 +254,34 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
           },
           required: ["summary"],
         },
-        response: { 200: { type: "object", additionalProperties: true } },
+        response: {
+          200: { type: "object", additionalProperties: true },
+          404: {
+            type: "object",
+            properties: { error: { type: "string" } },
+          },
+        },
       },
     },
-    async (req) => {
+    async (req, reply) => {
       const { id } = idParams.parse(req.params);
       const body = completeTaskBody.parse(req.body);
-      const task = completeTask(db, id, body);
+      const task = inTransaction(() => {
+        const t = completeTask(db, id, body);
+        if (!t) return null;
 
-      createNotification(db, {
-        type: "task.completed",
-        title: "Task completed",
-        body: `Task "${task.title}" has been completed.`,
-        entityType: "task",
-        entityId: task.id,
+        createNotification(db, {
+          type: "task.completed",
+          title: "Task completed",
+          body: `Task "${t.title}" has been completed.`,
+          entityType: "task",
+          entityId: t.id,
+        });
+
+        writeEvent(db, "task.completed", t.id, { summary: body.summary });
+        return t;
       });
-
-      writeEvent("task.completed", task.id, { summary: body.summary });
+      if (!task) return reply.code(404).send({ error: "Task not found" });
       return task;
     },
   );

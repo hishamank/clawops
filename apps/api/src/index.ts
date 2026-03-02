@@ -38,13 +38,11 @@ await app.register(swaggerUi, { routePrefix: "/docs" });
 
 // ── Auth hook ──────────────────────────────────────────────────────────────
 
-const publicPaths = new Set(["/health", "/docs", "/docs/"]);
+const publicPaths = new Set(["/health"]);
 
 app.addHook("onRequest", async (req, reply) => {
-  if (
-    publicPaths.has(req.url) ||
-    req.url.startsWith("/docs/")
-  ) {
+  const pathname = req.url.split("?")[0];
+  if (publicPaths.has(pathname)) {
     return;
   }
 

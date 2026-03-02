@@ -1,10 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { db, events } from "@clawops/core";
+import type { DB } from "@clawops/core";
 import { createIdea, listIdeas, promoteIdeaToProject } from "@clawops/ideas";
+import { IdeaStatus } from "@clawops/domain";
 
-const ideaStatusEnum = z.enum(["raw", "reviewed", "promoted", "archived"]);
-const ideaSourceEnum = z.enum(["human", "agent"]);
+const ideaStatusEnum = z.nativeEnum(IdeaStatus);
+const ideaSourceEnum = z.enum(["human", "agent"] as const);
 
 // ── Schemas ────────────────────────────────────────────────────────────────
 
@@ -25,12 +27,13 @@ const idParams = z.object({ id: z.string().min(1) });
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function writeEvent(
+  dbHandle: DB,
   action: string,
   entityType: string,
   entityId: string,
   meta: Record<string, unknown>,
 ): void {
-  db.insert(events)
+  dbHandle.insert(events)
     .values({
       action,
       entityType,
@@ -38,6 +41,10 @@ function writeEvent(
       meta: JSON.stringify(meta),
     })
     .run();
+}
+
+function inTransaction<T>(fn: () => T): T {
+  return db.$client.transaction(fn)();
 }
 
 // ── Plugin ─────────────────────────────────────────────────────────────────
@@ -65,8 +72,11 @@ export async function ideaRoutes(app: FastifyInstance): Promise<void> {
     },
     async (req, reply) => {
       const body = createIdeaBody.parse(req.body);
-      const idea = createIdea(db, body);
-      writeEvent("idea.created", "idea", idea.id, { title: idea.title });
+      const idea = inTransaction(() => {
+        const i = createIdea(db, body);
+        writeEvent(db, "idea.created", "idea", i.id, { title: i.title });
+        return i;
+      });
       return reply.status(201).send(idea);
     },
   );
@@ -81,7 +91,7 @@ export async function ideaRoutes(app: FastifyInstance): Promise<void> {
         querystring: {
           type: "object",
           properties: {
-            status: { type: "string", enum: ideaStatusEnum.options },
+            status: { type: "string", enum: Object.values(IdeaStatus) },
             tag: { type: "string" },
           },
         },
@@ -123,22 +133,18 @@ export async function ideaRoutes(app: FastifyInstance): Promise<void> {
       const { id } = idParams.parse(req.params);
       try {
         const result = promoteIdeaToProject(db, id);
-        writeEvent("idea.promoted", "idea", result.idea.id, {
+        writeEvent(db, "idea.promoted", "idea", result.idea.id, {
           projectId: result.project.id,
         });
-        writeEvent("project.created", "project", result.project.id, {
+        writeEvent(db, "project.created", "project", result.project.id, {
           name: result.project.name,
           ideaId: result.idea.id,
         });
         return result;
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Unknown error";
-        if (message.includes("not found")) {
-          return reply.status(404).send({ error: message, code: "IDEA_NOT_FOUND" });
-        }
-        if (message.includes("already promoted")) {
-          return reply.status(409).send({ error: message, code: "IDEA_ALREADY_PROMOTED" });
-        }
+        const msg = err instanceof Error ? err.message : "";
+        if (msg.includes("not found")) return reply.code(404).send({ error: msg });
+        if (msg.includes("already promoted")) return reply.code(409).send({ error: msg });
         throw err;
       }
     },
