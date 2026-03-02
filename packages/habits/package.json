@@ -11,9 +11,12 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@clawops/core": "workspace:*"
+    "@clawops/core": "workspace:*",
+    "@clawops/domain": "workspace:*",
+    "drizzle-orm": "^0.38.0"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "typescript": "^5.7.0"
   }
 }
