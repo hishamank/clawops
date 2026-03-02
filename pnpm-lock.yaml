@@ -111,6 +111,15 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
+  packages/domain:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.13
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
   packages/habits:
     dependencies:
       '@clawops/core':
@@ -147,15 +156,6 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
-
-  packages/shared:
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.13
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
