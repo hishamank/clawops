@@ -12,14 +12,18 @@ const host = process.env["HOST"] || "0.0.0.0";
 
 const app = Fastify({ logger: true });
 
-app.get("/health", async () => {
-  return { status: "ok" };
-});
-
 async function start(): Promise<void> {
   try {
     runMigrations();
     app.log.info("Migrations applied");
+
+    // Global rate limit — applied to all routes
+    await app.register(rateLimit, {
+      global: true,
+      max: 100,
+      timeWindow: "1 minute",
+      keyGenerator: (req) => req.ip,
+    });
 
     await app.register(swagger, {
       openapi: {
@@ -35,12 +39,10 @@ async function start(): Promise<void> {
       routePrefix: "/docs",
     });
 
-    // Rate limit auth routes to prevent brute-force
-    await app.register(rateLimit, {
-      max: 20,
-      timeWindow: "1 minute",
-      keyGenerator: (req) => req.ip,
-      skipOnError: false,
+    // Public routes — no auth required
+    app.get("/health", {
+      config: { rateLimit: { max: 60, timeWindow: "1 minute" } },
+      handler: async () => ({ status: "ok" }),
     });
 
     // Auth middleware — skip /health, /auth/*, and /docs
@@ -56,8 +58,9 @@ async function start(): Promise<void> {
       await authMiddleware(request, reply);
     });
 
-    await app.register(agentRoutes);
-    await app.register(habitRoutes);
+    // Protected routes (rate limited globally above)
+    await app.register(agentRoutes, { prefix: "/agents" });
+    await app.register(habitRoutes, { prefix: "/habits" });
 
     await app.listen({ port, host });
     app.log.info(`ClawOps API listening on ${host}:${port}`);
