@@ -1,12 +1,13 @@
 import Fastify from "fastify";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
-import rateLimit from "@fastify/rate-limit";
 import { db, runMigrations } from "@clawops/core";
 import { getAgentByApiKey } from "@clawops/agents";
 import { hashApiKey } from "@clawops/domain";
-import { taskRoutes } from "./routes/tasks.js";
-import { ideaRoutes } from "./routes/ideas.js";
+import { projectRoutes } from "./routes/projects.js";
+import { analyticsRoutes } from "./routes/analytics.js";
+import { notificationRoutes } from "./routes/notifications.js";
+import { authRoutes } from "./routes/auth.js";
 
 const port = Number(process.env["PORT"] || 3001);
 const host = process.env["HOST"] || "0.0.0.0";
@@ -37,38 +38,41 @@ await app.register(swagger, {
 
 await app.register(swaggerUi, { routePrefix: "/docs" });
 
-// ── Health (public) ────────────────────────────────────────────────────────
+// ── Auth hook ──────────────────────────────────────────────────────────────
+
+const publicPrefixes = ["/health", "/auth/"];
+
+app.addHook("onRequest", async (req, reply) => {
+  const path = req.url.split("?")[0];
+
+  if (publicPrefixes.some((prefix) => path === prefix || path.startsWith(prefix))) {
+    return;
+  }
+
+  const key = req.headers["x-api-key"];
+  if (typeof key !== "string" || key.length === 0) {
+    return reply.status(401).send({ error: "Missing API key", code: "UNAUTHORIZED" });
+  }
+
+  const hashed = hashApiKey(key);
+  const agent = getAgentByApiKey(db, hashed);
+  if (!agent) {
+    return reply.status(401).send({ error: "Invalid API key", code: "UNAUTHORIZED" });
+  }
+});
+
+// ── Health ──────────────────────────────────────────────────────────────────
 
 app.get("/health", { schema: { tags: ["system"], summary: "Health check" } }, async () => {
   return { status: "ok" };
 });
 
-// ── Protected scope: rate limit applied before auth (prevents brute force) ─
+// ── Routes ─────────────────────────────────────────────────────────────────
 
-await app.register(async (protectedApp) => {
-  await protectedApp.register(rateLimit, {
-    max: 100,
-    timeWindow: "1 minute",
-    keyGenerator: (req) => req.ip,
-  });
-
-  // Auth check after rate limiting
-  protectedApp.addHook("onRequest", async (req, reply) => {
-    const key = req.headers["x-api-key"];
-    if (typeof key !== "string" || key.length === 0) {
-      return reply.status(401).send({ error: "Missing API key", code: "UNAUTHORIZED" });
-    }
-
-    const hashed = hashApiKey(key);
-    const agent = getAgentByApiKey(db, hashed);
-    if (!agent) {
-      return reply.status(401).send({ error: "Invalid API key", code: "UNAUTHORIZED" });
-    }
-  });
-
-  await protectedApp.register(taskRoutes);
-  await protectedApp.register(ideaRoutes);
-});
+await app.register(projectRoutes);
+await app.register(analyticsRoutes);
+await app.register(notificationRoutes);
+await app.register(authRoutes);
 
 // ── Start ──────────────────────────────────────────────────────────────────
 

@@ -17,9 +17,13 @@
     "drizzle-orm": "^0.38.0"
   },
   "devDependencies": {
+<<<<<<< HEAD
     "@types/better-sqlite3": "^7.6.0",
     "@types/node": "^22.0.0",
     "better-sqlite3": "^11.0.0",
+=======
+    "drizzle-orm": "^0.38.0",
+>>>>>>> 58e7b21 (feat(api): implement project, analytics, notification, and auth routes (#23))
     "typescript": "^5.7.0"
   }
 }

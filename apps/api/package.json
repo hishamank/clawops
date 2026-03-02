@@ -9,20 +9,23 @@
     "dev": "node --import tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
+<<<<<<< HEAD
+    "test": "echo \"No tests yet\""
+=======
     "lint": "eslint src/"
+>>>>>>> 58e7b21 (feat(api): implement project, analytics, notification, and auth routes (#23))
   },
   "dependencies": {
     "@clawops/agents": "workspace:^",
+    "@clawops/analytics": "workspace:^",
     "@clawops/core": "workspace:*",
     "@clawops/domain": "workspace:^",
-    "@clawops/ideas": "workspace:^",
     "@clawops/notifications": "workspace:^",
-    "@clawops/tasks": "workspace:^",
-    "@fastify/rate-limit": "^10.3.0",
+    "@clawops/projects": "workspace:^",
     "@fastify/swagger": "^9.7.0",
     "@fastify/swagger-ui": "^5.2.5",
     "fastify": "^5.2.0",
-    "zod": "^4.3.6"
+    "zod": "^3.24.0"
   },
   "devDependencies": {
     "tsx": "^4.19.0",

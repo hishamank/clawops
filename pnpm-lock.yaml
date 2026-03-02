@@ -32,12 +32,19 @@ importers:
       '@clawops/agents':
         specifier: workspace:^
         version: link:../../packages/agents
+<<<<<<< HEAD
+=======
+      '@clawops/analytics':
+        specifier: workspace:^
+        version: link:../../packages/analytics
+>>>>>>> 34281f1 (feat(api): implement project, analytics, notification, and auth routes (#23))
       '@clawops/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@clawops/domain':
         specifier: workspace:^
         version: link:../../packages/domain
+<<<<<<< HEAD
       '@clawops/ideas':
         specifier: workspace:^
         version: link:../../packages/ideas
@@ -50,6 +57,14 @@ importers:
       '@fastify/rate-limit':
         specifier: ^10.3.0
         version: 10.3.0
+=======
+      '@clawops/notifications':
+        specifier: workspace:^
+        version: link:../../packages/notifications
+      '@clawops/projects':
+        specifier: workspace:^
+        version: link:../../packages/projects
+>>>>>>> 34281f1 (feat(api): implement project, analytics, notification, and auth routes (#23))
       '@fastify/swagger':
         specifier: ^9.7.0
         version: 9.7.0
@@ -60,8 +75,13 @@ importers:
         specifier: ^5.2.0
         version: 5.7.4
       zod:
+<<<<<<< HEAD
         specifier: ^4.3.6
         version: 4.3.6
+=======
+        specifier: ^3.24.0
+        version: 3.25.76
+>>>>>>> 34281f1 (feat(api): implement project, analytics, notification, and auth routes (#23))
     devDependencies:
       tsx:
         specifier: ^4.19.0
@@ -142,6 +162,7 @@ importers:
         specifier: ^0.38.0
         version: 0.38.4(@types/better-sqlite3@7.6.13)(@types/react@19.2.14)(better-sqlite3@11.10.0)(react@19.2.4)
     devDependencies:
+<<<<<<< HEAD
       '@types/better-sqlite3':
         specifier: ^7.6.0
         version: 7.6.13
@@ -151,6 +172,11 @@ importers:
       better-sqlite3:
         specifier: ^11.0.0
         version: 11.10.0
+=======
+      drizzle-orm:
+        specifier: ^0.38.0
+        version: 0.38.4(@types/better-sqlite3@7.6.13)(@types/react@19.2.14)(better-sqlite3@11.10.0)(react@19.2.4)
+>>>>>>> 58e7b21 (feat(api): implement project, analytics, notification, and auth routes (#23))
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
@@ -781,9 +807,12 @@ packages:
   '@fastify/proxy-addr@5.1.0':
     resolution: {integrity: sha512-INS+6gh91cLUjB+PVHfu1UqcB76Sqtpyp7bnL+FYojhjygvOPA9ctiD/JDKsyD9Xgu4hUhCSJBPig/w7duNajw==}
 
+<<<<<<< HEAD
   '@fastify/rate-limit@10.3.0':
     resolution: {integrity: sha512-eIGkG9XKQs0nyynatApA3EVrojHOuq4l6fhB4eeCk4PIOeadvOJz9/4w3vGI44Go17uaXOWEcPkaD8kuKm7g6Q==}
 
+=======
+>>>>>>> 34281f1 (feat(api): implement project, analytics, notification, and auth routes (#23))
   '@fastify/send@4.1.0':
     resolution: {integrity: sha512-TMYeQLCBSy2TOFmV95hQWkiTYgC/SEx7vMdV+wnZVX4tt8VBLKzmH8vV9OzJehV0+XBfg+WxPMt5wp+JBUKsVw==}
 
@@ -2049,8 +2078,13 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
+<<<<<<< HEAD
   zod@4.3.6:
     resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
+=======
+  zod@3.25.76:
+    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+>>>>>>> 34281f1 (feat(api): implement project, analytics, notification, and auth routes (#23))
 
 snapshots:
 
@@ -2345,12 +2379,15 @@ snapshots:
       '@fastify/forwarded': 3.0.1
       ipaddr.js: 2.3.0
 
+<<<<<<< HEAD
   '@fastify/rate-limit@10.3.0':
     dependencies:
       '@lukeed/ms': 2.0.2
       fastify-plugin: 5.1.0
       toad-cache: 3.7.0
 
+=======
+>>>>>>> 34281f1 (feat(api): implement project, analytics, notification, and auth routes (#23))
   '@fastify/send@4.1.0':
     dependencies:
       '@lukeed/ms': 2.0.2
@@ -3566,4 +3603,8 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
+<<<<<<< HEAD
   zod@4.3.6: {}
+=======
+  zod@3.25.76: {}
+>>>>>>> 34281f1 (feat(api): implement project, analytics, notification, and auth routes (#23))
