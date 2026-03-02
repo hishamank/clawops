@@ -49,6 +49,17 @@ function inTransaction<T>(fn: () => T): T {
 
 // ── Plugin ─────────────────────────────────────────────────────────────────
 
+/**
+ * Fastify plugin that registers idea routes under `/ideas`.
+ *
+ * Routes:
+ * - `POST /ideas` – create an idea (201)
+ * - `GET  /ideas` – list ideas with optional status/tag filters
+ * - `POST /ideas/:id/promote` – promote an idea to a project (404 / 409 on conflict)
+ *
+ * All mutations run inside a SQLite transaction and emit audit events.
+ * The promote endpoint uses typed domain errors ({@link NotFoundError}, {@link ConflictError}).
+ */
 export async function ideaRoutes(app: FastifyInstance): Promise<void> {
   // POST /ideas
   app.post(

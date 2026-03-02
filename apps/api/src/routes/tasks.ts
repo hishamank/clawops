@@ -76,6 +76,18 @@ function inTransaction<T>(fn: () => T): T {
 
 // ── Plugin ─────────────────────────────────────────────────────────────────
 
+/**
+ * Fastify plugin that registers task CRUD routes under `/tasks`.
+ *
+ * Routes:
+ * - `POST /tasks` – create a task (201)
+ * - `GET  /tasks` – list tasks with optional filters
+ * - `GET  /tasks/:id` – get a single task (404 if missing)
+ * - `PATCH /tasks/:id` – update a task (404 if missing)
+ * - `POST /tasks/:id/complete` – mark a task complete and emit a notification (404 if missing)
+ *
+ * All mutations run inside a SQLite transaction and emit an audit event.
+ */
 export async function taskRoutes(app: FastifyInstance): Promise<void> {
   // POST /tasks
   app.post(
