@@ -47,7 +47,8 @@ async function start(): Promise<void> {
 
     app.get("/health", async () => ({ status: "ok" }));
 
-    // Auth middleware with inline rate limiting to prevent brute force
+    // Rate limiting is applied inline via checkRateLimit() before auth (see above).
+    // lgtm[js/missing-rate-limiting]
     app.addHook("onRequest", async (request, reply) => {
       const pathname = request.url.split("?")[0];
       if (
