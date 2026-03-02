@@ -2,17 +2,19 @@ import { eq, and, gte, desc } from "drizzle-orm";
 import type { DB } from "@clawops/core";
 import { habits, habitRuns } from "@clawops/core";
 import type { Habit, HabitRun } from "@clawops/core";
+import { HabitType, HabitStatus } from "@clawops/domain";
+import type { HabitType as HabitTypeT, HabitStatus as HabitStatusT } from "@clawops/domain";
 import crypto from "node:crypto";
 
 // ── createHabit ────────────────────────────────────────────────────────────
 
 interface CreateHabitInput {
   name: string;
-  type: "heartbeat" | "scheduled" | "cron" | "hook" | "watchdog" | "polling";
+  type: HabitTypeT;
   schedule?: string;
   cronExpr?: string;
   trigger?: string;
-  status?: "active" | "paused";
+  status?: HabitStatusT;
 }
 
 export function createHabit(
@@ -30,7 +32,7 @@ export function createHabit(
       schedule: input.schedule ?? null,
       cronExpr: input.cronExpr ?? null,
       trigger: input.trigger ?? null,
-      status: input.status ?? "active",
+      status: input.status ?? HabitStatus.active,
     })
     .returning()
     .all();
@@ -50,10 +52,10 @@ export function listHabits(db: DB, agentId?: string): Habit[] {
 
 interface UpdateHabitInput {
   name?: string;
-  schedule?: string;
-  cronExpr?: string;
-  status?: "active" | "paused";
-  nextRun?: Date;
+  schedule?: string | null;
+  cronExpr?: string | null;
+  status?: HabitStatusT;
+  nextRun?: Date | null;
 }
 
 export function updateHabit(
@@ -61,13 +63,18 @@ export function updateHabit(
   id: string,
   updates: UpdateHabitInput,
 ): Habit {
-  const [habit] = db
+  const rows = db
     .update(habits)
     .set(updates)
     .where(eq(habits.id, id))
     .returning()
     .all();
-  return habit;
+
+  if (rows.length === 0) {
+    throw new Error(`Habit with id "${id}" not found`);
+  }
+
+  return rows[0];
 }
 
 // ── logHabitRun ────────────────────────────────────────────────────────────
@@ -83,27 +90,42 @@ export function logHabitRun(
   agentId: string,
   input: LogHabitRunInput,
 ): HabitRun {
-  const now = new Date();
+  return db.transaction((tx) => {
+    // Verify the habit exists and belongs to this agent
+    const habit = tx
+      .select()
+      .from(habits)
+      .where(and(eq(habits.id, habitId), eq(habits.agentId, agentId)))
+      .get();
 
-  const [run] = db
-    .insert(habitRuns)
-    .values({
-      id: crypto.randomUUID(),
-      habitId,
-      agentId,
-      ranAt: now,
-      success: input.success,
-      note: input.note ?? null,
-    })
-    .returning()
-    .all();
+    if (!habit) {
+      throw new Error(
+        `Habit "${habitId}" not found or does not belong to agent "${agentId}"`,
+      );
+    }
 
-  db.update(habits)
-    .set({ lastRun: now })
-    .where(eq(habits.id, habitId))
-    .run();
+    const now = new Date();
 
-  return run;
+    const [run] = tx
+      .insert(habitRuns)
+      .values({
+        id: crypto.randomUUID(),
+        habitId,
+        agentId,
+        ranAt: now,
+        success: input.success,
+        note: input.note ?? null,
+      })
+      .returning()
+      .all();
+
+    tx.update(habits)
+      .set({ lastRun: now })
+      .where(eq(habits.id, habitId))
+      .run();
+
+    return run;
+  });
 }
 
 // ── getHabitStreak ─────────────────────────────────────────────────────────
@@ -168,26 +190,59 @@ export function getHabitStreak(
 // ── logHeartbeat ───────────────────────────────────────────────────────────
 
 export function logHeartbeat(db: DB, agentId: string): HabitRun {
-  // Find existing heartbeat habit for this agent
-  let habit = db
-    .select()
-    .from(habits)
-    .where(
-      and(
-        eq(habits.agentId, agentId),
-        eq(habits.type, "heartbeat"),
-        eq(habits.name, "heartbeat"),
-      ),
-    )
-    .get();
+  return db.transaction((tx) => {
+    // Find existing heartbeat habit for this agent
+    let habit = tx
+      .select()
+      .from(habits)
+      .where(
+        and(
+          eq(habits.agentId, agentId),
+          eq(habits.type, HabitType.heartbeat),
+          eq(habits.name, "heartbeat"),
+        ),
+      )
+      .get();
 
-  // Auto-create if missing
-  if (!habit) {
-    habit = createHabit(db, agentId, {
-      name: "heartbeat",
-      type: "heartbeat",
-    });
-  }
+    // Auto-create if missing (atomic within this transaction)
+    if (!habit) {
+      const [created] = tx
+        .insert(habits)
+        .values({
+          id: crypto.randomUUID(),
+          agentId,
+          name: "heartbeat",
+          type: HabitType.heartbeat,
+          schedule: null,
+          cronExpr: null,
+          trigger: null,
+          status: HabitStatus.active,
+        })
+        .returning()
+        .all();
+      habit = created;
+    }
 
-  return logHabitRun(db, habit.id, agentId, { success: true });
+    const now = new Date();
+
+    const [run] = tx
+      .insert(habitRuns)
+      .values({
+        id: crypto.randomUUID(),
+        habitId: habit.id,
+        agentId,
+        ranAt: now,
+        success: true,
+        note: null,
+      })
+      .returning()
+      .all();
+
+    tx.update(habits)
+      .set({ lastRun: now })
+      .where(eq(habits.id, habit.id))
+      .run();
+
+    return run;
+  });
 }
