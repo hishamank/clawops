@@ -21,7 +21,7 @@ Target users: developers running multi-agent AI systems who need observability a
 
 ### Database
 - **SQLite** via **better-sqlite3** — synchronous driver (no async/await in DB calls)
-- **Drizzle ORM** — all queries go through Drizzle; no raw SQL except aggregations in `packages/analytics`
+- **Drizzle ORM** — all queries go through Drizzle; no raw SQL except aggregations in `packages/analytics` and migration files in `packages/core/src/migrate.ts`
 - Schema lives in `packages/core/src/schema.ts` — 11 tables: agents, habits, habitRuns, projects, milestones, tasks, artifacts, ideas, usageLogs, events, notifications
 
 ### CLI (`apps/cli`)
@@ -54,7 +54,7 @@ Target users: developers running multi-agent AI systems who need observability a
 
 ### Database
 - **Synchronous only** — better-sqlite3 is sync; never use `async/await` in `packages/*`
-- **Drizzle ORM only** — no raw SQL outside `packages/analytics` aggregations and `packages/core/src/migrate.ts`
+- **Drizzle ORM only** — no raw SQL outside: `packages/analytics` aggregations, `packages/core/src/migrate.ts`, or Drizzle `sql`...`` template expressions in schema column defaults
 - **Transactions required** for any function that performs 2+ DB writes — use `db.transaction()`
 - **Handle 0-row returns** — `.returning().all()` can return empty; always check and throw a typed not-found error
 - Never expose raw API keys — store hashed, return plaintext only at creation time
@@ -97,7 +97,8 @@ clawops/
 │   ├── ideas/        # Idea business logic
 │   ├── habits/       # Habit + heartbeat logic
 │   ├── notifications/# Notification logic
-│   └── analytics/    # Token/cost tracking
+│   ├── analytics/    # Token/cost tracking
+│   └── web/          # (placeholder package)
 ├── turbo.json        # Turborepo pipeline
 ├── tsconfig.base.json
 └── eslint.config.mjs
