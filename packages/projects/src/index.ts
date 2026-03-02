@@ -13,7 +13,7 @@ export async function createProject(
   db: DB,
   input: { name: string; description?: string; status?: ProjectStatus; prd?: string; ideaId?: string },
 ): Promise<Project> {
-  const [project] = await db
+  const project = await db
     .insert(projects)
     .values({
       name: input.name,
