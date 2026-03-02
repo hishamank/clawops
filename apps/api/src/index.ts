@@ -1,7 +1,6 @@
 import Fastify from "fastify";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
-import rateLimit from "@fastify/rate-limit";
 import { runMigrations } from "@clawops/core";
 import { authMiddleware } from "./auth.js";
 import { agentRoutes } from "./routes/agents.js";
@@ -10,20 +9,29 @@ import { habitRoutes } from "./routes/habits.js";
 const port = Number(process.env["PORT"] || 3001);
 const host = process.env["HOST"] || "0.0.0.0";
 
+// Simple in-memory rate limiter for auth checks (prevents brute force)
+const authAttempts = new Map<string, { count: number; resetAt: number }>();
+const AUTH_RATE_LIMIT = 20;
+const AUTH_WINDOW_MS = 60_000;
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = authAttempts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    authAttempts.set(ip, { count: 1, resetAt: now + AUTH_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= AUTH_RATE_LIMIT) return false;
+  entry.count++;
+  return true;
+}
+
 const app = Fastify({ logger: true });
 
 async function start(): Promise<void> {
   try {
     runMigrations();
     app.log.info("Migrations applied");
-
-    // Global rate limit — applied to all routes
-    await app.register(rateLimit, {
-      global: true,
-      max: 100,
-      timeWindow: "1 minute",
-      keyGenerator: (req) => req.ip,
-    });
 
     await app.register(swagger, {
       openapi: {
@@ -35,17 +43,11 @@ async function start(): Promise<void> {
       },
     });
 
-    await app.register(swaggerUi, {
-      routePrefix: "/docs",
-    });
+    await app.register(swaggerUi, { routePrefix: "/docs" });
 
-    // Public routes — no auth required
-    app.get("/health", {
-      config: { rateLimit: { max: 60, timeWindow: "1 minute" } },
-      handler: async () => ({ status: "ok" }),
-    });
+    app.get("/health", async () => ({ status: "ok" }));
 
-    // Auth middleware — skip /health, /auth/*, and /docs
+    // Auth middleware with inline rate limiting to prevent brute force
     app.addHook("onRequest", async (request, reply) => {
       const pathname = request.url.split("?")[0];
       if (
@@ -55,10 +57,15 @@ async function start(): Promise<void> {
       ) {
         return;
       }
+      // Rate limit before authorization check
+      const ip = request.ip;
+      if (!checkRateLimit(ip)) {
+        await reply.status(429).send({ error: "Too many requests" });
+        return;
+      }
       await authMiddleware(request, reply);
     });
 
-    // Protected routes (rate limited globally above)
     await app.register(agentRoutes, { prefix: "/agents" });
     await app.register(habitRoutes, { prefix: "/habits" });
 
