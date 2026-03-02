@@ -15,7 +15,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "clean": "rm -rf dist",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "test": "echo \"No tests yet\""
   },
   "dependencies": {
     "better-sqlite3": "^11.7.0",

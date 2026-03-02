@@ -6,7 +6,8 @@
     "build": "next build",
     "dev": "next dev --port 3000",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf .next out"
+    "clean": "rm -rf .next out",
+    "test": "echo \"No tests yet\""
   },
   "dependencies": {
     "@clawops/core": "workspace:*",
