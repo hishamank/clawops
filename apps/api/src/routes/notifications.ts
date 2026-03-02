@@ -37,6 +37,18 @@ function writeEvent(
 
 // ── Plugin ─────────────────────────────────────────────────────────────────
 
+/**
+ * Fastify plugin that registers notification routes.
+ *
+ * Routes:
+ * - `GET   /notifications` — List notifications, optionally filtered by read status.
+ * - `PATCH /notifications/:id/read` — Mark a single notification as read.
+ * - `PATCH /notifications/read-all` — Mark all notifications as read.
+ *
+ * All mutating endpoints write audit events decorated with `req.agentId`.
+ *
+ * @param app - The Fastify instance to register routes on.
+ */
 export async function notificationRoutes(app: FastifyInstance): Promise<void> {
   // GET /notifications
   app.get(

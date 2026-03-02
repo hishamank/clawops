@@ -48,6 +48,19 @@ function writeEvent(
 
 // ── Plugin ─────────────────────────────────────────────────────────────────
 
+/**
+ * Fastify plugin that registers CRUD routes for project management.
+ *
+ * Routes:
+ * - `POST /projects` — Create a new project (writes audit event inside a transaction).
+ * - `GET  /projects` — List all projects.
+ * - `GET  /projects/:id` — Get a single project with its milestones and task count.
+ * - `PATCH /projects/:id` — Update a project (writes audit event inside a transaction).
+ *
+ * All mutating endpoints decorate the audit event with `req.agentId` when present.
+ *
+ * @param app - The Fastify instance to register routes on.
+ */
 export async function projectRoutes(app: FastifyInstance): Promise<void> {
   // POST /projects
   app.post(

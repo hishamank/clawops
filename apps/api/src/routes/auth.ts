@@ -12,6 +12,15 @@ const loginBody = z.object({
 
 // ── Plugin ─────────────────────────────────────────────────────────────────
 
+/**
+ * Fastify plugin that registers authentication routes.
+ *
+ * Routes:
+ * - `POST /auth/login` — Authenticate with an API key. Returns agent profile on success, 401 on failure.
+ * - `POST /auth/logout` — Stateless logout (always returns 200). Writes an audit event if `req.agentId` is set.
+ *
+ * @param app - The Fastify instance to register routes on.
+ */
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   // POST /auth/login
   app.post(

@@ -18,6 +18,16 @@ interface TokenSummary {
   count: number;
 }
 
+/**
+ * Aggregate token usage and cost across usage logs.
+ *
+ * Builds a dynamic WHERE clause from the supplied filters (agentId, model,
+ * date range) and returns summed totals for tokens in/out, cost, and row count.
+ *
+ * @param db - Drizzle database handle.
+ * @param filters - Optional filters to narrow the aggregation.
+ * @returns A summary with `totalIn`, `totalOut`, `totalCost`, and `count`.
+ */
 export function getTokenSummary(db: DB, filters: TokenFilters): TokenSummary {
   const conditions: SQL[] = [];
 
@@ -65,6 +75,12 @@ interface CostByGroup {
   count: number;
 }
 
+/**
+ * Aggregate usage costs grouped by agent ID.
+ *
+ * @param db - Drizzle database handle.
+ * @returns An array of cost summaries, one per agent.
+ */
 export function getCostsByAgent(db: DB): CostByGroup[] {
   const rows = db
     .select({
@@ -87,6 +103,12 @@ export function getCostsByAgent(db: DB): CostByGroup[] {
   }));
 }
 
+/**
+ * Aggregate usage costs grouped by model name.
+ *
+ * @param db - Drizzle database handle.
+ * @returns An array of cost summaries, one per model.
+ */
 export function getCostsByModel(db: DB): CostByGroup[] {
   const rows = db
     .select({
@@ -109,6 +131,14 @@ export function getCostsByModel(db: DB): CostByGroup[] {
   }));
 }
 
+/**
+ * Aggregate usage costs grouped by project ID (via a join on tasks).
+ *
+ * Usage logs without an associated task/project are grouped as `"unassigned"`.
+ *
+ * @param db - Drizzle database handle.
+ * @returns An array of cost summaries, one per project.
+ */
 export function getCostsByProject(db: DB): CostByGroup[] {
   const rows = db
     .select({
