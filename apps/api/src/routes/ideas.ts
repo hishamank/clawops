@@ -3,10 +3,10 @@ import { z } from "zod";
 import { db, events } from "@clawops/core";
 import type { DB } from "@clawops/core";
 import { createIdea, listIdeas, promoteIdeaToProject } from "@clawops/ideas";
-import { IdeaStatus } from "@clawops/domain";
+import { IdeaStatus, Source, NotFoundError, ConflictError } from "@clawops/domain";
 
 const ideaStatusEnum = z.nativeEnum(IdeaStatus);
-const ideaSourceEnum = z.enum(["human", "agent"] as const);
+const ideaSourceEnum = z.enum([Source.human, Source.agent]);
 
 // ── Schemas ────────────────────────────────────────────────────────────────
 
@@ -132,19 +132,21 @@ export async function ideaRoutes(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       const { id } = idParams.parse(req.params);
       try {
-        const result = promoteIdeaToProject(db, id);
-        writeEvent(db, "idea.promoted", "idea", result.idea.id, {
-          projectId: result.project.id,
-        });
-        writeEvent(db, "project.created", "project", result.project.id, {
-          name: result.project.name,
-          ideaId: result.idea.id,
+        const result = inTransaction(() => {
+          const r = promoteIdeaToProject(db, id);
+          writeEvent(db, "idea.promoted", "idea", r.idea.id, {
+            projectId: r.project.id,
+          });
+          writeEvent(db, "project.created", "project", r.project.id, {
+            name: r.project.name,
+            ideaId: r.idea.id,
+          });
+          return r;
         });
         return result;
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "";
-        if (msg.includes("not found")) return reply.code(404).send({ error: msg });
-        if (msg.includes("already promoted")) return reply.code(409).send({ error: msg });
+        if (err instanceof NotFoundError) return reply.code(404).send({ error: err.message, code: err.code });
+        if (err instanceof ConflictError) return reply.code(409).send({ error: err.message, code: err.code });
         throw err;
       }
     },
