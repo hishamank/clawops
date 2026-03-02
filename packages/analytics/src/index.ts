@@ -54,6 +54,17 @@ interface DailySpend {
 
 // ── logUsage ────────────────────────────────────────────────────────────────
 
+/**
+ * Inserts a usage log entry for an agent's model invocation.
+ *
+ * Calculates the cost from the model pricing table and persists the record.
+ * Throws if the insert fails to return a row.
+ *
+ * @param db - Drizzle database instance.
+ * @param input - Token counts, model identifier, and agent/task context.
+ * @returns The newly created {@link UsageLog} row.
+ * @throws {Error} If the insert does not produce a row.
+ */
 export function logUsage(db: DB, input: LogUsageInput): UsageLog {
   const cost = calcCost(input.model, input.tokensIn, input.tokensOut);
 
@@ -76,6 +87,14 @@ export function logUsage(db: DB, input: LogUsageInput): UsageLog {
 
 // ── getTokenStats ───────────────────────────────────────────────────────────
 
+/**
+ * Returns aggregate token and cost statistics, optionally filtered by
+ * agent, model, and/or date range.
+ *
+ * @param db - Drizzle database instance.
+ * @param filters - Optional filters for agent, model, and date range.
+ * @returns Aggregated {@link TokenStats} (zeros when no rows match).
+ */
 export function getTokenStats(
   db: DB,
   filters?: TokenStatsFilters,
@@ -113,6 +132,15 @@ export function getTokenStats(
 
 // ── getCostByAgent ──────────────────────────────────────────────────────────
 
+/**
+ * Returns total cost and token usage grouped by agent, ordered by
+ * descending cost. Optionally restricted to a date range.
+ *
+ * @param db - Drizzle database instance.
+ * @param from - Optional start of the date range (inclusive).
+ * @param to - Optional end of the date range (inclusive).
+ * @returns Array of {@link CostByAgent} rows.
+ */
 export function getCostByAgent(
   db: DB,
   from?: Date,
@@ -144,6 +172,15 @@ export function getCostByAgent(
 
 // ── getCostByModel ──────────────────────────────────────────────────────────
 
+/**
+ * Returns total cost and token usage grouped by model name, ordered by
+ * descending cost. Optionally restricted to a date range.
+ *
+ * @param db - Drizzle database instance.
+ * @param from - Optional start of the date range (inclusive).
+ * @param to - Optional end of the date range (inclusive).
+ * @returns Array of {@link CostByModel} rows.
+ */
 export function getCostByModel(
   db: DB,
   from?: Date,
@@ -175,6 +212,16 @@ export function getCostByModel(
 
 // ── getCostByProject ────────────────────────────────────────────────────────
 
+/**
+ * Returns total cost and token usage grouped by project. Uses a left join
+ * from usage logs to tasks so that logs without an associated task appear
+ * with a `null` projectId.
+ *
+ * @param db - Drizzle database instance.
+ * @param from - Optional start of the date range (inclusive).
+ * @param to - Optional end of the date range (inclusive).
+ * @returns Array of {@link CostByProject} rows.
+ */
 export function getCostByProject(
   db: DB,
   from?: Date,
@@ -207,6 +254,16 @@ export function getCostByProject(
 
 // ── getDailySpend ───────────────────────────────────────────────────────────
 
+/**
+ * Returns daily spend and token totals for every day in the given range,
+ * filling gaps with zero-valued entries so the caller always receives a
+ * contiguous series of dates.
+ *
+ * @param db - Drizzle database instance.
+ * @param from - Start of the date range (inclusive, truncated to UTC midnight).
+ * @param to - End of the date range (inclusive, truncated to UTC midnight).
+ * @returns Array of {@link DailySpend} rows, one per calendar day.
+ */
 export function getDailySpend(
   db: DB,
   from: Date,
