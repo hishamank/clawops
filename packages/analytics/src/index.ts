@@ -1,4 +1,4 @@
-import { sql, eq, and, gte, lte, count } from "drizzle-orm";
+import { sql, eq, and, gte, lte, count, type SQL } from "drizzle-orm";
 import type { DB, UsageLog } from "@clawops/core";
 import { usageLogs, tasks } from "@clawops/core";
 import { calcCost } from "@clawops/domain";
@@ -80,7 +80,7 @@ export function getTokenStats(
   db: DB,
   filters?: TokenStatsFilters,
 ): TokenStats {
-  const conditions = [];
+  const conditions: SQL[] = [];
 
   if (filters?.agentId) {
     conditions.push(eq(usageLogs.agentId, filters.agentId));
@@ -118,7 +118,7 @@ export function getCostByAgent(
   from?: Date,
   to?: Date,
 ): CostByAgent[] {
-  const conditions = [];
+  const conditions: SQL[] = [];
 
   if (from) {
     conditions.push(gte(usageLogs.createdAt, from));
@@ -149,7 +149,7 @@ export function getCostByModel(
   from?: Date,
   to?: Date,
 ): CostByModel[] {
-  const conditions = [];
+  const conditions: SQL[] = [];
 
   if (from) {
     conditions.push(gte(usageLogs.createdAt, from));
@@ -180,7 +180,7 @@ export function getCostByProject(
   from?: Date,
   to?: Date,
 ): CostByProject[] {
-  const conditions = [];
+  const conditions: SQL[] = [];
 
   if (from) {
     conditions.push(gte(usageLogs.createdAt, from));
