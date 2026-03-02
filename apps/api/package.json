@@ -16,6 +16,7 @@
     "@clawops/core": "workspace:*",
     "@clawops/domain": "workspace:^",
     "@clawops/habits": "workspace:^",
+    "@fastify/rate-limit": "^10.3.0",
     "@fastify/swagger": "^9.7.0",
     "@fastify/swagger-ui": "^5.2.5",
     "fastify": "^5.2.0",

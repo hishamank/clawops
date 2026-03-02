@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
+import rateLimit from "@fastify/rate-limit";
 import { runMigrations } from "@clawops/core";
 import { authMiddleware } from "./auth.js";
 import { agentRoutes } from "./routes/agents.js";
@@ -34,14 +35,21 @@ async function start(): Promise<void> {
       routePrefix: "/docs",
     });
 
-    // Auth middleware — skip /health and /docs
+    // Rate limit auth routes to prevent brute-force
+    await app.register(rateLimit, {
+      max: 20,
+      timeWindow: "1 minute",
+      keyGenerator: (req) => req.ip,
+      skipOnError: false,
+    });
+
+    // Auth middleware — skip /health, /auth/*, and /docs
     app.addHook("onRequest", async (request, reply) => {
-      const url = request.url;
+      const pathname = request.url.split("?")[0];
       if (
-        url === "/health" ||
-        url === "/auth" ||
-        url.startsWith("/docs") ||
-        url.startsWith("/docs/")
+        pathname === "/health" ||
+        pathname?.startsWith("/auth") ||
+        pathname?.startsWith("/docs")
       ) {
         return;
       }
