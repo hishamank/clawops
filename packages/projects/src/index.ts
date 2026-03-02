@@ -9,11 +9,9 @@ import {
 } from "@clawops/core";
 import type { ProjectStatus, MilestoneStatus } from "@clawops/domain";
 
-// ── Projects ─────────────────────────────────────────────────────────────────
-
 export function createProject(
   db: DB,
-  input: { name: string; description?: string; status?: ProjectStatus; prd?: string },
+  input: { name: string; description?: string; status?: ProjectStatus; prd?: string; ideaId?: string },
 ): Project {
   const project = db
     .insert(projects)
@@ -23,6 +21,7 @@ export function createProject(
       status: input.status ?? "planning",
       prd: input.prd ?? null,
       prdUpdatedAt: input.prd ? new Date() : null,
+      ideaId: input.ideaId ?? null,
     })
     .returning()
     .get();
