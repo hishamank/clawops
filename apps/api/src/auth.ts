@@ -9,6 +9,15 @@ declare module "fastify" {
   }
 }
 
+/**
+ * Fastify pre-handler that authenticates requests via API key.
+ *
+ * Reads the key from `x-api-key` header or `Authorization: Bearer <key>`,
+ * hashes it with scrypt, and resolves the owning agent. On success the
+ * authenticated agent's ID is attached as `request.agentId`.
+ *
+ * Responds with 401 if the key is missing or does not match any agent.
+ */
 export async function authMiddleware(
   request: FastifyRequest,
   reply: FastifyReply,

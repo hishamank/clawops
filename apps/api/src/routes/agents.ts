@@ -37,17 +37,32 @@ const skillsSchema = z.object({
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
+/** Return a copy of the agent with the `apiKey` field removed. */
 function stripApiKey(agent: Agent): Omit<Agent, "apiKey"> {
   const { apiKey: _key, ...rest } = agent;
   return rest;
 }
 
+/** Check whether an error is a domain "not found" error. */
 function isNotFoundError(err: unknown): boolean {
   return err instanceof Error && /not found/i.test(err.message);
 }
 
 // ── Routes ──────────────────────────────────────────────────────────────────
 
+/**
+ * Register all `/agents` routes on the given Fastify instance.
+ *
+ * Routes:
+ * - `POST /agents/register` – create a new agent (returns API key once).
+ * - `GET  /agents`          – list all agents (keys stripped).
+ * - `GET  /agents/:id`      – agent detail with recent tasks, habits & streaks.
+ * - `PATCH /agents/:id/status` – update agent status (auth-scoped).
+ * - `PATCH /agents/:id/skills` – update agent skills (auth-scoped).
+ * - `POST  /agents/:id/heartbeat` – record heartbeat (auth-scoped).
+ *
+ * Auth-scoped routes return 403 when `params.id !== request.agentId`.
+ */
 export async function agentRoutes(app: FastifyInstance): Promise<void> {
   // POST /agents/register
   app.post(

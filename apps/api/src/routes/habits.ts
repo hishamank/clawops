@@ -26,12 +26,23 @@ const habitRunSchema = z.object({
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
+/** Check whether an error is a domain "not found" error. */
 function isNotFoundError(err: unknown): boolean {
   return err instanceof Error && /not found/i.test(err.message);
 }
 
 // ── Routes ──────────────────────────────────────────────────────────────────
 
+/**
+ * Register all `/habits` routes on the given Fastify instance.
+ *
+ * Routes:
+ * - `POST /habits`       – create a habit for the authenticated agent.
+ * - `GET  /habits`       – list habits, optionally filtered by `agentId` query param.
+ * - `POST /habits/:id/run` – log a habit run for the authenticated agent.
+ *
+ * All mutating routes are scoped to the authenticated agent via `request.agentId`.
+ */
 export async function habitRoutes(app: FastifyInstance): Promise<void> {
   // POST /habits
   app.post(
