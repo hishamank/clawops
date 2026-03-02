@@ -5,7 +5,7 @@ import { hashApiKey } from "@clawops/domain";
 
 declare module "fastify" {
   interface FastifyRequest {
-    agentId: string;
+    agentId?: string;
   }
 }
 

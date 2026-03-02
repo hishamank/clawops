@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { db, events, tasks, eq, desc, type Agent } from "@clawops/core";
+import { db, events, tasks, eq, desc, type Agent, type DB } from "@clawops/core";
 import {
   createAgent,
   getAgent,
@@ -14,6 +14,8 @@ import crypto from "node:crypto";
 
 // ── Zod schemas ─────────────────────────────────────────────────────────────
 
+const paramsSchema = z.object({ id: z.string().min(1) });
+
 const registerSchema = z.object({
   name: z.string().min(1),
   model: z.string().min(1),
@@ -25,7 +27,7 @@ const registerSchema = z.object({
 });
 
 const statusSchema = z.object({
-  status: z.enum(["online", "idle", "busy", "offline"]),
+  status: z.nativeEnum(AgentStatus),
   message: z.string().optional(),
 });
 
@@ -38,6 +40,10 @@ const skillsSchema = z.object({
 function stripApiKey(agent: Agent): Omit<Agent, "apiKey"> {
   const { apiKey: _key, ...rest } = agent;
   return rest;
+}
+
+function isNotFoundError(err: unknown): boolean {
+  return err instanceof Error && /not found/i.test(err.message);
 }
 
 // ── Routes ──────────────────────────────────────────────────────────────────
@@ -73,19 +79,23 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
           .send({ error: parsed.error.message, code: "VALIDATION_ERROR" });
       }
 
-      const result = createAgent(db, parsed.data);
+      const result = db.transaction((tx) => {
+        const agent = createAgent(tx as unknown as DB, parsed.data);
 
-      db.insert(events)
-        .values({
-          id: crypto.randomUUID(),
-          agentId: result.id,
-          action: "agent.registered",
-          entityType: "agent",
-          entityId: result.id,
-          meta: JSON.stringify({ name: result.name }),
-          createdAt: new Date(),
-        })
-        .run();
+        tx.insert(events)
+          .values({
+            id: crypto.randomUUID(),
+            agentId: agent.id,
+            action: "agent.registered",
+            entityType: "agent",
+            entityId: agent.id,
+            meta: JSON.stringify({ name: agent.name }),
+            createdAt: new Date(),
+          })
+          .run();
+
+        return agent;
+      });
 
       return reply.code(201).send({
         ...stripApiKey(result),
@@ -123,7 +133,14 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (request, reply) => {
-      const agent = getAgent(db, request.params.id);
+      const params = paramsSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply
+          .code(400)
+          .send({ error: params.error.message, code: "VALIDATION_ERROR" });
+      }
+
+      const agent = getAgent(db, params.data.id);
       if (!agent) {
         return reply
           .code(404)
@@ -173,7 +190,7 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
           properties: {
             status: {
               type: "string",
-              enum: ["online", "idle", "busy", "offline"],
+              enum: Object.values(AgentStatus),
             },
             message: { type: "string" },
           },
@@ -181,6 +198,19 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (request, reply) => {
+      const params = paramsSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply
+          .code(400)
+          .send({ error: params.error.message, code: "VALIDATION_ERROR" });
+      }
+
+      if (params.data.id !== request.agentId) {
+        return reply
+          .code(403)
+          .send({ error: "Forbidden", code: "FORBIDDEN" });
+      }
+
       const parsed = statusSchema.safeParse(request.body);
       if (!parsed.success) {
         return reply
@@ -189,30 +219,37 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
       }
 
       try {
-        const agent = updateAgentStatus(
-          db,
-          request.params.id,
-          parsed.data.status as AgentStatus,
-          parsed.data.message,
-        );
+        const agent = db.transaction((tx) => {
+          const a = updateAgentStatus(
+            tx as unknown as DB,
+            params.data.id,
+            parsed.data.status,
+            parsed.data.message,
+          );
 
-        db.insert(events)
-          .values({
-            id: crypto.randomUUID(),
-            agentId: agent.id,
-            action: "agent.status_updated",
-            entityType: "agent",
-            entityId: agent.id,
-            meta: JSON.stringify({ status: parsed.data.status }),
-            createdAt: new Date(),
-          })
-          .run();
+          tx.insert(events)
+            .values({
+              id: crypto.randomUUID(),
+              agentId: a.id,
+              action: "agent.status_updated",
+              entityType: "agent",
+              entityId: a.id,
+              meta: JSON.stringify({ status: parsed.data.status }),
+              createdAt: new Date(),
+            })
+            .run();
+
+          return a;
+        });
 
         return stripApiKey(agent);
-      } catch {
-        return reply
-          .code(404)
-          .send({ error: "Agent not found", code: "NOT_FOUND" });
+      } catch (err) {
+        if (isNotFoundError(err)) {
+          return reply
+            .code(404)
+            .send({ error: "Agent not found", code: "NOT_FOUND" });
+        }
+        throw err;
       }
     },
   );
@@ -239,6 +276,19 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (request, reply) => {
+      const params = paramsSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply
+          .code(400)
+          .send({ error: params.error.message, code: "VALIDATION_ERROR" });
+      }
+
+      if (params.data.id !== request.agentId) {
+        return reply
+          .code(403)
+          .send({ error: "Forbidden", code: "FORBIDDEN" });
+      }
+
       const parsed = skillsSchema.safeParse(request.body);
       if (!parsed.success) {
         return reply
@@ -247,29 +297,32 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
       }
 
       try {
-        const agent = updateAgentSkills(
-          db,
-          request.params.id,
-          parsed.data.skills,
-        );
+        const agent = db.transaction((tx) => {
+          const a = updateAgentSkills(tx as unknown as DB, params.data.id, parsed.data.skills);
 
-        db.insert(events)
-          .values({
-            id: crypto.randomUUID(),
-            agentId: agent.id,
-            action: "agent.skills_updated",
-            entityType: "agent",
-            entityId: agent.id,
-            meta: JSON.stringify({ skills: parsed.data.skills }),
-            createdAt: new Date(),
-          })
-          .run();
+          tx.insert(events)
+            .values({
+              id: crypto.randomUUID(),
+              agentId: a.id,
+              action: "agent.skills_updated",
+              entityType: "agent",
+              entityId: a.id,
+              meta: JSON.stringify({ skills: parsed.data.skills }),
+              createdAt: new Date(),
+            })
+            .run();
+
+          return a;
+        });
 
         return stripApiKey(agent);
-      } catch {
-        return reply
-          .code(404)
-          .send({ error: "Agent not found", code: "NOT_FOUND" });
+      } catch (err) {
+        if (isNotFoundError(err)) {
+          return reply
+            .code(404)
+            .send({ error: "Agent not found", code: "NOT_FOUND" });
+        }
+        throw err;
       }
     },
   );
@@ -289,28 +342,45 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (request, reply) => {
-      const agent = getAgent(db, request.params.id);
+      const params = paramsSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply
+          .code(400)
+          .send({ error: params.error.message, code: "VALIDATION_ERROR" });
+      }
+
+      if (params.data.id !== request.agentId) {
+        return reply
+          .code(403)
+          .send({ error: "Forbidden", code: "FORBIDDEN" });
+      }
+
+      const agent = getAgent(db, params.data.id);
       if (!agent) {
         return reply
           .code(404)
           .send({ error: "Agent not found", code: "NOT_FOUND" });
       }
 
-      const run = logHeartbeat(db, agent.id);
+      const run = db.transaction((tx) => {
+        const r = logHeartbeat(tx as unknown as DB, agent.id);
 
-      updateAgentStatus(db, agent.id, AgentStatus.online);
+        updateAgentStatus(tx as unknown as DB, agent.id, AgentStatus.online);
 
-      db.insert(events)
-        .values({
-          id: crypto.randomUUID(),
-          agentId: agent.id,
-          action: "agent.heartbeat",
-          entityType: "agent",
-          entityId: agent.id,
-          meta: JSON.stringify({ habitRunId: run.id }),
-          createdAt: new Date(),
-        })
-        .run();
+        tx.insert(events)
+          .values({
+            id: crypto.randomUUID(),
+            agentId: agent.id,
+            action: "agent.heartbeat",
+            entityType: "agent",
+            entityId: agent.id,
+            meta: JSON.stringify({ habitRunId: r.id }),
+            createdAt: new Date(),
+          })
+          .run();
+
+        return r;
+      });
 
       return reply.code(201).send(run);
     },

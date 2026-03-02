@@ -1,34 +1,34 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { db, events } from "@clawops/core";
+import { db, events, type DB } from "@clawops/core";
 import { createHabit, listHabits, logHabitRun } from "@clawops/habits";
 import { getAgent } from "@clawops/agents";
+import { HabitType, HabitStatus } from "@clawops/domain";
 import crypto from "node:crypto";
 
 // ── Zod schemas ─────────────────────────────────────────────────────────────
 
+const paramsSchema = z.object({ id: z.string().min(1) });
+
 const createHabitSchema = z.object({
-  agentId: z.string().min(1),
   name: z.string().min(1),
-  type: z.enum([
-    "heartbeat",
-    "scheduled",
-    "cron",
-    "hook",
-    "watchdog",
-    "polling",
-  ]),
+  type: z.nativeEnum(HabitType),
   schedule: z.string().optional(),
   cronExpr: z.string().optional(),
   trigger: z.string().optional(),
-  status: z.enum(["active", "paused"]).optional(),
+  status: z.nativeEnum(HabitStatus).optional(),
 });
 
 const habitRunSchema = z.object({
-  agentId: z.string().min(1),
   success: z.boolean(),
   note: z.string().optional(),
 });
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function isNotFoundError(err: unknown): boolean {
+  return err instanceof Error && /not found/i.test(err.message);
+}
 
 // ── Routes ──────────────────────────────────────────────────────────────────
 
@@ -42,25 +42,17 @@ export async function habitRoutes(app: FastifyInstance): Promise<void> {
         summary: "Create a habit",
         body: {
           type: "object",
-          required: ["agentId", "name", "type"],
+          required: ["name", "type"],
           properties: {
-            agentId: { type: "string" },
             name: { type: "string" },
             type: {
               type: "string",
-              enum: [
-                "heartbeat",
-                "scheduled",
-                "cron",
-                "hook",
-                "watchdog",
-                "polling",
-              ],
+              enum: Object.values(HabitType),
             },
             schedule: { type: "string" },
             cronExpr: { type: "string" },
             trigger: { type: "string" },
-            status: { type: "string", enum: ["active", "paused"] },
+            status: { type: "string", enum: Object.values(HabitStatus) },
           },
         },
       },
@@ -73,7 +65,7 @@ export async function habitRoutes(app: FastifyInstance): Promise<void> {
           .send({ error: parsed.error.message, code: "VALIDATION_ERROR" });
       }
 
-      const { agentId, ...input } = parsed.data;
+      const agentId = request.agentId!;
 
       const agent = getAgent(db, agentId);
       if (!agent) {
@@ -82,19 +74,23 @@ export async function habitRoutes(app: FastifyInstance): Promise<void> {
           .send({ error: "Agent not found", code: "NOT_FOUND" });
       }
 
-      const habit = createHabit(db, agentId, input);
+      const habit = db.transaction((tx) => {
+        const h = createHabit(tx as unknown as DB, agentId, parsed.data);
 
-      db.insert(events)
-        .values({
-          id: crypto.randomUUID(),
-          agentId,
-          action: "habit.created",
-          entityType: "habit",
-          entityId: habit.id,
-          meta: JSON.stringify({ name: habit.name, type: habit.type }),
-          createdAt: new Date(),
-        })
-        .run();
+        tx.insert(events)
+          .values({
+            id: crypto.randomUUID(),
+            agentId,
+            action: "habit.created",
+            entityType: "habit",
+            entityId: h.id,
+            meta: JSON.stringify({ name: h.name, type: h.type }),
+            createdAt: new Date(),
+          })
+          .run();
+
+        return h;
+      });
 
       return reply.code(201).send(habit);
     },
@@ -134,9 +130,8 @@ export async function habitRoutes(app: FastifyInstance): Promise<void> {
         },
         body: {
           type: "object",
-          required: ["agentId", "success"],
+          required: ["success"],
           properties: {
-            agentId: { type: "string" },
             success: { type: "boolean" },
             note: { type: "string" },
           },
@@ -144,6 +139,13 @@ export async function habitRoutes(app: FastifyInstance): Promise<void> {
       },
     },
     async (request, reply) => {
+      const params = paramsSchema.safeParse(request.params);
+      if (!params.success) {
+        return reply
+          .code(400)
+          .send({ error: params.error.message, code: "VALIDATION_ERROR" });
+      }
+
       const parsed = habitRunSchema.safeParse(request.body);
       if (!parsed.success) {
         return reply
@@ -151,35 +153,44 @@ export async function habitRoutes(app: FastifyInstance): Promise<void> {
           .send({ error: parsed.error.message, code: "VALIDATION_ERROR" });
       }
 
+      const agentId = request.agentId!;
+
       try {
-        const run = logHabitRun(db, request.params.id, parsed.data.agentId, {
-          success: parsed.data.success,
-          note: parsed.data.note,
+        const run = db.transaction((tx) => {
+          const r = logHabitRun(tx as unknown as DB, params.data.id, agentId, {
+            success: parsed.data.success,
+            note: parsed.data.note,
+          });
+
+          tx.insert(events)
+            .values({
+              id: crypto.randomUUID(),
+              agentId,
+              action: "habit.run_logged",
+              entityType: "habitRun",
+              entityId: r.id,
+              meta: JSON.stringify({
+                habitId: params.data.id,
+                success: parsed.data.success,
+              }),
+              createdAt: new Date(),
+            })
+            .run();
+
+          return r;
         });
 
-        db.insert(events)
-          .values({
-            id: crypto.randomUUID(),
-            agentId: parsed.data.agentId,
-            action: "habit.run_logged",
-            entityType: "habitRun",
-            entityId: run.id,
-            meta: JSON.stringify({
-              habitId: request.params.id,
-              success: parsed.data.success,
-            }),
-            createdAt: new Date(),
-          })
-          .run();
-
         return reply.code(201).send(run);
-      } catch {
-        return reply
-          .code(404)
-          .send({
-            error: "Habit not found or does not belong to agent",
-            code: "NOT_FOUND",
-          });
+      } catch (err) {
+        if (isNotFoundError(err)) {
+          return reply
+            .code(404)
+            .send({
+              error: "Habit not found or does not belong to agent",
+              code: "NOT_FOUND",
+            });
+        }
+        throw err;
       }
     },
   );

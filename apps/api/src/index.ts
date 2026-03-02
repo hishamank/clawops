@@ -39,6 +39,7 @@ async function start(): Promise<void> {
       const url = request.url;
       if (
         url === "/health" ||
+        url === "/auth" ||
         url.startsWith("/docs") ||
         url.startsWith("/docs/")
       ) {
