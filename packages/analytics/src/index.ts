@@ -1,4 +1,4 @@
-import { sql, eq, and, gte, lte, sum, count } from "drizzle-orm";
+import { sql, eq, and, gte, lte, count } from "drizzle-orm";
 import type { DB, UsageLog } from "@clawops/core";
 import { usageLogs, tasks } from "@clawops/core";
 import { calcCost } from "@clawops/domain";

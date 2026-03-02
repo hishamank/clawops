@@ -1,0 +1,32 @@
+Fix Copilot review issues on PR #42 for packages/analytics.
+
+Branch: feat/gemini/issue-20
+File: packages/analytics/src/index.ts
+
+## Issues to fix
+
+1. **Raw SQL via db.$client** — 4 functions use raw SQL instead of Drizzle. Rewrite ALL of them using Drizzle's query builder with `sql` template tag for aggregations:
+   - `getTokenStats` — use Drizzle select with sql`SUM(...)` for aggregates
+   - `getCostByAgent` — use Drizzle groupBy + orderBy + sql`SUM(...)`
+   - `getCostByModel` — same pattern
+   - `getCostByProject` — use Drizzle join (usageLogs → tasks) + groupBy
+   - `getDailySpend` — use Drizzle with date bucketing via sql`strftime('%Y-%m-%d', ...)`
+
+2. **logUsage non-null assertion** — `.returning().all()` can return 0 rows. Replace `rows[0]!` with an explicit check:
+   ```ts
+   if (rows.length === 0) throw new Error('Failed to insert usageLog');
+   return rows[0];
+   ```
+
+3. **drizzle-orm unused dep in package.json** — Remove it. The package imports Drizzle through @clawops/core already.
+
+## Rules
+- Import `sql` from `drizzle-orm` (re-exported from @clawops/core) for aggregate expressions
+- All functions stay synchronous
+- No any types
+- pnpm typecheck must pass after changes
+
+## When done
+1. git add -A && git commit -m "fix(analytics): use Drizzle for all queries, remove raw SQL, fix non-null assert (#20)"
+2. git push
+3. Run: openclaw system event --text "Done: PR 42 analytics fixes complete" --mode now
