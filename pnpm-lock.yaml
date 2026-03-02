@@ -144,6 +144,15 @@ importers:
       '@clawops/core':
         specifier: workspace:*
         version: link:../core
+      '@clawops/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@clawops/projects':
+        specifier: workspace:*
+        version: link:../projects
+      drizzle-orm:
+        specifier: ^0.38.0
+        version: 0.38.4(@types/better-sqlite3@7.6.13)(@types/react@19.2.14)(better-sqlite3@11.10.0)(react@19.2.4)
     devDependencies:
       typescript:
         specifier: ^5.7.0

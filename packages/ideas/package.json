@@ -10,7 +10,10 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@clawops/core": "workspace:*"
+    "@clawops/core": "workspace:*",
+    "@clawops/domain": "workspace:*",
+    "@clawops/projects": "workspace:*",
+    "drizzle-orm": "^0.38.0"
   },
   "devDependencies": {
     "typescript": "^5.7.0"
