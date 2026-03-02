@@ -33,19 +33,17 @@ function writeEvent(
   action: string,
   entityId: string,
   meta: Record<string, unknown>,
+  agentId?: string,
 ): void {
   dbHandle.insert(events)
     .values({
       action,
       entityType: "project",
       entityId,
+      agentId,
       meta: JSON.stringify(meta),
     })
     .run();
-}
-
-function inTransaction<T>(fn: () => T): T {
-  return db.$client.transaction(fn)();
 }
 
 // ── Plugin ─────────────────────────────────────────────────────────────────
@@ -74,9 +72,9 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
     },
     async (req, reply) => {
       const body = createProjectBody.parse(req.body);
-      const project = inTransaction(() => {
+      const project = db.transaction(() => {
         const p = createProject(db, body);
-        writeEvent(db, "project.created", p.id, { name: p.name });
+        writeEvent(db, "project.created", p.id, { name: p.name }, req.agentId);
         return p;
       });
       return reply.status(201).send(project);
@@ -168,9 +166,9 @@ export async function projectRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(404).send({ error: "Not found" });
       }
 
-      const project = inTransaction(() => {
+      const project = db.transaction(() => {
         const p = updateProject(db, id, body);
-        writeEvent(db, "project.updated", p.id, { fields: Object.keys(body) });
+        writeEvent(db, "project.updated", p.id, { fields: Object.keys(body) }, req.agentId);
         return p;
       });
       return project;

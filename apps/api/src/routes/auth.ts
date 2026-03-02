@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { db } from "@clawops/core";
+import { db, events } from "@clawops/core";
 import { getAgentByApiKey } from "@clawops/agents";
 import { hashApiKey } from "@clawops/domain";
 
@@ -43,6 +43,16 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       if (!agent) {
         return reply.status(401).send({ error: "Invalid API key", code: "UNAUTHORIZED" });
       }
+      db.insert(events)
+        .values({
+          action: "auth.login",
+          entityType: "agent",
+          entityId: agent.id,
+          agentId: agent.id,
+          meta: JSON.stringify({ name: agent.name }),
+        })
+        .run();
+
       return { id: agent.id, name: agent.name, model: agent.model, role: agent.role, status: agent.status };
     },
   );
@@ -62,7 +72,19 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         },
       },
     },
-    async () => {
+    async (req) => {
+      if (req.agentId) {
+        db.insert(events)
+          .values({
+            action: "auth.logout",
+            entityType: "agent",
+            entityId: req.agentId,
+            agentId: req.agentId,
+            meta: JSON.stringify({}),
+          })
+          .run();
+      }
+
       return { success: true };
     },
   );

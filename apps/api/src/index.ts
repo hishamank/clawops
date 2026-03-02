@@ -9,10 +9,18 @@ import { analyticsRoutes } from "./routes/analytics.js";
 import { notificationRoutes } from "./routes/notifications.js";
 import { authRoutes } from "./routes/auth.js";
 
+declare module "fastify" {
+  interface FastifyRequest {
+    agentId?: string;
+  }
+}
+
 const port = Number(process.env["PORT"] || 3001);
 const host = process.env["HOST"] || "0.0.0.0";
 
 const app = Fastify({ logger: true });
+
+app.decorateRequest("agentId", undefined);
 
 // ── Swagger ────────────────────────────────────────────────────────────────
 
@@ -40,12 +48,10 @@ await app.register(swaggerUi, { routePrefix: "/docs" });
 
 // ── Auth hook ──────────────────────────────────────────────────────────────
 
-const publicPrefixes = ["/health", "/auth/"];
-
 app.addHook("onRequest", async (req, reply) => {
   const path = req.url.split("?")[0];
 
-  if (publicPrefixes.some((prefix) => path === prefix || path.startsWith(prefix))) {
+  if (path === "/health" || path.startsWith("/auth/")) {
     return;
   }
 
@@ -59,6 +65,8 @@ app.addHook("onRequest", async (req, reply) => {
   if (!agent) {
     return reply.status(401).send({ error: "Invalid API key", code: "UNAUTHORIZED" });
   }
+
+  req.agentId = agent.id;
 });
 
 // ── Health ──────────────────────────────────────────────────────────────────

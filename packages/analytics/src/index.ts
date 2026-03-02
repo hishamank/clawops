@@ -1,4 +1,4 @@
-import { eq, and, gte, lte, sum, count } from "drizzle-orm";
+import { eq, and, gte, lte, sum, count, type SQL } from "drizzle-orm";
 import type { DB } from "@clawops/core";
 import { usageLogs, tasks } from "@clawops/core";
 
@@ -19,7 +19,7 @@ interface TokenSummary {
 }
 
 export function getTokenSummary(db: DB, filters: TokenFilters): TokenSummary {
-  const conditions = [];
+  const conditions: SQL[] = [];
 
   if (filters.agentId) {
     conditions.push(eq(usageLogs.agentId, filters.agentId));

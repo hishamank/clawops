@@ -22,19 +22,17 @@ function writeEvent(
   action: string,
   entityId: string,
   meta: Record<string, unknown>,
+  agentId?: string,
 ): void {
   dbHandle.insert(events)
     .values({
       action,
       entityType: "notification",
       entityId,
+      agentId,
       meta: JSON.stringify(meta),
     })
     .run();
-}
-
-function inTransaction<T>(fn: () => T): T {
-  return db.$client.transaction(fn)();
 }
 
 // ── Plugin ─────────────────────────────────────────────────────────────────
@@ -85,10 +83,10 @@ export async function notificationRoutes(app: FastifyInstance): Promise<void> {
     },
     async (req, reply) => {
       const { id } = idParams.parse(req.params);
-      const notification = inTransaction(() => {
+      const notification = db.transaction(() => {
         const n = markRead(db, id);
         if (!n) return null;
-        writeEvent(db, "notification.read", n.id, {});
+        writeEvent(db, "notification.read", n.id, {}, req.agentId);
         return n;
       });
       if (!notification) {
@@ -113,10 +111,10 @@ export async function notificationRoutes(app: FastifyInstance): Promise<void> {
         },
       },
     },
-    async () => {
-      inTransaction(() => {
+    async (req) => {
+      db.transaction(() => {
         markAllRead(db);
-        writeEvent(db, "notification.read-all", "all", {});
+        writeEvent(db, "notification.read-all", "all", {}, req.agentId);
       });
       return { success: true };
     },
