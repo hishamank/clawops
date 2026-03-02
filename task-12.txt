@@ -1,0 +1,45 @@
+You are a senior engineer working on ClawOps — an open source operations layer for AI agent teams.
+
+ISSUE #12: Monorepo scaffold and packages/core schema
+Branch: feat/claude/issue-12-scaffold
+Repo: https://github.com/hishamank/clawops
+
+## Context
+Read these files first before touching anything:
+- claude.md (project context, full data model, coding principles)
+- agents.md (how to work on this codebase)
+- packages/core/src/schema.ts (existing schema)
+- packages/core/package.json
+- tsconfig.base.json
+
+## Current state
+The monorepo structure already exists. The problem is pnpm typecheck fails on packages/core with missing module errors (better-sqlite3, drizzle-orm, node types). The deps ARE installed in node_modules.
+
+## Your job
+Fix everything needed so ALL of these pass:
+1. pnpm typecheck — zero errors across all packages
+2. apps/api starts and responds to GET /health (implement the health endpoint if missing)
+3. All 11 schema tables exist in packages/core/src/schema.ts matching the full data model in claude.md (agents, habits, habitRuns, projects, milestones, tasks, artifacts, ideas, usageLogs, events, notifications)
+4. All 8 packages scaffolded with proper package.json, tsconfig.json, and a minimal src/index.ts exporting a placeholder if empty
+
+## Deliverables checklist
+- [ ] tsconfig.json files correct in all packages (extends tsconfig.base.json, includes node types where needed)
+- [ ] packages/core/src/schema.ts has all 11 tables with exact fields from claude.md
+- [ ] packages/core/src/db.ts connects to SQLite in WAL mode
+- [ ] packages/core/src/migrate.ts runs migrations
+- [ ] packages/core/src/index.ts exports db, schema, and migrate
+- [ ] All other packages have package.json + tsconfig.json + src/index.ts
+- [ ] apps/api has GET /health returning { status: "ok", version: "0.1.0" }
+- [ ] apps/api/package.json has fastify + @fastify/swagger + @fastify/swagger-ui + zod as deps
+- [ ] pnpm typecheck passes with zero errors
+- [ ] pnpm install runs cleanly
+
+## Rules
+- TypeScript strict mode, no any
+- No raw SQL outside migration files
+- Follow all principles in claude.md
+
+## When completely done
+1. git add -A && git commit -m "chore: complete monorepo scaffold and packages/core schema (#12)"
+2. git push -u origin feat/claude/issue-12-scaffold
+3. Run: openclaw system event --text "Done: Issue 12 scaffold complete, typecheck passing, PR ready" --mode now
