@@ -8,15 +8,16 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "test": "echo \"No tests yet\""
   },
   "dependencies": {
     "@clawops/core": "workspace:*",
-    "@clawops/domain": "workspace:*"
+    "@clawops/domain": "workspace:*",
+    "drizzle-orm": "^0.38.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "drizzle-orm": "^0.38.0",
     "typescript": "^5.7.0"
   }
 }

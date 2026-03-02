@@ -11,7 +11,8 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "test": "echo \"No tests yet\""
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
