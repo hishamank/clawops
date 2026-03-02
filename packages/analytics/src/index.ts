@@ -1,5 +1,6 @@
+import { sql, eq, and, gte, lte, sum, count } from "drizzle-orm";
 import type { DB, UsageLog } from "@clawops/core";
-import { usageLogs } from "@clawops/core";
+import { usageLogs, tasks } from "@clawops/core";
 import { calcCost } from "@clawops/domain";
 
 // ── Input types ─────────────────────────────────────────────────────────────
@@ -69,7 +70,8 @@ export function logUsage(db: DB, input: LogUsageInput): UsageLog {
     .returning()
     .all();
 
-  return rows[0]!;
+  if (rows.length === 0) throw new Error("Failed to insert usageLog");
+  return rows[0];
 }
 
 // ── getTokenStats ───────────────────────────────────────────────────────────
@@ -78,38 +80,35 @@ export function getTokenStats(
   db: DB,
   filters?: TokenStatsFilters,
 ): TokenStats {
-  const conditions: string[] = [];
-  const params: unknown[] = [];
+  const conditions = [];
 
   if (filters?.agentId) {
-    conditions.push("agent_id = ?");
-    params.push(filters.agentId);
+    conditions.push(eq(usageLogs.agentId, filters.agentId));
   }
   if (filters?.model) {
-    conditions.push("model = ?");
-    params.push(filters.model);
+    conditions.push(eq(usageLogs.model, filters.model));
   }
   if (filters?.from) {
-    conditions.push("created_at >= ?");
-    params.push(Math.floor(filters.from.getTime() / 1000));
+    conditions.push(gte(usageLogs.createdAt, filters.from));
   }
   if (filters?.to) {
-    conditions.push("created_at <= ?");
-    params.push(Math.floor(filters.to.getTime() / 1000));
+    conditions.push(lte(usageLogs.createdAt, filters.to));
   }
 
-  const where =
-    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-  const query = `SELECT
-    COALESCE(SUM(tokens_in), 0) AS totalTokensIn,
-    COALESCE(SUM(tokens_out), 0) AS totalTokensOut,
-    COALESCE(SUM(cost), 0) AS totalCost,
-    COUNT(*) AS count
-  FROM usage_logs ${where}`;
+  const row = db
+    .select({
+      totalTokensIn: sql<number>`COALESCE(SUM(${usageLogs.tokensIn}), 0)`,
+      totalTokensOut: sql<number>`COALESCE(SUM(${usageLogs.tokensOut}), 0)`,
+      totalCost: sql<number>`COALESCE(SUM(${usageLogs.cost}), 0)`,
+      count: count(),
+    })
+    .from(usageLogs)
+    .where(where)
+    .get();
 
-  const row = db.$client.prepare(query).get(...params) as TokenStats;
-  return row;
+  return row ?? { totalTokensIn: 0, totalTokensOut: 0, totalCost: 0, count: 0 };
 }
 
 // ── getCostByAgent ──────────────────────────────────────────────────────────
@@ -119,30 +118,28 @@ export function getCostByAgent(
   from?: Date,
   to?: Date,
 ): CostByAgent[] {
-  const conditions: string[] = [];
-  const params: unknown[] = [];
+  const conditions = [];
 
   if (from) {
-    conditions.push("created_at >= ?");
-    params.push(Math.floor(from.getTime() / 1000));
+    conditions.push(gte(usageLogs.createdAt, from));
   }
   if (to) {
-    conditions.push("created_at <= ?");
-    params.push(Math.floor(to.getTime() / 1000));
+    conditions.push(lte(usageLogs.createdAt, to));
   }
 
-  const where =
-    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-  const query = `SELECT
-    agent_id AS agentId,
-    COALESCE(SUM(cost), 0) AS totalCost,
-    COALESCE(SUM(tokens_in + tokens_out), 0) AS totalTokens
-  FROM usage_logs ${where}
-  GROUP BY agent_id
-  ORDER BY totalCost DESC`;
-
-  return db.$client.prepare(query).all(...params) as CostByAgent[];
+  return db
+    .select({
+      agentId: usageLogs.agentId,
+      totalCost: sql<number>`COALESCE(SUM(${usageLogs.cost}), 0)`,
+      totalTokens: sql<number>`COALESCE(SUM(${usageLogs.tokensIn} + ${usageLogs.tokensOut}), 0)`,
+    })
+    .from(usageLogs)
+    .where(where)
+    .groupBy(usageLogs.agentId)
+    .orderBy(sql`SUM(${usageLogs.cost}) DESC`)
+    .all();
 }
 
 // ── getCostByModel ──────────────────────────────────────────────────────────
@@ -152,30 +149,28 @@ export function getCostByModel(
   from?: Date,
   to?: Date,
 ): CostByModel[] {
-  const conditions: string[] = [];
-  const params: unknown[] = [];
+  const conditions = [];
 
   if (from) {
-    conditions.push("created_at >= ?");
-    params.push(Math.floor(from.getTime() / 1000));
+    conditions.push(gte(usageLogs.createdAt, from));
   }
   if (to) {
-    conditions.push("created_at <= ?");
-    params.push(Math.floor(to.getTime() / 1000));
+    conditions.push(lte(usageLogs.createdAt, to));
   }
 
-  const where =
-    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-  const query = `SELECT
-    model,
-    COALESCE(SUM(cost), 0) AS totalCost,
-    COALESCE(SUM(tokens_in + tokens_out), 0) AS totalTokens
-  FROM usage_logs ${where}
-  GROUP BY model
-  ORDER BY totalCost DESC`;
-
-  return db.$client.prepare(query).all(...params) as CostByModel[];
+  return db
+    .select({
+      model: usageLogs.model,
+      totalCost: sql<number>`COALESCE(SUM(${usageLogs.cost}), 0)`,
+      totalTokens: sql<number>`COALESCE(SUM(${usageLogs.tokensIn} + ${usageLogs.tokensOut}), 0)`,
+    })
+    .from(usageLogs)
+    .where(where)
+    .groupBy(usageLogs.model)
+    .orderBy(sql`SUM(${usageLogs.cost}) DESC`)
+    .all();
 }
 
 // ── getCostByProject ────────────────────────────────────────────────────────
@@ -185,32 +180,29 @@ export function getCostByProject(
   from?: Date,
   to?: Date,
 ): CostByProject[] {
-  const conditions: string[] = [];
-  const params: unknown[] = [];
+  const conditions = [];
 
   if (from) {
-    conditions.push("u.created_at >= ?");
-    params.push(Math.floor(from.getTime() / 1000));
+    conditions.push(gte(usageLogs.createdAt, from));
   }
   if (to) {
-    conditions.push("u.created_at <= ?");
-    params.push(Math.floor(to.getTime() / 1000));
+    conditions.push(lte(usageLogs.createdAt, to));
   }
 
-  const where =
-    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-  const query = `SELECT
-    t.project_id AS projectId,
-    COALESCE(SUM(u.cost), 0) AS totalCost,
-    COALESCE(SUM(u.tokens_in + u.tokens_out), 0) AS totalTokens
-  FROM usage_logs u
-  LEFT JOIN tasks t ON u.task_id = t.id
-  ${where}
-  GROUP BY t.project_id
-  ORDER BY totalCost DESC`;
-
-  return db.$client.prepare(query).all(...params) as CostByProject[];
+  return db
+    .select({
+      projectId: tasks.projectId,
+      totalCost: sql<number>`COALESCE(SUM(${usageLogs.cost}), 0)`,
+      totalTokens: sql<number>`COALESCE(SUM(${usageLogs.tokensIn} + ${usageLogs.tokensOut}), 0)`,
+    })
+    .from(usageLogs)
+    .leftJoin(tasks, eq(usageLogs.taskId, tasks.id))
+    .where(where)
+    .groupBy(tasks.projectId)
+    .orderBy(sql`SUM(${usageLogs.cost}) DESC`)
+    .all();
 }
 
 // ── getDailySpend ───────────────────────────────────────────────────────────
@@ -220,20 +212,18 @@ export function getDailySpend(
   from: Date,
   to: Date,
 ): DailySpend[] {
-  const fromUnix = Math.floor(from.getTime() / 1000);
-  const toUnix = Math.floor(to.getTime() / 1000);
-
-  const query = `SELECT
-    DATE(created_at, 'unixepoch') AS date,
-    COALESCE(SUM(cost), 0) AS cost,
-    COALESCE(SUM(tokens_in), 0) AS tokensIn,
-    COALESCE(SUM(tokens_out), 0) AS tokensOut
-  FROM usage_logs
-  WHERE created_at >= ? AND created_at <= ?
-  GROUP BY DATE(created_at, 'unixepoch')
-  ORDER BY date ASC`;
-
-  const rows = db.$client.prepare(query).all(fromUnix, toUnix) as DailySpend[];
+  const rows = db
+    .select({
+      date: sql<string>`DATE(${usageLogs.createdAt}, 'unixepoch')`,
+      cost: sql<number>`COALESCE(SUM(${usageLogs.cost}), 0)`,
+      tokensIn: sql<number>`COALESCE(SUM(${usageLogs.tokensIn}), 0)`,
+      tokensOut: sql<number>`COALESCE(SUM(${usageLogs.tokensOut}), 0)`,
+    })
+    .from(usageLogs)
+    .where(and(gte(usageLogs.createdAt, from), lte(usageLogs.createdAt, to)))
+    .groupBy(sql`DATE(${usageLogs.createdAt}, 'unixepoch')`)
+    .orderBy(sql`DATE(${usageLogs.createdAt}, 'unixepoch') ASC`)
+    .all();
 
   // Build a map of existing data
   const dataByDate = new Map<string, DailySpend>();
