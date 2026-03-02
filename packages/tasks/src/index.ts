@@ -1,1 +1,172 @@
-export {};
+import { eq, and } from "drizzle-orm";
+import type { DB, Task, Artifact } from "@clawops/core";
+import { tasks, artifacts, usageLogs } from "@clawops/core";
+import { calcCost } from "@clawops/domain";
+
+// ── createTask ─────────────────────────────────────────────────────────────
+
+interface CreateTaskInput {
+  title: string;
+  description?: string;
+  status?: Task["status"];
+  priority?: Task["priority"];
+  assigneeId?: string;
+  projectId?: string;
+  source?: Task["source"];
+  dueDate?: Date;
+}
+
+export function createTask(db: DB, input: CreateTaskInput): Task {
+  const rows = db
+    .insert(tasks)
+    .values({
+      title: input.title,
+      description: input.description,
+      status: input.status,
+      priority: input.priority,
+      assigneeId: input.assigneeId,
+      projectId: input.projectId,
+      source: input.source,
+      dueDate: input.dueDate,
+    })
+    .returning()
+    .all();
+  return rows[0];
+}
+
+// ── getTask ────────────────────────────────────────────────────────────────
+
+export function getTask(
+  db: DB,
+  id: string,
+): (Task & { artifacts: Artifact[] }) | null {
+  const task = db.select().from(tasks).where(eq(tasks.id, id)).get();
+  if (!task) return null;
+
+  const taskArtifacts = db
+    .select()
+    .from(artifacts)
+    .where(eq(artifacts.taskId, id))
+    .all();
+
+  return { ...task, artifacts: taskArtifacts };
+}
+
+// ── listTasks ──────────────────────────────────────────────────────────────
+
+interface ListTasksFilters {
+  status?: Task["status"];
+  assigneeId?: string;
+  projectId?: string;
+  priority?: Task["priority"];
+}
+
+export function listTasks(db: DB, filters?: ListTasksFilters): Task[] {
+  const conditions = [];
+
+  if (filters?.status) {
+    conditions.push(eq(tasks.status, filters.status));
+  }
+  if (filters?.assigneeId) {
+    conditions.push(eq(tasks.assigneeId, filters.assigneeId));
+  }
+  if (filters?.projectId) {
+    conditions.push(eq(tasks.projectId, filters.projectId));
+  }
+  if (filters?.priority) {
+    conditions.push(eq(tasks.priority, filters.priority));
+  }
+
+  if (conditions.length === 0) {
+    return db.select().from(tasks).all();
+  }
+
+  return db
+    .select()
+    .from(tasks)
+    .where(and(...conditions))
+    .all();
+}
+
+// ── updateTask ─────────────────────────────────────────────────────────────
+
+interface UpdateTaskInput {
+  title?: string;
+  description?: string;
+  status?: Task["status"];
+  priority?: Task["priority"];
+  assigneeId?: string;
+  projectId?: string;
+  dueDate?: Date;
+}
+
+export function updateTask(db: DB, id: string, updates: UpdateTaskInput): Task {
+  const rows = db
+    .update(tasks)
+    .set(updates)
+    .where(eq(tasks.id, id))
+    .returning()
+    .all();
+  return rows[0];
+}
+
+// ── completeTask ───────────────────────────────────────────────────────────
+
+interface CompleteTaskInput {
+  summary: string;
+  tokensIn?: number;
+  tokensOut?: number;
+  model?: string;
+  artifacts?: Array<{ label: string; value: string }>;
+}
+
+export function completeTask(
+  db: DB,
+  id: string,
+  input: CompleteTaskInput,
+): Task {
+  const rows = db
+    .update(tasks)
+    .set({
+      status: "done",
+      completedAt: new Date(),
+      summary: input.summary,
+    })
+    .where(eq(tasks.id, id))
+    .returning()
+    .all();
+  const task = rows[0];
+
+  if (
+    input.tokensIn != null &&
+    input.tokensOut != null &&
+    input.model != null &&
+    task.assigneeId != null
+  ) {
+    const cost = calcCost(input.model, input.tokensIn, input.tokensOut);
+    db.insert(usageLogs)
+      .values({
+        agentId: task.assigneeId,
+        taskId: id,
+        model: input.model,
+        tokensIn: input.tokensIn,
+        tokensOut: input.tokensOut,
+        cost,
+      })
+      .run();
+  }
+
+  if (input.artifacts && input.artifacts.length > 0) {
+    for (const artifact of input.artifacts) {
+      db.insert(artifacts)
+        .values({
+          taskId: id,
+          label: artifact.label,
+          value: artifact.value,
+        })
+        .run();
+    }
+  }
+
+  return task;
+}
