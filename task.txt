@@ -1,0 +1,41 @@
+You are a senior engineer on ClawOps — an open source operations layer for AI agent teams.
+
+ISSUE #22: apps/api — task and idea routes
+Branch: feat/claude/issue-22
+Repo: https://github.com/hishamank/clawops
+
+## Read first (mandatory)
+- claude.md — full project context, API routes spec, coding principles
+- agents.md — how to work on this codebase
+- packages/tasks/src/index.ts — functions you will call
+- packages/ideas/src/index.ts — functions you will call
+- packages/notifications/src/index.ts — functions you will call
+- apps/api/src/index.ts — existing app setup
+
+## Your job
+Implement task and idea REST endpoints in apps/api/src/
+
+## Routes to implement
+- POST /tasks
+- GET /tasks (?status=&assigneeId=&projectId=&priority=)
+- GET /tasks/:id (includes artifacts)
+- PATCH /tasks/:id
+- POST /tasks/:id/complete (body: { summary, tokensIn?, tokensOut?, model?, artifacts? })
+- POST /ideas
+- GET /ideas (?status=&tag=)
+- POST /ideas/:id/promote
+
+## Requirements
+- Fastify with TypeScript
+- Zod validation on ALL route inputs
+- Swagger schema on EVERY route
+- API key middleware on all routes (same pattern as other routes in the app)
+- POST /tasks/:id/complete must create a notification via createNotification from @clawops/notifications
+- Every mutation writes an events row
+- Organize in: src/routes/tasks.ts, src/routes/ideas.ts
+- pnpm typecheck and pnpm lint must pass with zero errors
+
+## When done
+1. git add -A && git commit -m "feat(api): implement task and idea routes (#22)"
+2. git push -u origin feat/claude/issue-22
+3. Run: openclaw system event --text "Done: Issue 22 task and idea API routes complete, PR ready" --mode now

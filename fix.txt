@@ -1,0 +1,56 @@
+Fix Copilot review issues on PR #44 for apps/api task and idea routes.
+
+Branch: feat/claude/issue-22
+Files: apps/api/src/routes/tasks.ts, apps/api/src/routes/ideas.ts, apps/api/src/index.ts
+
+## Issues to fix
+
+1. **writeEvent() closes over global db** — Change signature to accept a db/tx handle:
+   ```ts
+   function writeEvent(dbHandle: DB, action: string, entityId: string, meta: Record<string, unknown>): void
+   ```
+   Update all callers to pass db or the transaction handle.
+
+2. **Missing transactions on mutations** — Wrap EVERY mutation that does 2+ DB writes in db.transaction():
+   - POST /tasks: createTask + writeEvent → wrap in transaction
+   - PATCH /tasks/:id: updateTask + writeEvent → wrap in transaction
+   - POST /tasks/:id/complete: completeTask + createNotification + writeEvent → single transaction
+   - POST /ideas: createIdea + writeEvent → wrap in transaction
+   - POST /ideas/:id/promote: already has own transaction in promoteIdeaToProject, but add writeEvent inside it
+
+3. **404 guards on updateTask and completeTask** — Both can return undefined for unknown IDs. Add:
+   ```ts
+   if (!task) return reply.code(404).send({ error: 'Task not found' });
+   ```
+
+4. **Normalize req.url before checking publicPaths** (in apps/api/src/index.ts):
+   ```ts
+   const pathname = req.url.split('?')[0];
+   if (publicPaths.has(pathname) || pathname.startsWith('/docs/')) return;
+   ```
+
+5. **Protect /docs** — Only /health should be public. Remove /docs from publicPaths or add auth to it.
+
+6. **Use domain constants instead of local string enums**:
+   - In tasks.ts: import TaskStatus, TaskPriority, Source from @clawops/domain — use z.nativeEnum()
+   - In ideas.ts: import IdeaStatus, Source from @clawops/domain — use z.nativeEnum()
+
+7. **Typed errors in promoteIdeaToProject handler** — Instead of matching error message substrings like "not found" or "already promoted", catch them as specific checks:
+   ```ts
+   try { ... } catch (err) {
+     const msg = err instanceof Error ? err.message : '';
+     if (msg.includes('not found')) return reply.code(404).send({ error: msg });
+     if (msg.includes('already promoted')) return reply.code(409).send({ error: msg });
+     throw err;
+   }
+   ```
+
+## Rules
+- TypeScript strict mode, no any
+- pnpm typecheck and pnpm lint must pass after all changes
+- Keep all routes synchronous (better-sqlite3 is sync)
+
+## When done
+1. git add -A && git commit -m "fix(api): address Copilot review — transactions, typed errors, domain enums, 404 guards (#22)"
+2. git push
+3. Run: openclaw system event --text "Done: PR 44 task and idea route fixes complete" --mode now
