@@ -9,11 +9,20 @@
     "dev": "node --import tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "test": "echo \"No tests yet\""
+    "lint": "eslint src/"
   },
   "dependencies": {
+    "@clawops/agents": "workspace:^",
     "@clawops/core": "workspace:*",
-    "fastify": "^5.2.0"
+    "@clawops/domain": "workspace:^",
+    "@clawops/ideas": "workspace:^",
+    "@clawops/notifications": "workspace:^",
+    "@clawops/tasks": "workspace:^",
+    "@fastify/rate-limit": "^10.3.0",
+    "@fastify/swagger": "^9.7.0",
+    "@fastify/swagger-ui": "^5.2.5",
+    "fastify": "^5.2.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "tsx": "^4.19.0",

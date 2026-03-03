@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type { DB, Idea, NewIdea, Project } from "@clawops/core";
 import { ideas, projects, parseJsonArray, toJsonArray } from "@clawops/core";
 import type { IdeaStatus } from "@clawops/domain";
+import { NotFoundError, ConflictError } from "@clawops/domain";
 
 export function createIdea(
   db: DB,
@@ -80,11 +81,11 @@ export function promoteIdeaToProject(
     .all();
 
   if (!existing) {
-    throw new Error(`Idea not found: ${ideaId}`);
+    throw new NotFoundError(`Idea not found: ${ideaId}`);
   }
 
   if (existing.status === "promoted" || existing.projectId) {
-    throw new Error(`Idea "${ideaId}" is already promoted`);
+    throw new ConflictError(`Idea "${ideaId}" is already promoted`);
   }
 
   const tags = parseJsonArray(existing.tags);
