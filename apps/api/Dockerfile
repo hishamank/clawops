@@ -21,11 +21,19 @@ WORKDIR /app
 
 RUN addgroup -S clawops && adduser -S clawops -G clawops
 
-COPY --from=build /app/apps/api/dist ./dist
-COPY --from=build /app/apps/api/package.json ./
+# Copy built api output
+COPY --from=build /app/apps/api/dist ./apps/api/dist
+COPY --from=build /app/apps/api/package.json ./apps/api/package.json
+
+# Copy built packages (workspace deps — required at runtime via node_modules symlinks)
+COPY --from=build /app/packages ./packages
+
+# Copy node_modules (includes symlinks to /app/packages/*)
 COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/package.json ./package.json
 
 USER clawops
 
 EXPOSE 3001
+WORKDIR /app/apps/api
 CMD ["node", "dist/index.js"]
