@@ -57,8 +57,10 @@ agentCmd
 
 // ── agent status ────────────────────────────────────────────────────────────
 
-agentCmd
-  .command("status <status>")
+const statusCmd = agentCmd.command("status").description("Manage agent status");
+
+statusCmd
+  .command("set <status>")
   .description("Set agent status (online|idle|busy|offline)")
   .action(async (status: string) => {
     const id = getAgentId();
@@ -83,8 +85,10 @@ agentCmd
 
 // ── agent skills ────────────────────────────────────────────────────────────
 
-agentCmd
-  .command("skills <skills>")
+const skillsCmd = agentCmd.command("skills").description("Manage agent skills");
+
+skillsCmd
+  .command("set <skills>")
   .description("Update agent skills (comma-separated)")
   .action(async (skills: string) => {
     const id = getAgentId();
