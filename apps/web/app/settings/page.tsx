@@ -2,7 +2,7 @@ import { Globe, Key, Info, CheckCircle, XCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-const API_URL = process.env.CLAWOPS_API_URL ?? "http://localhost:3001";
+const API_URL = process.env.CLAWOPS_API_URL ?? "";
 const API_KEY = process.env.CLAWOPS_API_KEY ?? "";
 
 function maskUrl(url: string): string {
@@ -53,7 +53,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
               <span className="text-xs font-medium text-muted-foreground">
                 API URL
               </span>
-              <p className="rounded-lg bg-muted px-3 py-2 font-mono text-sm">
+              <p className="rounded-xl bg-muted px-3 py-2 font-mono text-sm">
                 {maskUrl(API_URL)}
               </p>
             </div>
