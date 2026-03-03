@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
+import rateLimit from "@fastify/rate-limit";
 import { runMigrations } from "@clawops/core";
 import { authMiddleware } from "./auth.js";
 import { agentRoutes } from "./routes/agents.js";
@@ -8,23 +9,6 @@ import { habitRoutes } from "./routes/habits.js";
 
 const port = Number(process.env["PORT"] || 3001);
 const host = process.env["HOST"] || "0.0.0.0";
-
-// Simple in-memory rate limiter for auth checks (prevents brute force)
-const authAttempts = new Map<string, { count: number; resetAt: number }>();
-const AUTH_RATE_LIMIT = 20;
-const AUTH_WINDOW_MS = 60_000;
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = authAttempts.get(ip);
-  if (!entry || now > entry.resetAt) {
-    authAttempts.set(ip, { count: 1, resetAt: now + AUTH_WINDOW_MS });
-    return true;
-  }
-  if (entry.count >= AUTH_RATE_LIMIT) return false;
-  entry.count++;
-  return true;
-}
 
 const app = Fastify({ logger: true });
 
@@ -47,28 +31,23 @@ async function start(): Promise<void> {
 
     app.get("/health", async () => ({ status: "ok" }));
 
-    // Rate limiting is applied inline via checkRateLimit() before auth (see above).
-    // lgtm[js/missing-rate-limiting]
-    app.addHook("onRequest", async (request, reply) => {
-      const pathname = request.url.split("?")[0];
-      if (
-        pathname === "/health" ||
-        pathname?.startsWith("/auth") ||
-        pathname?.startsWith("/docs")
-      ) {
-        return;
-      }
-      // Rate limit before authorization check
-      const ip = request.ip;
-      if (!checkRateLimit(ip)) {
-        await reply.status(429).send({ error: "Too many requests" });
-        return;
-      }
-      await authMiddleware(request, reply);
-    });
+    // Protected scope: rate limiting applied before auth check (prevents brute force)
+    await app.register(async (protectedApp) => {
+      // Register rate limiter first — applies to all routes in this scope
+      await protectedApp.register(rateLimit, {
+        max: 100,
+        timeWindow: "1 minute",
+        keyGenerator: (req) => req.ip,
+      });
 
-    await app.register(agentRoutes, { prefix: "/agents" });
-    await app.register(habitRoutes, { prefix: "/habits" });
+      // Auth check runs after rate limiting
+      protectedApp.addHook("onRequest", async (request, reply) => {
+        await authMiddleware(request, reply);
+      });
+
+      await protectedApp.register(agentRoutes, { prefix: "/agents" });
+      await protectedApp.register(habitRoutes, { prefix: "/habits" });
+    });
 
     await app.listen({ port, host });
     app.log.info(`ClawOps API listening on ${host}:${port}`);
