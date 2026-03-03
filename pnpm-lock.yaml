@@ -130,9 +130,21 @@ importers:
         specifier: workspace:*
         version: link:../core
       drizzle-orm:
-        specifier: ^0.38.0
+        specifier: ^0.38.4
         version: 0.38.4(@types/better-sqlite3@7.6.13)(@types/react@19.2.14)(better-sqlite3@11.10.0)(react@19.2.4)
     devDependencies:
+<<<<<<< HEAD
+=======
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.13
+      better-sqlite3:
+        specifier: ^11.10.0
+        version: 11.10.0
+>>>>>>> c659b41 (fix: add missing analytics dev deps (better-sqlite3, drizzle-orm))
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
