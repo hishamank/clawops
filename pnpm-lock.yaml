@@ -81,20 +81,26 @@ importers:
 
   apps/cli:
     dependencies:
+      '@clawops/agents':
+        specifier: workspace:^
+        version: link:../../packages/agents
       '@clawops/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@clawops/domain':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../packages/domain
+      '@clawops/habits':
+        specifier: workspace:^
+        version: link:../../packages/habits
       '@clawops/ideas':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../packages/ideas
       '@clawops/projects':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../packages/projects
       '@clawops/tasks':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../packages/tasks
       commander:
         specifier: ^13.0.0
