@@ -8,18 +8,13 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "lint": "eslint src/",
-    "test": "echo \"No tests yet\""
+    "lint": "eslint src/"
   },
   "dependencies": {
     "@clawops/core": "workspace:*",
-    "@clawops/domain": "workspace:*",
     "drizzle-orm": "^0.38.0"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.0",
-    "@types/node": "^22.0.0",
-    "better-sqlite3": "^11.0.0",
     "typescript": "^5.7.0"
   }
 }

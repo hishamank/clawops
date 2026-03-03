@@ -5,13 +5,23 @@ import rateLimit from "@fastify/rate-limit";
 import { db, runMigrations } from "@clawops/core";
 import { getAgentByApiKey } from "@clawops/agents";
 import { hashApiKey } from "@clawops/domain";
-import { taskRoutes } from "./routes/tasks.js";
-import { ideaRoutes } from "./routes/ideas.js";
+import { projectRoutes } from "./routes/projects.js";
+import { analyticsRoutes } from "./routes/analytics.js";
+import { notificationRoutes } from "./routes/notifications.js";
+import { authRoutes } from "./routes/auth.js";
+
+declare module "fastify" {
+  interface FastifyRequest {
+    agentId?: string;
+  }
+}
 
 const port = Number(process.env["PORT"] || 3001);
 const host = process.env["HOST"] || "0.0.0.0";
 
 const app = Fastify({ logger: true });
+
+app.decorateRequest("agentId", undefined);
 
 // ── Swagger ────────────────────────────────────────────────────────────────
 
@@ -37,11 +47,13 @@ await app.register(swagger, {
 
 await app.register(swaggerUi, { routePrefix: "/docs" });
 
-// ── Health (public) ────────────────────────────────────────────────────────
+// ── Public routes ──────────────────────────────────────────────────────────
 
 app.get("/health", { schema: { tags: ["system"], summary: "Health check" } }, async () => {
   return { status: "ok" };
 });
+
+await app.register(authRoutes); // /auth/* — no key required
 
 // ── Protected scope: rate limit applied before auth (prevents brute force) ─
 
@@ -52,7 +64,7 @@ await app.register(async (protectedApp) => {
     keyGenerator: (req) => req.ip,
   });
 
-  // Auth check after rate limiting
+  // Auth check after rate limiting — attaches agentId to request
   protectedApp.addHook("onRequest", async (req, reply) => {
     const key = req.headers["x-api-key"];
     if (typeof key !== "string" || key.length === 0) {
@@ -64,10 +76,13 @@ await app.register(async (protectedApp) => {
     if (!agent) {
       return reply.status(401).send({ error: "Invalid API key", code: "UNAUTHORIZED" });
     }
+
+    req.agentId = agent.id;
   });
 
-  await protectedApp.register(taskRoutes);
-  await protectedApp.register(ideaRoutes);
+  await protectedApp.register(projectRoutes);
+  await protectedApp.register(analyticsRoutes);
+  await protectedApp.register(notificationRoutes);
 });
 
 // ── Start ──────────────────────────────────────────────────────────────────
