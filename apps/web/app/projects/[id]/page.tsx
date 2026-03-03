@@ -43,7 +43,7 @@ async function getProject(id: string): Promise<ProjectDetail | null> {
 
 async function getProjectTasks(id: string): Promise<Task[]> {
   try {
-    return await api<Task[]>(`/tasks?projectId=${id}`, {
+    return await api<Task[]>(`/tasks?projectId=${encodeURIComponent(id)}`, {
       tags: ["tasks"],
       revalidate: 30,
     });

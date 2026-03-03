@@ -101,7 +101,7 @@ export interface Milestone {
   status: MilestoneStatus;
 }
 
-export interface Project {
+export interface ProjectListItem {
   id: string;
   name: string;
   description: string | null;
@@ -109,12 +109,12 @@ export interface Project {
   ideaId: string | null;
   prd: string | null;
   prdUpdatedAt: string | null;
-  milestones: Milestone[];
-  taskCount: number;
   createdAt: string;
 }
 
-export interface ProjectDetail extends Project {
+export interface ProjectDetail extends ProjectListItem {
+  milestones: Milestone[];
+  taskCount: number;
   completedTaskCount?: number;
   tasks?: Task[];
 }

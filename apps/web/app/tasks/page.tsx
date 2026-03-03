@@ -1,6 +1,6 @@
 import { CheckSquare, ListTodo, Clock } from "lucide-react";
 import { api } from "@/lib/api";
-import type { Task, Agent, Project } from "@/lib/types";
+import type { Task, Agent, ProjectListItem } from "@/lib/types";
 import { timeAgo } from "@/lib/time";
 import { StatsCard } from "@/components/stats-card";
 import { StatusBadge } from "@/components/status-badge";
@@ -14,7 +14,7 @@ interface PageProps {
 
 async function getTasks(status?: string): Promise<Task[]> {
   try {
-    const query = status && status !== "all" ? `?status=${status}` : "";
+    const query = status && status !== "all" ? `?status=${encodeURIComponent(status)}` : "";
     return await api<Task[]>(`/tasks${query}`, { tags: ["tasks"] });
   } catch (err) {
     if (err instanceof Error && err.message.includes("404")) return [];
@@ -30,23 +30,18 @@ async function getAgents(): Promise<Agent[]> {
   }
 }
 
-async function getProjects(): Promise<Project[]> {
+async function getProjects(): Promise<ProjectListItem[]> {
   try {
-    return await api<Project[]>("/projects", { tags: ["projects"] });
+    return await api<ProjectListItem[]>("/projects", { tags: ["projects"] });
   } catch {
     return [];
   }
 }
 
-function isToday(dateStr: string | null): boolean {
+function withinLast24h(dateStr: string | null): boolean {
   if (!dateStr) return false;
-  const d = new Date(dateStr);
-  const now = new Date();
-  return (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
-  );
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  return new Date(dateStr) > oneDayAgo;
 }
 
 export default async function TasksPage({ searchParams }: PageProps): Promise<React.JSX.Element> {
@@ -61,7 +56,7 @@ export default async function TasksPage({ searchParams }: PageProps): Promise<Re
   const projectMap = new Map(projects.map((p) => [p.id, p.name]));
 
   const inProgress = tasks.filter((t) => t.status === "in-progress").length;
-  const completedToday = tasks.filter((t) => isToday(t.completedAt)).length;
+  const completedToday = tasks.filter((t) => t.status === "done" && withinLast24h(t.completedAt)).length;
 
   return (
     <div className="space-y-8">

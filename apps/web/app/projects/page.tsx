@@ -1,7 +1,7 @@
 import { FolderKanban, Activity, FileText } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import type { Project } from "@/lib/types";
+import type { ProjectListItem } from "@/lib/types";
 import type { ProjectStatus } from "@clawops/domain";
 import { timeAgo } from "@/lib/time";
 import { StatsCard } from "@/components/stats-card";
@@ -23,9 +23,9 @@ const projectStatusLabels: Record<ProjectStatus, string> = {
   done: "Done",
 };
 
-async function getProjects(): Promise<Project[]> {
+async function getProjects(): Promise<ProjectListItem[]> {
   try {
-    return await api<Project[]>("/projects", { tags: ["projects"] });
+    return await api<ProjectListItem[]>("/projects", { tags: ["projects"] });
   } catch (err) {
     if (err instanceof Error && err.message.includes("404")) return [];
     throw err;
@@ -102,14 +102,6 @@ export default async function ProjectsPage(): Promise<React.JSX.Element> {
                     </p>
                   )}
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Tasks</span>
-                    <span>{project.taskCount === 1 ? "1 task" : `${project.taskCount} tasks`}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>
-                      {project.milestones.length}{" "}
-                      {project.milestones.length === 1 ? "milestone" : "milestones"}
-                    </span>
                     <span>{timeAgo(project.createdAt)}</span>
                   </div>
                 </CardContent>

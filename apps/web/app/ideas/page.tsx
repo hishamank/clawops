@@ -48,7 +48,7 @@ function parseTags(tags: string | null): string[] {
 
 async function getIdeas(status?: string): Promise<Idea[]> {
   try {
-    const query = status && status !== "all" ? `?status=${status}` : "";
+    const query = status && status !== "all" ? `?status=${encodeURIComponent(status)}` : "";
     return await api<Idea[]>(`/ideas${query}`, { tags: ["ideas"] });
   } catch (err) {
     if (err instanceof Error && err.message.includes("404")) return [];
