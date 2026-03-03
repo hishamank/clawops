@@ -15,9 +15,14 @@
   },
   "dependencies": {
     "@clawops/core": "workspace:*",
+    "@clawops/domain": "workspace:*",
+    "@clawops/ideas": "workspace:*",
+    "@clawops/projects": "workspace:*",
+    "@clawops/tasks": "workspace:*",
     "commander": "^13.0.0"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   }
