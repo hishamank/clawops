@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { api } from "../lib/client.js";
+import { projectCreate, projectList, projectInfo } from "../lib/client.js";
 
 export const projectCmd = new Command("project").description(
   "Manage projects",
@@ -12,14 +12,14 @@ projectCmd
   .option("--status <status>", "Initial status")
   .option("--json", "Output raw JSON")
   .action(async (opts) => {
-    const body: Record<string, string> = { name: opts.name };
-    if (opts.status) body["status"] = opts.status;
-    const project = await api.post("/projects", body);
+    const project = await projectCreate({
+      name: opts.name,
+      status: opts.status,
+    });
     if (opts.json) {
       console.log(JSON.stringify(project, null, 2));
     } else {
-      const p = project as Record<string, unknown>;
-      console.log(`Created project ${p["id"]}: ${p["name"]}`);
+      console.log(`Created project ${project.id}: ${project.name}`);
     }
   });
 
@@ -28,17 +28,14 @@ projectCmd
   .description("List projects")
   .option("--json", "Output raw JSON")
   .action(async (opts) => {
-    const projects = await api.get("/projects");
+    const projects = await projectList();
     if (opts.json) {
       console.log(JSON.stringify(projects, null, 2));
+    } else if (projects.length === 0) {
+      console.log("No projects found.");
     } else {
-      const list = projects as Array<Record<string, unknown>>;
-      if (list.length === 0) {
-        console.log("No projects found.");
-      } else {
-        for (const p of list) {
-          console.log(`[${p["status"]}] ${p["id"]}  ${p["name"]}`);
-        }
+      for (const p of projects) {
+        console.log(`[${p.status}] ${p.id}  ${p.name}`);
       }
     }
   });
@@ -49,13 +46,12 @@ projectCmd
   .argument("<id>", "Project ID")
   .option("--json", "Output raw JSON")
   .action(async (id: string, opts) => {
-    const project = await api.get(`/projects/${id}`);
+    const project = await projectInfo(id);
     if (opts.json) {
       console.log(JSON.stringify(project, null, 2));
     } else {
-      const p = project as Record<string, unknown>;
-      console.log(`Project: ${p["name"]}`);
-      console.log(`Status:  ${p["status"]}`);
-      console.log(`Tasks:   ${p["taskCount"]}`);
+      console.log(`Project: ${project.name}`);
+      console.log(`Status:  ${project.status}`);
+      console.log(`Tasks:   ${project.taskCount}`);
     }
   });

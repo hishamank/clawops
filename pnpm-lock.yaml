@@ -84,6 +84,18 @@ importers:
       '@clawops/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@clawops/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@clawops/ideas':
+        specifier: workspace:*
+        version: link:../../packages/ideas
+      '@clawops/projects':
+        specifier: workspace:*
+        version: link:../../packages/projects
+      '@clawops/tasks':
+        specifier: workspace:*
+        version: link:../../packages/tasks
       commander:
         specifier: ^13.0.0
         version: 13.1.0

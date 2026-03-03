@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { api } from "../lib/client.js";
+import { taskCreate, taskList, taskUpdate, taskDone } from "../lib/client.js";
 
 export const taskCmd = new Command("task").description("Manage tasks");
 
@@ -13,7 +13,7 @@ taskCmd
   .option("--assignee <id>", "Assignee agent ID")
   .option("--json", "Output raw JSON")
   .action(async (opts) => {
-    const task = await api.post("/tasks", {
+    const task = await taskCreate({
       title: opts.title,
       description: opts.desc,
       priority: opts.priority,
@@ -23,8 +23,7 @@ taskCmd
     if (opts.json) {
       console.log(JSON.stringify(task, null, 2));
     } else {
-      const t = task as Record<string, unknown>;
-      console.log(`Created task ${t["id"]}: ${t["title"]}`);
+      console.log(`Created task ${task.id}: ${task.title}`);
     }
   });
 
@@ -36,22 +35,18 @@ taskCmd
   .option("--project <id>", "Filter by project")
   .option("--json", "Output raw JSON")
   .action(async (opts) => {
-    const params = new URLSearchParams();
-    if (opts.status) params.set("status", opts.status);
-    if (opts.assignee) params.set("assigneeId", opts.assignee);
-    if (opts.project) params.set("projectId", opts.project);
-    const qs = params.toString();
-    const tasks = await api.get(`/tasks${qs ? `?${qs}` : ""}`);
+    const tasks = await taskList({
+      status: opts.status,
+      assigneeId: opts.assignee,
+      projectId: opts.project,
+    });
     if (opts.json) {
       console.log(JSON.stringify(tasks, null, 2));
+    } else if (tasks.length === 0) {
+      console.log("No tasks found.");
     } else {
-      const list = tasks as Array<Record<string, unknown>>;
-      if (list.length === 0) {
-        console.log("No tasks found.");
-      } else {
-        for (const t of list) {
-          console.log(`[${t["status"]}] ${t["id"]}  ${t["title"]}`);
-        }
+      for (const t of tasks) {
+        console.log(`[${t.status}] ${t.id}  ${t.title}`);
       }
     }
   });
@@ -64,14 +59,14 @@ taskCmd
   .option("--priority <priority>", "New priority")
   .option("--json", "Output raw JSON")
   .action(async (id: string, opts) => {
-    const body: Record<string, string> = { status: opts.status };
-    if (opts.priority) body["priority"] = opts.priority;
-    const task = await api.patch(`/tasks/${id}`, body);
+    const task = await taskUpdate(id, {
+      status: opts.status,
+      priority: opts.priority,
+    });
     if (opts.json) {
       console.log(JSON.stringify(task, null, 2));
     } else {
-      const t = task as Record<string, unknown>;
-      console.log(`Updated task ${t["id"]} → ${t["status"]}`);
+      console.log(`Updated task ${task.id} → ${task.status}`);
     }
   });
 
@@ -84,21 +79,20 @@ taskCmd
   .option("--artifacts <artifacts>", "Artifacts as label:value,...")
   .option("--json", "Output raw JSON")
   .action(async (id: string, opts) => {
-    const body: Record<string, unknown> = { summary: opts.summary };
-    if (opts.tokens) body["tokensIn"] = Number(opts.tokens);
-    if (opts.artifacts) {
-      body["artifacts"] = (opts.artifacts as string)
-        .split(",")
-        .map((pair: string) => {
+    const artifacts = opts.artifacts
+      ? (opts.artifacts as string).split(",").map((pair: string) => {
           const [label, ...rest] = pair.split(":");
           return { label, value: rest.join(":") };
-        });
-    }
-    const task = await api.post(`/tasks/${id}/complete`, body);
+        })
+      : undefined;
+    const task = await taskDone(id, {
+      summary: opts.summary,
+      tokensIn: opts.tokens ? Number(opts.tokens) : undefined,
+      artifacts,
+    });
     if (opts.json) {
       console.log(JSON.stringify(task, null, 2));
     } else {
-      const t = task as Record<string, unknown>;
-      console.log(`Task ${t["id"]} marked done.`);
+      console.log(`Task ${task.id} marked done.`);
     }
   });
