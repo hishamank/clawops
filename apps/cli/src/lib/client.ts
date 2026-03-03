@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- CLI tool uses console for output */
 import type { DB, Task, Artifact, Idea, Project, Milestone } from "@clawops/core";
 import { db as coreDb, runMigrations, events } from "@clawops/core";
 import {
@@ -223,3 +224,46 @@ export async function projectInfo(
     `/projects/${id}`,
   );
 }
+
+export function getAgentId(): string {
+  const id = process.env["CLAWOPS_AGENT_ID"];
+  if (!id) {
+    console.error("CLAWOPS_AGENT_ID is required");
+    process.exit(1);
+  }
+  return id;
+}
+
+async function request(
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<unknown> {
+  const res = await fetch(`${baseUrl}${path}`, {
+    method,
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": getApiKey(),
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+
+  const json = (await res.json()) as Record<string, unknown>;
+
+  if (!res.ok) {
+    const msg =
+      typeof json["error"] === "string" ? json["error"] : res.statusText;
+    console.error(msg);
+    process.exit(1);
+  }
+
+  return json;
+}
+
+export const api = {
+  get: (path: string): Promise<unknown> => request("GET", path),
+  post: (path: string, body?: unknown): Promise<unknown> =>
+    request("POST", path, body),
+  patch: (path: string, body?: unknown): Promise<unknown> =>
+    request("PATCH", path, body),
+};
