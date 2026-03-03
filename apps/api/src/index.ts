@@ -29,20 +29,28 @@ async function start(): Promise<void> {
       },
     });
 
-    await app.register(swaggerUi, { routePrefix: "/docs" });
-
     app.get("/health", { schema: { tags: ["system"], summary: "Health check" } }, async () => ({ status: "ok" }));
 
-    // Public auth routes (login does not require an API key)
-    await app.register(authRoutes, { prefix: "/auth" });
+    // Public auth routes with dedicated rate limit
+    await app.register(async (authScope) => {
+      await authScope.register(rateLimit, {
+        max: 10,
+        timeWindow: "1 minute",
+        keyGenerator: (req) => req.ip,
+      });
 
-    // Protected scope: rate limiter registered before auth hook
+      await authScope.register(authRoutes);
+    });
+
+    // Protected scope: rate limiter + auth hook + Swagger docs
     await app.register(async (protectedApp) => {
       await protectedApp.register(rateLimit, {
         max: 100,
         timeWindow: "1 minute",
         keyGenerator: (req) => req.ip,
       });
+
+      await protectedApp.register(swaggerUi, { routePrefix: "/docs" });
 
       protectedApp.addHook("onRequest", async (req, reply) => {
         const key = req.headers["x-api-key"];
@@ -57,11 +65,11 @@ async function start(): Promise<void> {
         req.agentId = agent.id;
       });
 
-      await protectedApp.register(agentRoutes, { prefix: "/agents" });
-      await protectedApp.register(habitRoutes, { prefix: "/habits" });
-      await protectedApp.register(projectRoutes, { prefix: "/projects" });
-      await protectedApp.register(analyticsRoutes, { prefix: "/analytics" });
-      await protectedApp.register(notificationRoutes, { prefix: "/notifications" });
+      await protectedApp.register(agentRoutes);
+      await protectedApp.register(habitRoutes);
+      await protectedApp.register(projectRoutes);
+      await protectedApp.register(analyticsRoutes);
+      await protectedApp.register(notificationRoutes);
     });
 
     await app.listen({ port, host });
