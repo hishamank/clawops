@@ -9,6 +9,7 @@ services:
       - "3001:3001"
     environment:
       - CLAWOPS_MODE=local
+      - CLAWOPS_API_KEY
       - CLAWOPS_DB_PATH=/data/clawops.db
       - PORT=3001
     volumes:
@@ -22,6 +23,7 @@ services:
       - "3000:3000"
     environment:
       - CLAWOPS_API_URL=http://api:3001
+      - CLAWOPS_API_KEY
     depends_on:
       - api
 
