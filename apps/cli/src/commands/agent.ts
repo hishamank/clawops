@@ -40,10 +40,21 @@ agentCmd
     let data: Agent;
 
     if (isLocalMode()) {
-      const { db } = await import("@clawops/core");
+      const { db, events } = await import("@clawops/core");
       const { initAgent } = await import("@clawops/agents");
       const result = initAgent(db, input);
       data = result.agent;
+
+      // Write agent.registered event
+      db.insert(events)
+        .values({
+          agentId: data.id,
+          action: "agent.registered",
+          entityType: "agent",
+          entityId: data.id,
+          meta: JSON.stringify({ name: data.name, created: result.created }),
+        })
+        .run();
     } else {
       data = (await api.post("/agents/register", input)) as Agent;
     }
@@ -62,17 +73,31 @@ const statusCmd = agentCmd.command("status").description("Manage agent status");
 statusCmd
   .command("set <status>")
   .description("Set agent status (online|idle|busy|offline)")
-  .action(async (status: string) => {
+  .option("--message <message>", "Status message")
+  .action(async (status: string, opts: Record<string, string>) => {
     const id = getAgentId();
+    const message = opts["message"] as string | undefined;
     let data: Agent;
 
     if (isLocalMode()) {
-      const { db } = await import("@clawops/core");
+      const { db, events } = await import("@clawops/core");
       const { updateAgentStatus } = await import("@clawops/agents");
-      data = updateAgentStatus(db, id, status as AgentStatus);
+      data = updateAgentStatus(db, id, status as AgentStatus, message);
+
+      // Write agent.status_updated event
+      db.insert(events)
+        .values({
+          agentId: id,
+          action: "agent.status_updated",
+          entityType: "agent",
+          entityId: id,
+          meta: JSON.stringify({ status, message }),
+        })
+        .run();
     } else {
       data = (await api.patch(`/agents/${id}/status`, {
         status,
+        message,
       })) as Agent;
     }
 
@@ -96,9 +121,20 @@ skillsCmd
     let data: Agent;
 
     if (isLocalMode()) {
-      const { db } = await import("@clawops/core");
+      const { db, events } = await import("@clawops/core");
       const { updateAgentSkills } = await import("@clawops/agents");
       data = updateAgentSkills(db, id, parsed);
+
+      // Write agent.skills_updated event
+      db.insert(events)
+        .values({
+          agentId: id,
+          action: "agent.skills_updated",
+          entityType: "agent",
+          entityId: id,
+          meta: JSON.stringify({ skills: parsed }),
+        })
+        .run();
     } else {
       data = (await api.patch(`/agents/${id}/skills`, {
         skills: parsed,
@@ -119,20 +155,37 @@ agentCmd
   .description("Send agent heartbeat")
   .action(async () => {
     const id = getAgentId();
-    let data: { id: string };
 
     if (isLocalMode()) {
-      const { db } = await import("@clawops/core");
+      const { db, events } = await import("@clawops/core");
       const { logHeartbeat } = await import("@clawops/habits");
       const run = logHeartbeat(db, id);
-      data = { id: run.id };
-    } else {
-      data = (await api.post(`/agents/${id}/heartbeat`)) as { id: string };
-    }
 
-    if (jsonOut(agentCmd)) {
-      console.log(JSON.stringify(data, null, 2));
+      // Write agent.heartbeat event
+      db.insert(events)
+        .values({
+          agentId: id,
+          action: "agent.heartbeat",
+          entityType: "agent",
+          entityId: id,
+          meta: JSON.stringify({ runId: run.id }),
+        })
+        .run();
+
+      if (jsonOut(agentCmd)) {
+        console.log(JSON.stringify({ id: run.id }, null, 2));
+      } else {
+        console.log(`agent ${id} heartbeat`);
+      }
     } else {
-      console.log(`agent ${data.id} heartbeat`);
+      const data = (await api.post(`/agents/${id}/heartbeat`)) as {
+        id: string;
+      };
+
+      if (jsonOut(agentCmd)) {
+        console.log(JSON.stringify(data, null, 2));
+      } else {
+        console.log(`agent ${id} heartbeat`);
+      }
     }
   });

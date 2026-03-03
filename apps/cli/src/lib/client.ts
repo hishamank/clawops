@@ -1,9 +1,8 @@
 /* eslint-disable no-console -- CLI tool uses console for output */
-import type { DB, Task, Artifact, Idea, Project, Milestone } from "@clawops/core";
+import type { DB, Task, Idea, Project, Milestone } from "@clawops/core";
 import { db as coreDb, runMigrations, events } from "@clawops/core";
 import {
   createTask,
-  getTask,
   listTasks,
   updateTask,
   completeTask,
@@ -19,6 +18,10 @@ import type { IdeaStatus } from "@clawops/domain";
 // ── Mode detection ──────────────────────────────────────────────────────────
 
 const mode = (process.env["CLAWOPS_MODE"] ?? "remote") as "local" | "remote";
+
+export function isLocalMode(): boolean {
+  return mode === "local";
+}
 
 function getDb(): DB {
   return coreDb;
@@ -36,8 +39,18 @@ function logReadEvent(
 
 // ── Remote helpers ──────────────────────────────────────────────────────────
 
-const baseUrl =
-  process.env["CLAWOPS_API_URL"] ?? "http://localhost:3001";
+function getBaseUrl(): string {
+  const url = process.env["CLAWOPS_API_URL"];
+  if (mode === "local") {
+    return url ?? "http://localhost:3001";
+  }
+  if (!url) {
+    return "http://localhost:3001";
+  }
+  return url;
+}
+
+const baseUrl = getBaseUrl();
 
 function getApiKey(): string {
   const key = process.env["CLAWOPS_API_KEY"];
@@ -53,18 +66,38 @@ async function request<T>(
   path: string,
   body?: unknown,
 ): Promise<T> {
-  const res = await fetch(`${baseUrl}${path}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": getApiKey(),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl}${path}`, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": getApiKey(),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`Network error: ${msg}`);
+    process.exit(1);
+  }
 
   if (!res.ok) {
     const text = await res.text();
     console.error(`API error ${res.status}: ${text}`);
+    process.exit(1);
+  }
+
+  const contentType = res.headers.get("content-type") ?? "";
+  const contentLength = res.headers.get("content-length");
+
+  if (contentLength === "0" || res.status === 204) {
+    return undefined as unknown as T;
+  }
+
+  if (!contentType.includes("application/json")) {
+    const text = await res.text();
+    console.error(`Unexpected response content-type: ${contentType}\n${text}`);
     process.exit(1);
   }
 
@@ -232,32 +265,6 @@ export function getAgentId(): string {
     process.exit(1);
   }
   return id;
-}
-
-async function request(
-  method: string,
-  path: string,
-  body?: unknown,
-): Promise<unknown> {
-  const res = await fetch(`${baseUrl}${path}`, {
-    method,
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": getApiKey(),
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
-
-  const json = (await res.json()) as Record<string, unknown>;
-
-  if (!res.ok) {
-    const msg =
-      typeof json["error"] === "string" ? json["error"] : res.statusText;
-    console.error(msg);
-    process.exit(1);
-  }
-
-  return json;
 }
 
 export const api = {

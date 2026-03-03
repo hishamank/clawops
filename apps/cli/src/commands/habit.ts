@@ -20,28 +20,53 @@ function jsonOut(cmd: Command): boolean {
 habitCmd
   .command("register <name>")
   .description("Register a new habit")
-  .requiredOption("--type <type>", "Habit type")
-  .requiredOption("--schedule <cron>", "Cron expression")
-  .option("--interval <ms>", "Interval in ms")
+  .requiredOption("--type <type>", "Habit type (cron|interval)")
+  .option("--schedule <cron>", "Cron expression (required for cron type)")
+  .option("--interval <ms>", "Interval in ms (required for interval type)")
   .action(async (name: string, opts: Record<string, string>) => {
+    const habitType = opts["type"] as HabitType;
+
+    // Validate schedule/interval based on type
+    if (habitType === "cron" && !opts["schedule"]) {
+      console.error("--schedule is required for cron habits");
+      process.exit(1);
+    }
+    if (habitType === "scheduled" && !opts["interval"]) {
+      console.error("--interval is required for scheduled habits");
+      process.exit(1);
+    }
+
     const agentId = getAgentId();
     let data: Habit;
 
     if (isLocalMode()) {
-      const { db } = await import("@clawops/core");
+      const { db, events } = await import("@clawops/core");
       const { createHabit } = await import("@clawops/habits");
       data = createHabit(db, agentId, {
         name,
-        type: opts["type"] as HabitType,
+        type: habitType,
         cronExpr: opts["schedule"],
         schedule: opts["interval"],
       });
+
+      // Write habit.created event
+      db.insert(events)
+        .values({
+          agentId,
+          action: "habit.created",
+          entityType: "habit",
+          entityId: data.id,
+          meta: JSON.stringify({ name, type: habitType }),
+        })
+        .run();
     } else {
       const body: Record<string, unknown> = {
         name,
         type: opts["type"],
-        cronExpr: opts["schedule"],
       };
+      if (opts["schedule"]) {
+        body["cronExpr"] = opts["schedule"];
+      }
       if (opts["interval"]) {
         body["schedule"] = opts["interval"];
       }
@@ -69,9 +94,20 @@ habitCmd
     let data: HabitRun;
 
     if (isLocalMode()) {
-      const { db } = await import("@clawops/core");
+      const { db, events } = await import("@clawops/core");
       const { logHabitRun } = await import("@clawops/habits");
       data = logHabitRun(db, id, agentId, { success, note });
+
+      // Write habit.run_logged event
+      db.insert(events)
+        .values({
+          agentId,
+          action: "habit.run_logged",
+          entityType: "habit_run",
+          entityId: data.id,
+          meta: JSON.stringify({ habitId: id, success, note }),
+        })
+        .run();
     } else {
       const body: Record<string, unknown> = { success };
       if (note) {
@@ -94,26 +130,30 @@ habitCmd
   .description("List habits")
   .option("--agent <id>", "Filter by agent ID")
   .action(async (opts: Record<string, string>) => {
+    // Default to CLAWOPS_AGENT_ID when --agent is not provided
+    const agentId = opts["agent"] ?? process.env["CLAWOPS_AGENT_ID"];
     let data: Habit[];
 
     if (isLocalMode()) {
       const { db, events } = await import("@clawops/core");
       const { listHabits } = await import("@clawops/habits");
-      const agentId = opts["agent"];
       data = listHabits(db, agentId);
 
-      // Write read event in local mode
+      // Write habit.listed event
       db.insert(events)
         .values({
           agentId: agentId ?? null,
-          action: "read",
+          action: "habit.listed",
           entityType: "habit",
           entityId: "*",
+          meta: JSON.stringify({ agentId: agentId ?? null }),
         })
         .run();
     } else {
-      const query = opts["agent"] ? `?agentId=${opts["agent"]}` : "";
-      data = (await api.get(`/habits${query}`)) as Habit[];
+      const params = new URLSearchParams();
+      if (agentId) params.set("agentId", agentId);
+      const qs = params.toString();
+      data = (await api.get(`/habits${qs ? `?${qs}` : ""}`)) as Habit[];
     }
 
     if (jsonOut(habitCmd)) {
