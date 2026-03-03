@@ -41,6 +41,9 @@ importers:
       '@clawops/domain':
         specifier: workspace:^
         version: link:../../packages/domain
+      '@clawops/habits':
+        specifier: workspace:^
+        version: link:../../packages/habits
       '@clawops/ideas':
         specifier: workspace:^
         version: link:../../packages/ideas
@@ -66,8 +69,8 @@ importers:
         specifier: ^5.2.0
         version: 5.7.4
       zod:
-        specifier: ^3.24.0
-        version: 3.25.76
+        specifier: ^4.3.6
+        version: 4.3.6
     devDependencies:
       tsx:
         specifier: ^4.19.0
@@ -141,10 +144,22 @@ importers:
       '@clawops/core':
         specifier: workspace:*
         version: link:../core
+      '@clawops/domain':
+        specifier: workspace:*
+        version: link:../domain
       drizzle-orm:
-        specifier: ^0.38.0
+        specifier: ^0.38.4
         version: 0.38.4(@types/better-sqlite3@7.6.13)(@types/react@19.2.14)(better-sqlite3@11.10.0)(react@19.2.4)
     devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.13
+      better-sqlite3:
+        specifier: ^11.10.0
+        version: 11.10.0
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
@@ -2043,8 +2058,8 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
-  zod@3.25.76:
-    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+  zod@4.3.6:
+    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
 
 snapshots:
 
@@ -3560,4 +3575,4 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  zod@3.25.76: {}
+  zod@4.3.6: {}
