@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 export async function PATCH(
   _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: { id: string } },
 ): Promise<NextResponse> {
   const apiUrl = process.env.CLAWOPS_API_URL;
   const apiKey = process.env.CLAWOPS_API_KEY;
@@ -14,7 +14,7 @@ export async function PATCH(
     );
   }
 
-  const { id } = await params;
+  const { id } = params;
   try {
     const res = await fetch(`${apiUrl}/notifications/${id}`, {
       method: "PATCH",
@@ -24,10 +24,18 @@ export async function PATCH(
       },
       body: JSON.stringify({ read: true }),
     });
-    if (!res.ok) return NextResponse.json({ error: "Failed" }, { status: res.status });
+    if (!res.ok) {
+      return NextResponse.json(
+        { error: "Failed to mark notification as read" },
+        { status: res.status },
+      );
+    }
     const data: unknown = await res.json();
     return NextResponse.json(data);
   } catch {
-    return NextResponse.json({ error: "Failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to mark notification as read" },
+      { status: 500 },
+    );
   }
 }

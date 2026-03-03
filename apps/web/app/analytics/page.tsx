@@ -80,8 +80,8 @@ export default async function AnalyticsPage(): Promise<React.JSX.Element> {
     getCostBreakdown("project"),
   ]);
 
-  const agentCount = byAgent.length || 1;
-  const avgCostPerAgent = tokenSummary.totalCost / agentCount;
+  const agentCount = byAgent.length;
+  const avgCostPerAgent = agentCount > 0 ? tokenSummary.totalCost / agentCount : 0;
   const hasData =
     tokenSummary.totalTokensIn > 0 ||
     tokenSummary.totalTokensOut > 0 ||
