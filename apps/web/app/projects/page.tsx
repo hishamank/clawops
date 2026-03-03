@@ -101,21 +101,9 @@ export default async function ProjectsPage(): Promise<React.JSX.Element> {
                       {project.description}
                     </p>
                   )}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>Tasks</span>
-                      <span>{project.taskCount}</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-emerald-500 transition-all"
-                        style={{
-                          width: project.taskCount > 0
-                            ? `${Math.min(100, 0)}%`
-                            : "0%",
-                        }}
-                      />
-                    </div>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Tasks</span>
+                    <span>{project.taskCount === 1 ? "1 task" : `${project.taskCount} tasks`}</span>
                   </div>
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>

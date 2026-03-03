@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { TaskFilterTabs } from "./filter-tabs";
 
 interface PageProps {
-  searchParams: { status?: string };
+  searchParams: { [key: string]: string | string[] | undefined };
 }
 
 async function getTasks(status?: string): Promise<Task[]> {
@@ -50,7 +50,7 @@ function isToday(dateStr: string | null): boolean {
 }
 
 export default async function TasksPage({ searchParams }: PageProps): Promise<React.JSX.Element> {
-  const { status } = searchParams;
+  const status = typeof searchParams?.status === "string" ? searchParams.status : undefined;
   const [tasks, agents, projects] = await Promise.all([
     getTasks(status),
     getAgents(),

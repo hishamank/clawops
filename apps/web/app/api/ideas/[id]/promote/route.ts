@@ -1,17 +1,24 @@
 import { NextResponse } from "next/server";
 
-const API_URL = process.env.CLAWOPS_API_URL ?? "http://localhost:3001";
-const API_KEY = process.env.CLAWOPS_API_KEY ?? "";
-
 export async function POST(
   _request: Request,
   { params }: { params: { id: string } }
 ): Promise<NextResponse> {
+  const apiUrl = process.env.CLAWOPS_API_URL;
+  const apiKey = process.env.CLAWOPS_API_KEY;
+
+  if (!apiUrl || !apiKey) {
+    return NextResponse.json(
+      { error: "Server misconfiguration: CLAWOPS_API_URL and CLAWOPS_API_KEY must be set" },
+      { status: 500 }
+    );
+  }
+
   const { id } = params;
 
-  const res = await fetch(`${API_URL}/ideas/${id}/promote`, {
+  const res = await fetch(`${apiUrl}/ideas/${id}/promote`, {
     method: "POST",
-    headers: { "x-api-key": API_KEY },
+    headers: { "x-api-key": apiKey },
   });
 
   if (!res.ok) {

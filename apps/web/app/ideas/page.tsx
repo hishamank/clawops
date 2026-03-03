@@ -11,7 +11,7 @@ import { IdeaFilterTabs } from "./filter-tabs";
 import { PromoteButton } from "./promote-button";
 
 interface PageProps {
-  searchParams: { status?: string };
+  searchParams: { [key: string]: string | string[] | undefined };
 }
 
 const ideaStatusStyles: Record<IdeaStatus, string> = {
@@ -57,7 +57,7 @@ async function getIdeas(status?: string): Promise<Idea[]> {
 }
 
 export default async function IdeasPage({ searchParams }: PageProps): Promise<React.JSX.Element> {
-  const { status } = searchParams;
+  const status = typeof searchParams?.status === "string" ? searchParams.status : undefined;
   const ideas = await getIdeas(status);
 
   const raw = ideas.filter((i) => i.status === "raw").length;
