@@ -1,5 +1,7 @@
-const API_URL = process.env.NEXT_PUBLIC_CLAWOPS_API_URL ?? "http://localhost:3001";
-const API_KEY = process.env.NEXT_PUBLIC_CLAWOPS_API_KEY ?? "";
+import "server-only";
+
+const API_URL = process.env.CLAWOPS_API_URL ?? "http://localhost:3001";
+const API_KEY = process.env.CLAWOPS_API_KEY ?? "";
 
 interface FetchOptions {
   method?: string;

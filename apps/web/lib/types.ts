@@ -1,9 +1,19 @@
+import type {
+  AgentStatus,
+  TaskStatus,
+  TaskPriority,
+  HabitType,
+  HabitStatus,
+  IdeaStatus,
+  Source,
+} from "@clawops/domain";
+
 export interface Agent {
   id: string;
   name: string;
   model: string;
   role: string;
-  status: "online" | "idle" | "busy" | "offline";
+  status: AgentStatus;
   lastActive: string | null;
   avatar: string | null;
   framework: string | null;
@@ -16,11 +26,11 @@ export interface Task {
   id: string;
   title: string;
   description: string | null;
-  status: "backlog" | "todo" | "in-progress" | "review" | "done" | "cancelled";
-  priority: "low" | "medium" | "high" | "urgent";
+  status: TaskStatus;
+  priority: TaskPriority;
   assigneeId: string | null;
   projectId: string | null;
-  source: "human" | "agent" | "cli" | "script";
+  source: Source;
   dueDate: string | null;
   completedAt: string | null;
   summary: string | null;
@@ -31,11 +41,11 @@ export interface Habit {
   id: string;
   agentId: string;
   name: string;
-  type: "heartbeat" | "scheduled" | "cron" | "hook" | "watchdog" | "polling";
+  type: HabitType;
   schedule: string | null;
   cronExpr: string | null;
   trigger: string | null;
-  status: "active" | "paused";
+  status: HabitStatus;
   lastRun: string | null;
   nextRun: string | null;
   createdAt: string;
@@ -51,10 +61,10 @@ export interface Idea {
   id: string;
   title: string;
   description: string | null;
-  status: "raw" | "reviewed" | "promoted" | "archived";
+  status: IdeaStatus;
   tags: string | null;
   projectId: string | null;
-  source: "human" | "agent";
+  source: Source;
   createdAt: string;
 }
 

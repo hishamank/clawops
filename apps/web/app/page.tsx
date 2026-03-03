@@ -10,16 +10,20 @@ import { Button } from "@/components/ui/button";
 async function getAgents(): Promise<Agent[]> {
   try {
     return await api<Agent[]>("/agents", { tags: ["agents"] });
-  } catch {
-    return [];
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("404")) return [];
+    throw err;
   }
 }
 
 async function getTokenSummary(): Promise<TokenSummary> {
   try {
     return await api<TokenSummary>("/analytics/tokens", { tags: ["analytics"] });
-  } catch {
-    return { totalTokensIn: 0, totalTokensOut: 0, totalCost: 0 };
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("404")) {
+      return { totalTokensIn: 0, totalTokensOut: 0, totalCost: 0 };
+    }
+    throw err;
   }
 }
 

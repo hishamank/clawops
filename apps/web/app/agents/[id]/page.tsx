@@ -14,7 +14,7 @@ interface AgentDetailResponse extends Agent {
 }
 
 interface PageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 const statusColors: Record<Agent["status"], string> = {
@@ -53,7 +53,7 @@ function parseSkills(skills: string | null): string[] {
   if (!skills) return [];
   try {
     const parsed: unknown = JSON.parse(skills);
-    if (Array.isArray(parsed)) return parsed as string[];
+    if (Array.isArray(parsed)) return parsed.filter((v): v is string => typeof v === "string");
     return [];
   } catch {
     return skills.split(",").map((s) => s.trim()).filter(Boolean);
@@ -66,8 +66,9 @@ async function getAgent(id: string): Promise<AgentDetailResponse | null> {
       tags: ["agents", `agent-${id}`],
       revalidate: 15,
     });
-  } catch {
-    return null;
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("404")) return null;
+    throw err;
   }
 }
 
@@ -86,21 +87,20 @@ async function getAgentArtifacts(tasks: Task[]): Promise<Artifact[]> {
   const doneTasks = tasks.filter((t) => t.status === "done");
   if (doneTasks.length === 0) return [];
 
-  const allArtifacts: Artifact[] = [];
-  for (const task of doneTasks.slice(0, 5)) {
-    try {
-      const taskDetail = await api<Task & { artifacts?: Artifact[] }>(
-        `/tasks/${task.id}`,
-        { tags: ["tasks"], revalidate: 60 }
-      );
-      if (taskDetail.artifacts) {
-        allArtifacts.push(...taskDetail.artifacts);
+  const results = await Promise.all(
+    doneTasks.slice(0, 5).map(async (task) => {
+      try {
+        const taskDetail = await api<Task & { artifacts?: Artifact[] }>(
+          `/tasks/${task.id}`,
+          { tags: ["tasks"], revalidate: 60 }
+        );
+        return taskDetail.artifacts ?? [];
+      } catch {
+        return [];
       }
-    } catch {
-      // skip
-    }
-  }
-  return allArtifacts;
+    })
+  );
+  return results.flat();
 }
 
 function StreakDots({ streaks }: { streaks?: HabitStreak[] }): React.JSX.Element {
@@ -124,7 +124,7 @@ function StreakDots({ streaks }: { streaks?: HabitStreak[] }): React.JSX.Element
 }
 
 export default async function AgentProfile({ params }: PageProps): Promise<React.JSX.Element> {
-  const { id } = await params;
+  const { id } = params;
   const agent = await getAgent(id);
 
   if (!agent) {
