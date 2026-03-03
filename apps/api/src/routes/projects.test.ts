@@ -1,6 +1,5 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert";
-import { projectRoutes } from "./projects.js";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -11,7 +10,7 @@ let capturedEvents: Array<Record<string, unknown>> = [];
 /** Controls whether `db.transaction` should throw (simulates rollback). */
 let transactionShouldThrow = false;
 /** Tracks the agentId passed through `req.agentId`. */
-let lastAgentId: string | undefined;
+let _lastAgentId: string | undefined;
 
 const fakeProject = {
   id: "p-1",
@@ -32,16 +31,16 @@ const fakeProjectWithDetails = {
 };
 
 // Stub domain functions ────────────────────────────────────────────────────
-let createProjectStub = (_db: unknown, input: Record<string, unknown>) => ({
+const createProjectStub = (_db: unknown, input: Record<string, unknown>) => ({
   ...fakeProject,
   ...input,
 });
-let getProjectStub: (_db: unknown, id: string) => unknown = (
+const getProjectStub: (_db: unknown, id: string) => unknown = (
   _db: unknown,
   id: string,
 ) => (id === "p-1" ? fakeProjectWithDetails : null);
-let listProjectsStub = () => [fakeProject];
-let updateProjectStub = (
+const listProjectsStub = () => [fakeProject];
+const updateProjectStub = (
   _db: unknown,
   _id: string,
   updates: Record<string, unknown>,
