@@ -9,11 +9,8 @@
     "dev": "node --import tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
-<<<<<<< HEAD
+    "lint": "eslint src/",
     "test": "echo \"No tests yet\""
-=======
-    "lint": "eslint src/"
->>>>>>> 58e7b21 (feat(api): implement project, analytics, notification, and auth routes (#23))
   },
   "dependencies": {
     "@clawops/agents": "workspace:^",
