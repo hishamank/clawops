@@ -188,7 +188,7 @@ describe("projectRoutes", () => {
   beforeEach(async () => {
     capturedEvents = [];
     transactionShouldThrow = false;
-    lastAgentId = undefined;
+    _lastAgentId = undefined;
 
     const app = buildFakeApp();
     await registerFakeRoutes(app.instance);
