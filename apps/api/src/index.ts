@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
+import rateLimit from "@fastify/rate-limit";
 import { db, runMigrations } from "@clawops/core";
 import { getAgentByApiKey } from "@clawops/agents";
 import { hashApiKey } from "@clawops/domain";
@@ -46,41 +47,43 @@ await app.register(swagger, {
 
 await app.register(swaggerUi, { routePrefix: "/docs" });
 
-// ── Auth hook ──────────────────────────────────────────────────────────────
-
-app.addHook("onRequest", async (req, reply) => {
-  const path = req.url.split("?")[0];
-
-  if (path === "/health" || path.startsWith("/auth/")) {
-    return;
-  }
-
-  const key = req.headers["x-api-key"];
-  if (typeof key !== "string" || key.length === 0) {
-    return reply.status(401).send({ error: "Missing API key", code: "UNAUTHORIZED" });
-  }
-
-  const hashed = hashApiKey(key);
-  const agent = getAgentByApiKey(db, hashed);
-  if (!agent) {
-    return reply.status(401).send({ error: "Invalid API key", code: "UNAUTHORIZED" });
-  }
-
-  req.agentId = agent.id;
-});
-
-// ── Health ──────────────────────────────────────────────────────────────────
+// ── Public routes ──────────────────────────────────────────────────────────
 
 app.get("/health", { schema: { tags: ["system"], summary: "Health check" } }, async () => {
   return { status: "ok" };
 });
 
-// ── Routes ─────────────────────────────────────────────────────────────────
+await app.register(authRoutes); // /auth/* — no key required
 
-await app.register(projectRoutes);
-await app.register(analyticsRoutes);
-await app.register(notificationRoutes);
-await app.register(authRoutes);
+// ── Protected scope: rate limit applied before auth (prevents brute force) ─
+
+await app.register(async (protectedApp) => {
+  await protectedApp.register(rateLimit, {
+    max: 100,
+    timeWindow: "1 minute",
+    keyGenerator: (req) => req.ip,
+  });
+
+  // Auth check after rate limiting — attaches agentId to request
+  protectedApp.addHook("onRequest", async (req, reply) => {
+    const key = req.headers["x-api-key"];
+    if (typeof key !== "string" || key.length === 0) {
+      return reply.status(401).send({ error: "Missing API key", code: "UNAUTHORIZED" });
+    }
+
+    const hashed = hashApiKey(key);
+    const agent = getAgentByApiKey(db, hashed);
+    if (!agent) {
+      return reply.status(401).send({ error: "Invalid API key", code: "UNAUTHORIZED" });
+    }
+
+    req.agentId = agent.id;
+  });
+
+  await protectedApp.register(projectRoutes);
+  await protectedApp.register(analyticsRoutes);
+  await protectedApp.register(notificationRoutes);
+});
 
 // ── Start ──────────────────────────────────────────────────────────────────
 
