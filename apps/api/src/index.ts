@@ -2,8 +2,9 @@ import Fastify from "fastify";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import rateLimit from "@fastify/rate-limit";
-import { runMigrations } from "@clawops/core";
-import { authMiddleware } from "./auth.js";
+import { db, runMigrations } from "@clawops/core";
+import { getAgentByApiKey } from "@clawops/agents";
+import { hashApiKey } from "@clawops/domain";
 import { agentRoutes } from "./routes/agents.js";
 import { habitRoutes } from "./routes/habits.js";
 
@@ -15,34 +16,38 @@ const app = Fastify({ logger: true });
 async function start(): Promise<void> {
   try {
     runMigrations();
-    app.log.info("Migrations applied");
 
     await app.register(swagger, {
       openapi: {
-        info: {
-          title: "ClawOps API",
-          version: "0.1.0",
-          description: "Operations layer for AI agent teams",
-        },
+        info: { title: "ClawOps API", version: "0.1.0", description: "Operations layer for AI agent teams" },
+        components: { securitySchemes: { apiKey: { type: "apiKey", name: "x-api-key", in: "header" } } },
+        security: [{ apiKey: [] }],
       },
     });
 
     await app.register(swaggerUi, { routePrefix: "/docs" });
 
-    app.get("/health", async () => ({ status: "ok" }));
+    app.get("/health", { schema: { tags: ["system"], summary: "Health check" } }, async () => ({ status: "ok" }));
 
-    // Protected scope: rate limiting applied before auth check (prevents brute force)
+    // Protected scope: rate limiter registered before auth hook
     await app.register(async (protectedApp) => {
-      // Register rate limiter first — applies to all routes in this scope
       await protectedApp.register(rateLimit, {
         max: 100,
         timeWindow: "1 minute",
         keyGenerator: (req) => req.ip,
       });
 
-      // Auth check runs after rate limiting
-      protectedApp.addHook("onRequest", async (request, reply) => {
-        await authMiddleware(request, reply);
+      protectedApp.addHook("onRequest", async (req, reply) => {
+        const key = req.headers["x-api-key"];
+        if (typeof key !== "string" || key.length === 0) {
+          return reply.status(401).send({ error: "Missing API key", code: "UNAUTHORIZED" });
+        }
+        const hashed = hashApiKey(key);
+        const agent = getAgentByApiKey(db, hashed);
+        if (!agent) {
+          return reply.status(401).send({ error: "Invalid API key", code: "UNAUTHORIZED" });
+        }
+        req.agentId = agent.id;
       });
 
       await protectedApp.register(agentRoutes, { prefix: "/agents" });
@@ -50,7 +55,6 @@ async function start(): Promise<void> {
     });
 
     await app.listen({ port, host });
-    app.log.info(`ClawOps API listening on ${host}:${port}`);
   } catch (err) {
     app.log.error(err);
     process.exit(1);
