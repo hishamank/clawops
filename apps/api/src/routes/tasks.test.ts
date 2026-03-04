@@ -167,7 +167,7 @@ async function registerFakeRoutes(app: ReturnType<typeof buildFakeApp>["instance
       return t;
     });
     if (!task) return reply.code(404).send({ error: "Task not found" });
-    return task;
+    return reply.send(task);
   });
 
   // POST /tasks/:id/complete
@@ -188,7 +188,7 @@ async function registerFakeRoutes(app: ReturnType<typeof buildFakeApp>["instance
       return t;
     });
     if (!task) return reply.code(404).send({ error: "Task not found" });
-    return task;
+    return reply.send(task);
   });
 }
 
