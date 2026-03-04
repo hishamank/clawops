@@ -9,10 +9,17 @@ services:
       - "3001:3001"
     environment:
       - CLAWOPS_MODE=local
+      - CLAWOPS_API_KEY
       - CLAWOPS_DB_PATH=/data/clawops.db
       - PORT=3001
     volumes:
       - clawops_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   web:
     build:
@@ -22,8 +29,10 @@ services:
       - "3000:3000"
     environment:
       - CLAWOPS_API_URL=http://api:3001
+      - CLAWOPS_API_KEY
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
 volumes:
   clawops_data:
