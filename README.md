@@ -158,6 +158,7 @@ clawops habit run <id> --note "completed morning standup"
 | `CLAWOPS_MODE` | `local` (direct SQLite) or `remote` (calls API) | `local` |
 | `CLAWOPS_API_KEY` | API key for authentication | — |
 | `CLAWOPS_API_URL` | API server URL (required in remote mode) | `http://localhost:3001` |
+| `CLAWOPS_AGENT_ID` | Agent identifier (used by CLI to tag tasks/ideas to this agent) | — |
 | `CLAWOPS_DB_PATH` | SQLite database path (local mode only) | `./clawops.db` |
 | `PORT` | API server port | `3001` |
 
