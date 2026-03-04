@@ -2,6 +2,8 @@ import type {
   AgentStatus,
   TaskStatus,
   TaskPriority,
+  ProjectStatus,
+  MilestoneStatus,
   HabitType,
   HabitStatus,
   IdeaStatus,
@@ -91,6 +93,30 @@ export interface Artifact {
   label: string;
   value: string;
   createdAt: string;
+}
+
+export interface Milestone {
+  id: string;
+  title: string;
+  status: MilestoneStatus;
+}
+
+export interface ProjectListItem {
+  id: string;
+  name: string;
+  description: string | null;
+  status: ProjectStatus;
+  ideaId: string | null;
+  prd: string | null;
+  prdUpdatedAt: string | null;
+  createdAt: string;
+}
+
+export interface ProjectDetail extends ProjectListItem {
+  milestones: Milestone[];
+  taskCount: number;
+  completedTaskCount?: number;
+  tasks?: Task[];
 }
 
 export interface AgentDetail extends Agent {
