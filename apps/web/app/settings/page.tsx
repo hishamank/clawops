@@ -2,6 +2,8 @@ import { Globe, Key, Info, CheckCircle, XCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
+export const dynamic = 'force-dynamic';
+
 const API_URL = process.env.CLAWOPS_API_URL ?? "";
 const API_KEY = process.env.CLAWOPS_API_KEY ?? "";
 
