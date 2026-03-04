@@ -28,6 +28,13 @@
         "^build"
       ],
       "outputs": []
+    },
+    "test:integration": {
+      "dependsOn": [
+        "build",
+        "^build"
+      ],
+      "outputs": []
     }
   }
 }
