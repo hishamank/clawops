@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
+export const dynamic = "force-dynamic";
+
 const projectStatusStyles: Record<ProjectStatus, string> = {
   planning: "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
   active: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",

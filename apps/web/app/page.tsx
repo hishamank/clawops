@@ -7,6 +7,8 @@ import { AgentCard } from "@/components/agent-card";
 import { ActivityFeed } from "@/components/activity-feed";
 import { Button } from "@/components/ui/button";
 
+export const dynamic = "force-dynamic";
+
 async function getAgents(): Promise<Agent[]> {
   try {
     return await api<Agent[]>("/agents", { tags: ["agents"] });

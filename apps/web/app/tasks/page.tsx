@@ -8,8 +8,10 @@ import { PriorityBadge } from "@/components/priority-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { TaskFilterTabs } from "./filter-tabs";
 
+export const dynamic = "force-dynamic";
+
 interface PageProps {
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 async function getTasks(status?: string): Promise<Task[]> {
@@ -45,7 +47,8 @@ function withinLast24h(dateStr: string | null): boolean {
 }
 
 export default async function TasksPage({ searchParams }: PageProps): Promise<React.JSX.Element> {
-  const status = typeof searchParams?.status === "string" ? searchParams.status : undefined;
+  const resolvedParams = await searchParams;
+  const status = typeof resolvedParams?.status === "string" ? resolvedParams.status : undefined;
   const [tasks, agents, projects] = await Promise.all([
     getTasks(status),
     getAgents(),
