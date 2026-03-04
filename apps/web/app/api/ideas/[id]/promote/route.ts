@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 
 export async function POST(
   _request: Request,
@@ -29,5 +30,7 @@ export async function POST(
   }
 
   const data: unknown = await res.json();
+  revalidateTag("ideas");
+  revalidateTag("projects");
   return NextResponse.json(data);
 }

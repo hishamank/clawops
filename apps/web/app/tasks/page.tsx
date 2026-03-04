@@ -27,16 +27,18 @@ async function getTasks(status?: string): Promise<Task[]> {
 async function getAgents(): Promise<Agent[]> {
   try {
     return await api<Agent[]>("/agents", { tags: ["agents"] });
-  } catch {
-    return [];
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("404")) return [];
+    throw err;
   }
 }
 
 async function getProjects(): Promise<ProjectListItem[]> {
   try {
     return await api<ProjectListItem[]>("/projects", { tags: ["projects"] });
-  } catch {
-    return [];
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("404")) return [];
+    throw err;
   }
 }
 
