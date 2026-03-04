@@ -55,7 +55,7 @@ const mockDb = {
     },
   }),
   $client: {
-    transaction: <T>(fn: () => T) => fn,
+    transaction: <T>(fn: () => T) => () => fn(),
   },
 };
 
