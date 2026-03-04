@@ -17,7 +17,14 @@ import type { IdeaStatus } from "@clawops/domain";
 
 // ── Mode detection ──────────────────────────────────────────────────────────
 
-const mode = (process.env["CLAWOPS_MODE"] ?? "remote") as "local" | "remote";
+const rawMode = process.env["CLAWOPS_MODE"] ?? "remote";
+if (rawMode !== "local" && rawMode !== "remote") {
+  console.error(
+    `Invalid CLAWOPS_MODE: "${rawMode}". Must be "local" or "remote".`,
+  );
+  process.exit(1);
+}
+const mode = rawMode as "local" | "remote";
 
 export function isLocalMode(): boolean {
   return mode === "local";
@@ -41,13 +48,14 @@ function logReadEvent(
 
 function getBaseUrl(): string {
   const url = process.env["CLAWOPS_API_URL"];
-  if (mode === "local") {
-    return url ?? "http://localhost:3001";
+  if (mode === "remote") {
+    if (!url) {
+      console.error("CLAWOPS_API_URL is required in remote mode");
+      process.exit(1);
+    }
+    return url;
   }
-  if (!url) {
-    return "http://localhost:3001";
-  }
-  return url;
+  return url ?? "http://localhost:3001";
 }
 
 const baseUrl = getBaseUrl();
@@ -82,26 +90,44 @@ async function request<T>(
     process.exit(1);
   }
 
-  if (!res.ok) {
-    const text = await res.text();
-    console.error(`API error ${res.status}: ${text}`);
-    process.exit(1);
-  }
-
   const contentType = res.headers.get("content-type") ?? "";
   const contentLength = res.headers.get("content-length");
 
   if (contentLength === "0" || res.status === 204) {
+    if (!res.ok) {
+      console.error(`API error ${res.status}: ${res.statusText}`);
+      process.exit(1);
+    }
     return undefined as unknown as T;
   }
 
-  if (!contentType.includes("application/json")) {
-    const text = await res.text();
-    console.error(`Unexpected response content-type: ${contentType}\n${text}`);
+  let json: unknown;
+  try {
+    if (contentType.includes("application/json")) {
+      json = await res.json();
+    } else {
+      const text = await res.text();
+      if (!res.ok) {
+        console.error(`API error ${res.status}: ${text}`);
+        process.exit(1);
+      }
+      return undefined as unknown as T;
+    }
+  } catch {
+    console.error(`Failed to parse response (status ${res.status})`);
     process.exit(1);
   }
 
-  return res.json() as Promise<T>;
+  if (!res.ok) {
+    const msg =
+      typeof (json as Record<string, unknown>)["error"] === "string"
+        ? ((json as Record<string, unknown>)["error"] as string)
+        : res.statusText;
+    console.error(msg);
+    process.exit(1);
+  }
+
+  return json as T;
 }
 
 // ── Ensure migrations in local mode ─────────────────────────────────────────

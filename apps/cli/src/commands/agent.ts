@@ -73,7 +73,7 @@ const statusCmd = agentCmd.command("status").description("Manage agent status");
 statusCmd
   .command("set <status>")
   .description("Set agent status (online|idle|busy|offline)")
-  .option("--message <message>", "Status message")
+  .option("-m, --message <message>", "Optional status message")
   .action(async (status: string, opts: Record<string, string>) => {
     const id = getAgentId();
     const message = opts["message"] as string | undefined;
@@ -132,7 +132,7 @@ skillsCmd
           action: "agent.skills_updated",
           entityType: "agent",
           entityId: id,
-          meta: JSON.stringify({ skills: parsed }),
+          meta: JSON.stringify({ skillCount: parsed.length }),
         })
         .run();
     } else {
@@ -173,7 +173,7 @@ agentCmd
         .run();
 
       if (jsonOut(agentCmd)) {
-        console.log(JSON.stringify({ id: run.id }, null, 2));
+        console.log(JSON.stringify({ id }, null, 2));
       } else {
         console.log(`agent ${id} heartbeat`);
       }

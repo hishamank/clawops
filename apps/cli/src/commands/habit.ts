@@ -146,7 +146,7 @@ habitCmd
           action: "habit.listed",
           entityType: "habit",
           entityId: "*",
-          meta: JSON.stringify({ agentId: agentId ?? null }),
+          meta: JSON.stringify({ agentId: agentId ?? null, count: data.length }),
         })
         .run();
     } else {
