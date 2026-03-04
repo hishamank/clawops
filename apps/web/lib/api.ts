@@ -1,8 +1,5 @@
 import "server-only";
 
-const API_URL = process.env.CLAWOPS_API_URL ?? "http://localhost:3001";
-const API_KEY = process.env.CLAWOPS_API_KEY ?? "";
-
 interface FetchOptions {
   method?: string;
   body?: unknown;
@@ -11,17 +8,24 @@ interface FetchOptions {
 }
 
 export async function api<T>(path: string, options: FetchOptions = {}): Promise<T> {
+  const apiUrl = process.env.CLAWOPS_API_URL;
+  const apiKey = process.env.CLAWOPS_API_KEY;
+
+  if (!apiUrl || !apiKey) {
+    throw new Error("CLAWOPS_API_URL and CLAWOPS_API_KEY must be set");
+  }
+
   const { method = "GET", body, tags, revalidate } = options;
 
   const headers: Record<string, string> = {
-    "x-api-key": API_KEY,
+    "x-api-key": apiKey,
   };
 
   if (body) {
     headers["Content-Type"] = "application/json";
   }
 
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(`${apiUrl}${path}`, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,

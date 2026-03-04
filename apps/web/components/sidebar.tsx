@@ -63,6 +63,9 @@ export function Sidebar(): React.JSX.Element {
             >
               <Icon className="h-4 w-4" />
               {item.label}
+              {item.label === "Notifications" && (
+                <span className="ml-auto h-2 w-2 rounded-full bg-primary" />
+              )}
             </Link>
           );
         })}
