@@ -6,6 +6,7 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { DB } from "@clawops/core";
+import * as schema from "@clawops/core";
 import { NotFoundError, ConflictError } from "@clawops/domain";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -18,7 +19,7 @@ let db: DB;
 
 before(() => {
   const sqlite = new Database(":memory:");
-  db = drizzle(sqlite) as unknown as DB;
+  db = drizzle(sqlite, { schema }) as DB;
   migrate(db, {
     migrationsFolder: path.resolve(__dirname, "../../core/migrations"),
   });
