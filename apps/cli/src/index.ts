@@ -6,6 +6,7 @@ import { habitCmd } from "./commands/habit.js";
 import { taskCmd } from "./commands/task.js";
 import { ideaCmd } from "./commands/idea.js";
 import { projectCmd } from "./commands/project.js";
+import { isLocalMode, ensureMigrated } from "./lib/client.js";
 
 const program = new Command();
 
@@ -20,5 +21,17 @@ program.addCommand(habitCmd);
 program.addCommand(taskCmd);
 program.addCommand(ideaCmd);
 program.addCommand(projectCmd);
+
+program.hook("preAction", () => {
+  // Auto-run migrations once before any command in local mode
+  if (isLocalMode()) {
+    try {
+      ensureMigrated();
+    } catch (err) {
+      console.error("Failed to run migrations:", err instanceof Error ? err.message : err);
+      process.exit(1);
+    }
+  }
+});
 
 program.parse();
