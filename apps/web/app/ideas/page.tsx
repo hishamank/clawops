@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { IdeaFilterTabs } from "./filter-tabs";
 import { PromoteButton } from "./promote-button";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 interface PageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;

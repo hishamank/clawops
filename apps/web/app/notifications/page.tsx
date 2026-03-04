@@ -15,7 +15,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { timeAgo } from "@/lib/time";
 
-export const dynamic = 'force-dynamic';
 
 const ICON_MAP: Record<string, LucideIcon> = {
   task_complete: CheckSquare,

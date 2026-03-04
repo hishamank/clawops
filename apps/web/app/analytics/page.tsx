@@ -4,7 +4,7 @@ import type { TokenSummary } from "@/lib/types";
 import { StatsCard } from "@/components/stats-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 interface CostBreakdownItem {
   name: string;
