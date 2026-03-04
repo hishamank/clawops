@@ -107,7 +107,7 @@ async function request<T>(
 // ── Ensure migrations in local mode ─────────────────────────────────────────
 
 let migrated = false;
-function ensureMigrated(): void {
+export function ensureMigrated(): void {
   if (!migrated) {
     runMigrations();
     migrated = true;
