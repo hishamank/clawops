@@ -16,8 +16,11 @@ interface CostBreakdownItem {
 async function getTokenSummary(): Promise<TokenSummary> {
   try {
     return await api<TokenSummary>("/analytics/tokens", { tags: ["analytics"] });
-  } catch {
-    return { totalTokensIn: 0, totalTokensOut: 0, totalCost: 0 };
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("404")) {
+      return { totalTokensIn: 0, totalTokensOut: 0, totalCost: 0 };
+    }
+    throw err;
   }
 }
 
@@ -26,8 +29,9 @@ async function getCostBreakdown(groupBy: string): Promise<CostBreakdownItem[]> {
     return await api<CostBreakdownItem[]>(`/analytics/costs?groupBy=${groupBy}`, {
       tags: ["analytics"],
     });
-  } catch {
-    return [];
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("404")) return [];
+    throw err;
   }
 }
 

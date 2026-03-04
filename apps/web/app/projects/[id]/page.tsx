@@ -49,8 +49,9 @@ async function getProjectTasks(id: string): Promise<Task[]> {
       tags: ["tasks"],
       revalidate: 30,
     });
-  } catch {
-    return [];
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("404")) return [];
+    throw err;
   }
 }
 
