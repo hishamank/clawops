@@ -9,7 +9,7 @@
     "dev": "node --import tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
-    "test": "echo \"No tests yet\""
+    "test": "node --import tsx/esm --test src/routes/tasks.test.ts src/routes/projects.test.ts src/routes/ideas.test.ts"
   },
   "dependencies": {
     "@clawops/agents": "workspace:^",

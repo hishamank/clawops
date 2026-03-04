@@ -14,7 +14,7 @@ interface AgentDetailResponse extends Agent {
 }
 
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 const statusColors: Record<Agent["status"], string> = {
@@ -124,7 +124,7 @@ function StreakDots({ streaks }: { streaks?: HabitStreak[] }): React.JSX.Element
 }
 
 export default async function AgentProfile({ params }: PageProps): Promise<React.JSX.Element> {
-  const { id } = params;
+  const { id } = await params;
   const agent = await getAgent(id);
 
   if (!agent) {
