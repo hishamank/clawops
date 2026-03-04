@@ -22,9 +22,16 @@ program.addCommand(taskCmd);
 program.addCommand(ideaCmd);
 program.addCommand(projectCmd);
 
-// Auto-run migrations on first local mode run
-if (isLocalMode()) {
-  ensureMigrated();
-}
+program.hook("preAction", () => {
+  // Auto-run migrations once before any command in local mode
+  if (isLocalMode()) {
+    try {
+      ensureMigrated();
+    } catch (err) {
+      console.error("Failed to run migrations:", err instanceof Error ? err.message : err);
+      process.exit(1);
+    }
+  }
+});
 
 program.parse();
