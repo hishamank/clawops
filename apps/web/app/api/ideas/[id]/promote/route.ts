@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 export async function POST(
   _request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   const apiUrl = process.env.CLAWOPS_API_URL;
   const apiKey = process.env.CLAWOPS_API_KEY;
@@ -14,7 +14,7 @@ export async function POST(
     );
   }
 
-  const { id } = params;
+  const { id } = await params;
 
   const res = await fetch(`${apiUrl}/ideas/${id}/promote`, {
     method: "POST",

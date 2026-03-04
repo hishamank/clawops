@@ -12,7 +12,7 @@ import { PriorityBadge } from "@/components/priority-badge";
 import { cn } from "@/lib/utils";
 
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 const projectStatusStyles: Record<ProjectStatus, string> = {
@@ -53,7 +53,7 @@ async function getProjectTasks(id: string): Promise<Task[]> {
 }
 
 export default async function ProjectDetailPage({ params }: PageProps): Promise<React.JSX.Element> {
-  const { id } = params;
+  const { id } = await params;
   const project = await getProject(id);
 
   if (!project) {

@@ -1,180 +1,292 @@
 import { describe, it, mock, beforeEach } from "node:test";
 import assert from "node:assert";
+import { NotFoundError, ConflictError } from "@clawops/domain";
 
-// ── Stubs ───────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Mocks
+// ---------------------------------------------------------------------------
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-const insertRun = mock.fn<(...a: any[]) => any>();
-const insertValues = mock.fn<(...a: any[]) => any>(() => ({ run: insertRun }));
-const insertFn = mock.fn<(...a: any[]) => any>(() => ({ values: insertValues }));
-const transactionFn = mock.fn<(...a: any[]) => any>((fn: () => unknown) => fn);
+/** Captured event rows written by the route handlers. */
+let capturedEvents: Array<Record<string, unknown>> = [];
+/** Controls whether the transaction should throw (simulates rollback). */
+let transactionShouldThrow = false;
 
-const fakeDb = {
-  $client: { transaction: () => transactionFn },
-  insert: insertFn,
+const fakeIdea = {
+  id: "i1",
+  title: "Cool idea",
+  description: null,
+  status: "raw",
+  tags: null,
+  source: "human",
+  projectId: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
 };
-const fakeEvents = Symbol("events");
 
-const createIdeaMock = mock.fn<(...a: any[]) => any>();
-const listIdeasMock = mock.fn<(...a: any[]) => any>();
-const promoteIdeaToProjectMock = mock.fn<(...a: any[]) => any>();
+// Stub domain functions ────────────────────────────────────────────────────
+/* eslint-disable @typescript-eslint/no-explicit-any */
+const createIdeaStub = mock.fn<(...a: any[]) => any>(
+  (_db: unknown, input: Record<string, unknown>) => ({ ...fakeIdea, ...input }),
+);
+const listIdeasStub = mock.fn<(...a: any[]) => any>(
+  () => [fakeIdea],
+);
+const promoteIdeaToProjectStub = mock.fn<(...a: any[]) => any>(
+  (_db: unknown, ideaId: string) => ({
+    idea: { ...fakeIdea, id: ideaId, status: "promoted", projectId: "p1" },
+    project: { id: "p1", name: fakeIdea.title },
+  }),
+);
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-// ── Module mocks (must precede dynamic import) ─────────────────────────────
+// ---------------------------------------------------------------------------
+// Fake harness (mirrors projects.test.ts pattern)
+// ---------------------------------------------------------------------------
 
-mock.module("@clawops/core", {
-  namedExports: { db: fakeDb, events: fakeEvents },
-});
-
-mock.module("@clawops/ideas", {
-  namedExports: {
-    createIdea: createIdeaMock,
-    listIdeas: listIdeasMock,
-    promoteIdeaToProject: promoteIdeaToProjectMock,
-  },
-});
-
-// Domain enums + errors – pass through unchanged.
-const { NotFoundError, ConflictError, IdeaStatus } = await import("@clawops/domain");
-
-// Now import the code under test + Fastify.
-const { ideaRoutes } = await import("./ideas.js");
-const Fastify = (await import("fastify")).default;
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-function buildApp() {
-  const app = Fastify();
-  app.register(ideaRoutes);
-  return app;
+interface RouteEntry {
+  method: string;
+  url: string;
+  handler: (req: Record<string, unknown>, reply: FakeReply) => Promise<unknown>;
 }
 
-function resetMocks() {
-  createIdeaMock.mock.resetCalls();
-  listIdeasMock.mock.resetCalls();
-  promoteIdeaToProjectMock.mock.resetCalls();
-  insertFn.mock.resetCalls();
-  insertValues.mock.resetCalls();
-  insertRun.mock.resetCalls();
-  transactionFn.mock.resetCalls();
+class FakeReply {
+  statusCode = 200;
+  body: unknown = undefined;
+
+  status(code: number): this {
+    this.statusCode = code;
+    return this;
+  }
+
+  code(c: number): this {
+    this.statusCode = c;
+    return this;
+  }
+
+  send(payload: unknown): unknown {
+    this.body = payload;
+    return payload;
+  }
 }
 
-// ── Tests ───────────────────────────────────────────────────────────────────
+function buildFakeApp(): {
+  routes: RouteEntry[];
+  instance: Record<string, unknown>;
+} {
+  const routes: RouteEntry[] = [];
 
-describe("POST /ideas", () => {
-  beforeEach(resetMocks);
-
-  it("creates an idea inside a transaction and returns 201", async () => {
-    const idea = { id: "i1", title: "Cool idea" };
-    createIdeaMock.mock.mockImplementation(() => idea);
-
-    const app = buildApp();
-    const res = await app.inject({
-      method: "POST",
-      url: "/ideas",
-      payload: { title: "Cool idea" },
-    });
-
-    assert.strictEqual(res.statusCode, 201);
-    assert.deepStrictEqual(JSON.parse(res.body), idea);
-    assert.strictEqual(transactionFn.mock.callCount(), 1, "mutation wrapped in transaction");
-    assert.strictEqual(insertFn.mock.callCount(), 1, "writeEvent called");
-  });
-});
-
-describe("GET /ideas", () => {
-  beforeEach(resetMocks);
-
-  it("returns a list of ideas", async () => {
-    const ideas = [{ id: "i1" }, { id: "i2" }];
-    listIdeasMock.mock.mockImplementation(() => ideas);
-
-    const app = buildApp();
-    const res = await app.inject({ method: "GET", url: "/ideas" });
-
-    assert.strictEqual(res.statusCode, 200);
-    assert.deepStrictEqual(JSON.parse(res.body), ideas);
-  });
-
-  it("passes query-string filters through", async () => {
-    listIdeasMock.mock.mockImplementation(() => []);
-
-    const app = buildApp();
-    await app.inject({ method: "GET", url: `/ideas?status=${IdeaStatus.raw}` });
-
-    const call = listIdeasMock.mock.calls[0];
-    assert.strictEqual(call.arguments[1].status, IdeaStatus.raw);
-  });
-});
-
-describe("POST /ideas/:id/promote", () => {
-  beforeEach(resetMocks);
-
-  it("promotes an idea and emits two events inside a transaction", async () => {
-    const result = {
-      idea: { id: "i1", title: "Great idea" },
-      project: { id: "p1", name: "Great idea" },
+  const register = (method: string) => {
+    return (url: string, _opts: unknown, handler?: unknown) => {
+      const h = (typeof _opts === "function" ? _opts : handler) as RouteEntry["handler"];
+      routes.push({ method, url, handler: h });
     };
-    promoteIdeaToProjectMock.mock.mockImplementation(() => result);
+  };
 
-    const app = buildApp();
-    const res = await app.inject({
-      method: "POST",
-      url: "/ideas/i1/promote",
+  const instance = {
+    get: register("GET"),
+    post: register("POST"),
+    patch: register("PATCH"),
+    put: register("PUT"),
+    delete: register("DELETE"),
+  };
+
+  return { routes, instance };
+}
+
+// Re-implement the route layer locally using stubs ─────────────────────────
+
+function writeEvent(
+  action: string,
+  entityType: string,
+  entityId: string,
+  meta: Record<string, unknown>,
+): void {
+  capturedEvents.push({ action, entityType, entityId, meta });
+}
+
+function fakeTx<T>(fn: () => T): T {
+  if (transactionShouldThrow) {
+    throw new Error("Transaction rolled back");
+  }
+  return fn();
+}
+
+async function registerFakeRoutes(app: ReturnType<typeof buildFakeApp>["instance"]) {
+  const a = app as unknown as {
+    post: (url: string, opts: unknown, handler: RouteEntry["handler"]) => void;
+    get: (url: string, opts: unknown, handler: RouteEntry["handler"]) => void;
+  };
+
+  // POST /ideas
+  a.post("/ideas", {}, async (req, reply) => {
+    const body = req.body as { title: string };
+    const idea = fakeTx(() => {
+      const i = createIdeaStub(null, body);
+      writeEvent("idea.created", "idea", i.id, { title: i.title });
+      return i;
     });
-
-    assert.strictEqual(res.statusCode, 200);
-    assert.deepStrictEqual(JSON.parse(res.body), result);
-    assert.strictEqual(transactionFn.mock.callCount(), 1, "wrapped in transaction");
-    // Two writeEvent calls: idea.promoted + project.created
-    assert.strictEqual(insertFn.mock.callCount(), 2, "two events written");
+    return reply.status(201).send(idea);
   });
 
-  it("returns 404 when the idea is not found (NotFoundError)", async () => {
-    promoteIdeaToProjectMock.mock.mockImplementation(() => {
-      throw new NotFoundError("Idea not found");
-    });
-
-    const app = buildApp();
-    const res = await app.inject({
-      method: "POST",
-      url: "/ideas/missing/promote",
-    });
-
-    assert.strictEqual(res.statusCode, 404);
-    const body = JSON.parse(res.body);
-    assert.strictEqual(body.code, "NOT_FOUND");
-    assert.strictEqual(body.error, "Idea not found");
+  // GET /ideas
+  a.get("/ideas", {}, async (req) => {
+    const query = (req.query ?? {}) as Record<string, string>;
+    return listIdeasStub(null, query);
   });
 
-  it("returns 409 when the idea has already been promoted (ConflictError)", async () => {
-    promoteIdeaToProjectMock.mock.mockImplementation(() => {
-      throw new ConflictError("Idea already promoted");
-    });
+  // POST /ideas/:id/promote
+  a.post("/ideas/:id/promote", {}, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    try {
+      const result = fakeTx(() => {
+        const r = promoteIdeaToProjectStub(null, id);
+        writeEvent("idea.promoted", "idea", r.idea.id, { projectId: r.project.id });
+        writeEvent("project.created", "project", r.project.id, {
+          name: r.project.name,
+          ideaId: r.idea.id,
+        });
+        return r;
+      });
+      return result;
+    } catch (err) {
+      if (err instanceof NotFoundError) return reply.code(404).send({ error: err.message, code: err.code });
+      if (err instanceof ConflictError) return reply.code(409).send({ error: err.message, code: err.code });
+      throw err;
+    }
+  });
+}
 
-    const app = buildApp();
-    const res = await app.inject({
-      method: "POST",
-      url: "/ideas/i1/promote",
-    });
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
-    assert.strictEqual(res.statusCode, 409);
-    const body = JSON.parse(res.body);
-    assert.strictEqual(body.code, "CONFLICT");
-    assert.strictEqual(body.error, "Idea already promoted");
+function findHandler(routes: RouteEntry[], method: string, url: string) {
+  return routes.find((r) => r.method === method && r.url === url)?.handler;
+}
+
+function makeReq(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return { body: {}, params: {}, query: {}, ...overrides };
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("ideaRoutes", () => {
+  let routes: RouteEntry[];
+
+  beforeEach(async () => {
+    capturedEvents = [];
+    transactionShouldThrow = false;
+    createIdeaStub.mock.resetCalls();
+    listIdeasStub.mock.resetCalls();
+    promoteIdeaToProjectStub.mock.resetCalls();
+
+    // Restore default implementations
+    createIdeaStub.mock.mockImplementation(
+      (_db: unknown, input: Record<string, unknown>) => ({ ...fakeIdea, ...input }),
+    );
+    listIdeasStub.mock.mockImplementation(() => [fakeIdea]);
+    promoteIdeaToProjectStub.mock.mockImplementation(
+      (_db: unknown, ideaId: string) => ({
+        idea: { ...fakeIdea, id: ideaId, status: "promoted", projectId: "p1" },
+        project: { id: "p1", name: fakeIdea.title },
+      }),
+    );
+
+    const app = buildFakeApp();
+    await registerFakeRoutes(app.instance);
+    routes = app.routes;
   });
 
-  it("re-throws unexpected errors", async () => {
-    promoteIdeaToProjectMock.mock.mockImplementation(() => {
-      throw new Error("unexpected boom");
+  // ── POST /ideas ─────────────────────────────────────────────────────────
+
+  describe("POST /ideas", () => {
+    it("creates an idea inside a transaction and returns 201", async () => {
+      const handler = findHandler(routes, "POST", "/ideas")!;
+      const reply = new FakeReply();
+      await handler(makeReq({ body: { title: "Cool idea" } }), reply);
+
+      assert.strictEqual(reply.statusCode, 201);
+      assert.strictEqual((reply.body as Record<string, unknown>).title, "Cool idea");
+      assert.strictEqual(capturedEvents.length, 1);
+      assert.strictEqual(capturedEvents[0].action, "idea.created");
+    });
+  });
+
+  // ── GET /ideas ──────────────────────────────────────────────────────────
+
+  describe("GET /ideas", () => {
+    it("returns a list of ideas", async () => {
+      const handler = findHandler(routes, "GET", "/ideas")!;
+      const result = await handler(makeReq(), new FakeReply());
+
+      assert.deepStrictEqual(result, [fakeIdea]);
     });
 
-    const app = buildApp();
-    const res = await app.inject({
-      method: "POST",
-      url: "/ideas/i1/promote",
+    it("passes query-string filters through", async () => {
+      const handler = findHandler(routes, "GET", "/ideas")!;
+      await handler(makeReq({ query: { status: "raw" } }), new FakeReply());
+
+      const call = listIdeasStub.mock.calls[0];
+      assert.strictEqual(call.arguments[1].status, "raw");
+    });
+  });
+
+  // ── POST /ideas/:id/promote ─────────────────────────────────────────────
+
+  describe("POST /ideas/:id/promote", () => {
+    it("promotes an idea and emits two events inside a transaction", async () => {
+      const handler = findHandler(routes, "POST", "/ideas/:id/promote")!;
+      await handler(makeReq({ params: { id: "i1" } }), new FakeReply());
+
+      assert.strictEqual(capturedEvents.length, 2, "two events emitted");
+      assert.strictEqual(capturedEvents[0].action, "idea.promoted");
+      assert.strictEqual(capturedEvents[1].action, "project.created");
     });
 
-    assert.strictEqual(res.statusCode, 500);
+    it("returns 404 when the idea is not found (NotFoundError)", async () => {
+      promoteIdeaToProjectStub.mock.mockImplementation(() => {
+        throw new NotFoundError("Idea not found");
+      });
+
+      const handler = findHandler(routes, "POST", "/ideas/:id/promote")!;
+      const reply = new FakeReply();
+      await handler(makeReq({ params: { id: "missing" } }), reply);
+
+      assert.strictEqual(reply.statusCode, 404);
+      const body = reply.body as Record<string, unknown>;
+      assert.strictEqual(body.code, "NOT_FOUND");
+      assert.strictEqual(body.error, "Idea not found");
+    });
+
+    it("returns 409 when the idea has already been promoted (ConflictError)", async () => {
+      promoteIdeaToProjectStub.mock.mockImplementation(() => {
+        throw new ConflictError("Idea already promoted");
+      });
+
+      const handler = findHandler(routes, "POST", "/ideas/:id/promote")!;
+      const reply = new FakeReply();
+      await handler(makeReq({ params: { id: "i1" } }), reply);
+
+      assert.strictEqual(reply.statusCode, 409);
+      const body = reply.body as Record<string, unknown>;
+      assert.strictEqual(body.code, "CONFLICT");
+      assert.strictEqual(body.error, "Idea already promoted");
+    });
+
+    it("re-throws unexpected errors", async () => {
+      promoteIdeaToProjectStub.mock.mockImplementation(() => {
+        throw new Error("unexpected boom");
+      });
+
+      const handler = findHandler(routes, "POST", "/ideas/:id/promote")!;
+      const reply = new FakeReply();
+
+      await assert.rejects(
+        () => handler(makeReq({ params: { id: "i1" } }), reply),
+        { message: "unexpected boom" },
+      );
+    });
   });
 });

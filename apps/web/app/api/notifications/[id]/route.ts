@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 export async function PATCH(
   _request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   const apiUrl = process.env.CLAWOPS_API_URL;
   const apiKey = process.env.CLAWOPS_API_KEY;
@@ -14,7 +14,7 @@ export async function PATCH(
     );
   }
 
-  const { id } = params;
+  const { id } = await params;
   try {
     const res = await fetch(`${apiUrl}/notifications/${id}`, {
       method: "PATCH",
