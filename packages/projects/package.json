@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
     "lint": "eslint src/",
-    "test": "node --experimental-test-module-mocks --import tsx/esm --test src/projects.test.mts"
+    "test": "node --experimental-test-module-mocks --import tsx/esm --test src/projects.test.mts",
+    "test:integration": "node --import tsx/esm --test src/*.integration.test.mts"
   },
   "dependencies": {
     "@clawops/core": "workspace:*",
@@ -17,7 +18,9 @@
     "drizzle-orm": "^0.38.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.0.0",
+    "better-sqlite3": "^11.7.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   },
