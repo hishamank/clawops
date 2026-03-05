@@ -71,12 +71,17 @@ clawops habit list --json
 export function installClawOpsSkill(workspacePath: string): {
   installed: boolean;
   path: string;
+  error?: string;
 } {
   const skillDir = path.join(workspacePath, "skills", "clawops");
   const skillFile = path.join(skillDir, "SKILL.md");
 
-  fs.mkdirSync(skillDir, { recursive: true });
-  fs.writeFileSync(skillFile, SKILL_CONTENT, "utf8");
-
-  return { installed: true, path: skillFile };
+  try {
+    fs.mkdirSync(skillDir, { recursive: true });
+    fs.writeFileSync(skillFile, SKILL_CONTENT, "utf8");
+    return { installed: true, path: skillFile };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { installed: false, path: skillFile, error: message };
+  }
 }
