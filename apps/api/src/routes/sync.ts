@@ -35,15 +35,27 @@ export async function syncRoutes(app: FastifyInstance): Promise<void> {
     const body = syncRequestSchema.parse(req.body ?? {});
 
     // Scan filesystem
-    const { agents, workspaces, gatewayUrl } = openclaw.scanOpenClaw({
-      openclawDir: body.openclawDir,
-      gatewayUrl: body.gatewayUrl,
-    });
+    let scanResult: ReturnType<typeof openclaw.scanOpenClaw>;
+    try {
+      scanResult = openclaw.scanOpenClaw({
+        openclawDir: body.openclawDir,
+        gatewayUrl: body.gatewayUrl,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({ success: false, error: `Scan failed: ${message}` });
+    }
+    const { agents, workspaces, gatewayUrl } = scanResult;
 
     // Fetch from gateway if token provided
     let cronJobs: Awaited<ReturnType<typeof openclaw.fetchGatewayCronJobs>> = [];
     if (body.gatewayToken) {
-      cronJobs = await openclaw.fetchGatewayCronJobs(gatewayUrl, body.gatewayToken);
+      try {
+        cronJobs = await openclaw.fetchGatewayCronJobs(gatewayUrl, body.gatewayToken);
+      } catch {
+        // Gateway unreachable — continue with filesystem results only
+        cronJobs = [];
+      }
     }
 
     lastSyncResult = {
@@ -88,7 +100,13 @@ export async function syncRoutes(app: FastifyInstance): Promise<void> {
       workspacePaths: z.array(z.string().min(1)),
     }).parse(req.body);
 
-    const results = body.workspacePaths.map(workspacePath => {
+    // Basic path traversal protection — reject paths with ..
+    const safePaths = body.workspacePaths.filter(p => !p.includes(".."));
+    if (safePaths.length !== body.workspacePaths.length) {
+      return reply.status(400).send({ error: "Invalid workspace path: path traversal not allowed" });
+    }
+
+    const results = safePaths.map(workspacePath => {
       const result = openclaw.installClawOpsSkill(workspacePath);
       return { workspacePath, ...result };
     });
