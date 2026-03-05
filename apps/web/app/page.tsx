@@ -6,6 +6,7 @@ import { StatsCard } from "@/components/stats-card";
 import { AgentCard } from "@/components/agent-card";
 import { ActivityFeed } from "@/components/activity-feed";
 import { Button } from "@/components/ui/button";
+import { OnboardingBanner } from "@/components/onboarding/onboarding-banner";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,9 @@ export default async function FleetOverview(): Promise<React.JSX.Element> {
           </div>
         </div>
       </div>
+
+      {/* Onboarding banner — shown when no agents exist */}
+      {agents.length === 0 && <OnboardingBanner />}
 
       {/* Stats row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
