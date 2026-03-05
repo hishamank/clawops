@@ -6,6 +6,13 @@
   "bin": {
     "clawops": "./dist/index.js"
   },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "node --import tsx src/index.ts",
