@@ -17,7 +17,7 @@ export function scanOpenClaw(options: OpenClawScanOptions = {}): {
   workspaces: SyncWorkspace[];
   gatewayUrl: string;
 } {
-  const openclawDir = resolvePath(options.openclawDir ?? "~/.openclaw");
+  const openclawDir = resolvePath(options.openclawDir ?? process.env["OPENCLAW_DIR"] ?? "~/.openclaw");
   const configPath = path.join(openclawDir, "openclaw.json");
 
   let config: OpenClawConfig = {};

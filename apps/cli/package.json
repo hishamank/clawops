@@ -1,7 +1,7 @@
 {
   "name": "@clawops/cli",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "type": "module",
   "bin": {
     "clawops": "./dist/index.js"

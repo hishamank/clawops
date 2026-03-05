@@ -68,11 +68,11 @@ clawops habit list --json
 - Write a summary when marking done
 `;
 
-export function installClawOpsSkill(workspacePath: string): {
-  installed: boolean;
-  path: string;
-  error?: string;
-} {
+export type SkillInstallResult =
+  | { installed: true; path: string }
+  | { installed: false; path: string; error: string };
+
+export function installClawOpsSkill(workspacePath: string): SkillInstallResult {
   const skillDir = path.join(workspacePath, "skills", "clawops");
   const skillFile = path.join(skillDir, "SKILL.md");
 
