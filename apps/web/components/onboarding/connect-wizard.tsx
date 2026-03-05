@@ -96,6 +96,7 @@ export function ConnectWizard({ onClose }: { onClose?: () => void }): React.JSX.
           <button
             onClick={onClose}
             className="absolute right-4 top-4 text-zinc-500 hover:text-zinc-300 transition-colors"
+            aria-label="Close"
           >
             <X className="h-5 w-5" />
           </button>
@@ -174,6 +175,7 @@ export function ConnectWizard({ onClose }: { onClose?: () => void }): React.JSX.
             <button
               onClick={handleConnect}
               disabled={loading || !form.openclawDir}
+              title={!form.openclawDir ? "OpenClaw directory is required" : undefined}
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
