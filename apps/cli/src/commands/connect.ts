@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import readline from "node:readline";
+import path from "node:path";
 import { openclaw } from "@clawops/sync";
 
 function prompt(question: string): Promise<string> {
@@ -38,14 +39,14 @@ export const connectCmd = new Command("connect")
     });
 
     // Fetch from gateway if token provided
-    let cronJobs: Awaited<ReturnType<typeof openclaw.fetchGatewayCronJobs>> = [];
+    let _cronJobs: Awaited<ReturnType<typeof openclaw.fetchGatewayCronJobs>> = [];
     if (opts.gatewayToken) {
       console.log("\n🌐 Connecting to gateway...");
       const [gwAgents, gwCronJobs] = await Promise.all([
         openclaw.fetchGatewayAgents(gatewayUrl, opts.gatewayToken),
         openclaw.fetchGatewayCronJobs(gatewayUrl, opts.gatewayToken),
       ]);
-      cronJobs = gwCronJobs;
+      _cronJobs = gwCronJobs;
       if (gwCronJobs.length > 0) {
         console.log(`   Found ${gwCronJobs.length} cron job(s) running`);
       }
@@ -82,17 +83,17 @@ export const connectCmd = new Command("connect")
 
     console.log(`\n📝 Installing ClawOps skill to ${selectedWorkspaces.length} workspace(s)...`);
 
-    const results: Array<{ agentId: string; path: string; skipped?: boolean }> = [];
-
     for (const ws of selectedWorkspaces) {
       if (opts.dryRun) {
-        const skillPath = `${ws.path}/skills/clawops/SKILL.md`;
+        const skillPath = path.join(ws.path, "skills", "clawops", "SKILL.md");
         console.log(`   [dry-run] Would write: ${skillPath}`);
-        results.push({ agentId: ws.agentId, path: skillPath, skipped: true });
       } else {
         const result = openclaw.installClawOpsSkill(ws.path);
-        console.log(`   ✅ ${ws.agentId} → ${result.path}`);
-        results.push({ agentId: ws.agentId, path: result.path });
+        if (result.installed) {
+          console.log(`   ✅ ${ws.agentId} → ${result.path}`);
+        } else {
+          console.log(`   ❌ ${ws.agentId} — ${result.error ?? "unknown error"}`);
+        }
       }
     }
 
