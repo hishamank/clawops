@@ -38,7 +38,7 @@ export function ConnectWizard({ onClose }: { onClose?: () => void }): React.JSX.
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/sync/openclaw`, {
+      const res = await fetch("/api/sync/openclaw", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -68,7 +68,7 @@ export function ConnectWizard({ onClose }: { onClose?: () => void }): React.JSX.
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/sync/openclaw/install-skill`, {
+      const res = await fetch("/api/sync/openclaw/install-skill", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ workspacePaths: selectedPaths }),
