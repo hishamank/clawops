@@ -20,7 +20,7 @@ export async function syncRoutes(app: FastifyInstance): Promise<void> {
   // POST /sync/openclaw — trigger sync
   app.post("/sync/openclaw", {
     schema: {
-      description: "Trigger an OpenClaw sync — scan workspace files and optionally fetch from gateway",
+      summary: "Trigger an OpenClaw sync — scan workspace files and optionally fetch from gateway",
       tags: ["sync"],
       body: {
         type: "object",
@@ -81,7 +81,7 @@ export async function syncRoutes(app: FastifyInstance): Promise<void> {
   // POST /sync/openclaw/install-skill — install skill to selected agents
   app.post("/sync/openclaw/install-skill", {
     schema: {
-      description: "Install ClawOps SKILL.md to selected agent workspaces",
+      summary: "Install ClawOps SKILL.md to selected agent workspaces",
       tags: ["sync"],
       body: {
         type: "object",
@@ -117,7 +117,7 @@ export async function syncRoutes(app: FastifyInstance): Promise<void> {
   // GET /sync/openclaw/status — last sync result
   app.get("/sync/openclaw/status", {
     schema: {
-      description: "Get the last OpenClaw sync result",
+      summary: "Get the last OpenClaw sync result",
       tags: ["sync"],
     },
   }, async (_req, reply) => {
