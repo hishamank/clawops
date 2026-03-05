@@ -99,6 +99,9 @@ importers:
       '@clawops/projects':
         specifier: workspace:^
         version: link:../../packages/projects
+      '@clawops/sync':
+        specifier: workspace:^
+        version: link:../../packages/sync
       '@clawops/tasks':
         specifier: workspace:^
         version: link:../../packages/tasks
