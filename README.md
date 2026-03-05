@@ -46,22 +46,42 @@ Turborepo + pnpm workspaces monorepo. Business logic lives in `packages/` as ind
 
 ## Quick Start
 
-### Prerequisites
+### One-Line Install (Recommended)
 
+```bash
+# Clone and run the install script
+git clone https://github.com/hishamank/clawops.git
+cd clawops
+./install.sh
+```
+
+The install script will:
+- ✓ Check Node.js and pnpm are installed
+- ✓ Install all dependencies
+- ✓ Generate API keys and setup `.env`
+- ✓ Build all packages
+- ✓ Run database migrations
+- ✓ Link the CLI globally
+- ✓ Optionally start dev servers
+
+### Manual Install
+
+**Prerequisites:**
 - **Node.js** 22+
 - **pnpm** 9+
-
-### Install & Run
 
 ```bash
 # Install dependencies
 pnpm install
 
 # Build all packages and apps
-pnpm turbo build
+pnpm build
+
+# Run database migrations
+pnpm --filter @clawops/core db:migrate
 
 # Start development servers (API on :3001, Web on :3000)
-pnpm turbo dev
+pnpm dev
 ```
 
 ## Docker
@@ -159,7 +179,11 @@ ClawOps integrates with OpenClaw to auto-discover agents, sync workspaces, and i
 ### CLI onboarding
 
 ```bash
-# Install ClawOps CLI globally
+# For local development: build and link the CLI globally
+pnpm --filter @clawops/cli build
+cd apps/cli && pnpm link --global
+
+# Or install from npm (when published)
 npm install -g @clawops/cli
 
 # Connect to your OpenClaw setup
