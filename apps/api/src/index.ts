@@ -10,6 +10,7 @@ import { habitRoutes } from "./routes/habits.js";
 import { projectRoutes } from "./routes/projects.js";
 import { analyticsRoutes } from "./routes/analytics.js";
 import { notificationRoutes } from "./routes/notifications.js";
+import { syncRoutes } from "./routes/sync.js";
 import { authRoutes } from "./routes/auth.js";
 
 const port = Number(process.env["PORT"] || 3001);
@@ -70,6 +71,7 @@ async function start(): Promise<void> {
       await protectedApp.register(projectRoutes);
       await protectedApp.register(analyticsRoutes);
       await protectedApp.register(notificationRoutes);
+      await protectedApp.register(syncRoutes);
     });
 
     await app.listen({ port, host });
