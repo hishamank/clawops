@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Loader2, Check, X, FolderSync, Cpu } from "lucide-react";
 
 interface DiscoveredAgent {
@@ -16,7 +17,7 @@ interface SyncResult {
 
 type Step = "form" | "agents" | "done";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
 
 export function ConnectWizard({ onClose }: { onClose?: () => void }): React.JSX.Element {
   const [step, setStep] = useState<Step>("form");
@@ -24,6 +25,8 @@ export function ConnectWizard({ onClose }: { onClose?: () => void }): React.JSX.
   const [error, setError] = useState<string | null>(null);
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
+
+  const router = useRouter();
 
   const [form, setForm] = useState({
     openclawDir: "~/.openclaw",
@@ -90,7 +93,7 @@ export function ConnectWizard({ onClose }: { onClose?: () => void }): React.JSX.
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="relative w-full max-w-lg rounded-xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl">
+      <div role="dialog" aria-modal="true" aria-labelledby="connect-wizard-title" className="relative w-full max-w-lg rounded-xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl">
         {/* Close button */}
         {onClose && (
           <button
@@ -294,7 +297,7 @@ export function ConnectWizard({ onClose }: { onClose?: () => void }): React.JSX.
             <button
               onClick={() => {
                 onClose?.();
-                window.location.reload();
+                router.refresh();
               }}
               className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
             >
