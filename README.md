@@ -80,7 +80,7 @@ pnpm build
 # Run database migrations
 pnpm --filter @clawops/core db:migrate
 
-# Start development servers (API on :3001, Web on :3000)
+# Start development servers (API on :4444, Web on :3333)
 pnpm dev
 ```
 
