@@ -25,6 +25,7 @@
     "@clawops/ideas": "workspace:^",
     "@clawops/notifications": "workspace:^",
     "@clawops/projects": "workspace:^",
+    "@clawops/sync": "workspace:^",
     "@clawops/tasks": "workspace:^"
   },
   "devDependencies": {
