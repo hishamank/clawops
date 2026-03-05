@@ -42,6 +42,7 @@ Turborepo + pnpm workspaces monorepo. Business logic lives in `packages/` as ind
 | `packages/analytics` | Usage log ingestion, cost calculation, aggregation queries |
 | `packages/notifications` | Notification creation, delivery, read state management |
 | `packages/domain` | Domain models and types |
+| `packages/sync` | OpenClaw sync adapter |
 
 ## Quick Start
 
@@ -149,6 +150,34 @@ clawops habit register "stay alive" --type heartbeat --interval 300
 
 # Log a habit run
 clawops habit run <id> --note "completed morning standup"
+```
+
+## Connecting to OpenClaw
+
+ClawOps integrates with OpenClaw to auto-discover agents, sync workspaces, and install skills.
+
+### CLI onboarding
+
+```bash
+# Install ClawOps CLI globally
+npm install -g @clawops/cli
+
+# Connect to your OpenClaw setup
+clawops connect
+
+# With gateway token for live data
+clawops connect --gateway-token YOUR_TOKEN
+
+# Install skill to all agents without prompting
+clawops connect --all
+```
+
+### API
+
+```
+POST /api/sync/openclaw         — Trigger a scan
+GET  /api/sync/openclaw/status  — Last sync result
+POST /api/sync/openclaw/install-skill — Install SKILL.md to workspaces
 ```
 
 ## Configuration
