@@ -1,8 +1,8 @@
-# 🐾 ClawOps
+# ClawOps
 
 > **The calm operations layer above autonomous AI systems**
 
-[![Node](https://img.shields.io/badge/node-22%2B-brightgreen)](https://nodejs.org/)
+[![Node](https://img.shields.io/badge/node-18%2B-brightgreen)](https://nodejs.org/)
 [![pnpm](https://img.shields.io/badge/pnpm-9%2B-F69220)](https://pnpm.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6)](https://www.typescriptlang.org/)
@@ -46,162 +46,151 @@ Turborepo + pnpm workspaces monorepo. Business logic lives in `packages/` as ind
 
 ## Quick Start
 
-### One-Line Install (Recommended)
+### Production Install (Recommended)
 
 ```bash
-# Clone and run the install script
 git clone https://github.com/hishamank/clawops.git
 cd clawops
 ./install.sh
 ```
 
 The install script will:
-- ✓ Check Node.js and pnpm are installed
-- ✓ Install all dependencies
-- ✓ Generate API keys and setup `.env`
-- ✓ Build all packages
-- ✓ Run database migrations
-- ✓ Link the CLI globally
-- ✓ Optionally start dev servers
+- Check Node.js (>=18) and pnpm are installed
+- Install all dependencies (`pnpm install --frozen-lockfile`)
+- Build all packages
+- Run database migrations
+- Check port availability for web (3333) and API (4444)
+- Generate `.env` with API key and port config
+- Link the CLI globally
+- Verify `clawops --version`
+
+After install, run `clawops onboard` to connect to OpenClaw.
 
 ### Manual Install
 
 **Prerequisites:**
-- **Node.js** 22+
+- **Node.js** 18+
 - **pnpm** 9+
 
 ```bash
-# Install dependencies
 pnpm install
-
-# Build all packages and apps
 pnpm build
-
-# Run database migrations
 pnpm --filter @clawops/core db:migrate
-
-# Start development servers (API on :4444, Web on :3333)
-pnpm dev
+cd apps/cli && pnpm link --global && cd ../..
+clawops --version
 ```
 
-## Docker
+### Docker
 
 ```bash
-# Copy and configure environment
 cp .env.example .env   # fill in CLAWOPS_API_KEY
-
-# Start all services
 docker-compose up --build
 ```
 
 This starts:
-- **API** on `http://localhost:3001`
-- **Web dashboard** on `http://localhost:3000`
+- **API** on `http://localhost:4444`
+- **Web dashboard** on `http://localhost:3333`
 
 Data is persisted via a Docker volume at `/data/clawops.db`.
 
-## CLI Usage
+## Connecting to OpenClaw
+
+Use `clawops onboard` to interactively connect ClawOps to your OpenClaw setup:
+
+```bash
+clawops onboard
+```
+
+This will:
+1. Prompt for your OpenClaw directory (default: `~/.openclaw`)
+2. Scan for agents and workspaces
+3. Install the ClawOps skill (`SKILL.md`) into each agent workspace
+4. Optionally start the dashboard
+5. Optionally install system services (systemd/launchd)
+
+For non-interactive use (CI/scripting):
+
+```bash
+clawops onboard --all --json
+```
+
+## Re-syncing
+
+After onboarding, use `clawops sync` to keep ClawOps in sync with OpenClaw:
+
+```bash
+# Basic sync — detect new/removed agents, install missing skills
+clawops sync
+
+# With gateway data (cron jobs, live sessions)
+clawops sync --gateway-token YOUR_TOKEN
+
+# JSON output for scripting
+clawops sync --json
+```
+
+Exit codes: `0` = changes made, `1` = error, `2` = nothing changed.
+
+## CLI Commands
 
 The `clawops` CLI is the primary interface between agent frameworks and ClawOps. Every command supports `--json` for machine-readable output.
 
-### Agent Commands
+### Agent
 
 ```bash
-# Register or update an agent
 clawops agent init --name "Jax" --model "claude-opus-4-6" --role "orchestrator" --framework openclaw
-
-# Set agent status
 clawops agent status set busy --message "reviewing PRD"
-
-# Declare skills
 clawops agent skills set "task_create,idea_add,web_search,file_read"
-
-# Send heartbeat
 clawops agent heartbeat
 ```
 
-### Task Commands
+### Task
 
 ```bash
-# Create a task
 clawops task create --title "Review onboarding flow" --priority high --project <id> --assignee self
-
-# List tasks
 clawops task list --status todo --assignee self --json
-
-# Update status
 clawops task update <id> --status in-progress
-
-# Complete a task
 clawops task done <id> --summary "reviewed and approved" --tokens 1240 --artifacts "report.md,pr#42"
 ```
 
-### Idea Commands
+### Idea
 
 ```bash
-# Capture an idea
 clawops idea add "Redesign onboarding flow" --desc "..." --tags "ux,frontend"
-
-# List ideas
 clawops idea list --status raw --json
 ```
 
-### Project Commands
+### Project
 
 ```bash
-# Create a project
 clawops project create --name "Portfolio Redesign" --status planning
-
-# List projects
 clawops project list --json
-
-# View project details
 clawops project info <id>
 ```
 
-### Habit Commands
+### Habit
 
 ```bash
-# Register a scheduled habit
 clawops habit register "morning briefing" --type scheduled --schedule "0 8 * * *"
-
-# Register a heartbeat
 clawops habit register "stay alive" --type heartbeat --interval 300
-
-# Log a habit run
 clawops habit run <id> --note "completed morning standup"
 ```
 
-## Connecting to OpenClaw
-
-ClawOps integrates with OpenClaw to auto-discover agents, sync workspaces, and install skills.
-
-### CLI onboarding
+### Onboard
 
 ```bash
-# For local development: build and link the CLI globally
-pnpm --filter @clawops/cli build
-cd apps/cli && pnpm link --global
-
-# Or install from npm (when published)
-npm install -g @clawops/cli
-
-# Connect to your OpenClaw setup
-clawops connect
-
-# With gateway token for live data
-clawops connect --gateway-token YOUR_TOKEN
-
-# Install skill to all agents without prompting
-clawops connect --all
+clawops onboard                          # Interactive setup
+clawops onboard --all --json             # Non-interactive
+clawops onboard --dry-run                # Preview changes
 ```
 
-### API
+### Sync
 
-```
-POST /api/sync/openclaw         — Trigger a scan
-GET  /api/sync/openclaw/status  — Last sync result
-POST /api/sync/openclaw/install-skill — Install SKILL.md to workspaces
+```bash
+clawops sync                             # Detect changes, install skills
+clawops sync --gateway-token TOKEN       # Include gateway data
+clawops sync --reinstall-skills          # Force reinstall
+clawops sync --json                      # JSON output
 ```
 
 ## Configuration
@@ -210,21 +199,24 @@ POST /api/sync/openclaw/install-skill — Install SKILL.md to workspaces
 |---|---|---|
 | `CLAWOPS_MODE` | `local` (direct SQLite) or `remote` (calls API) | `local` |
 | `CLAWOPS_API_KEY` | API key for authentication | — |
-| `CLAWOPS_API_URL` | API server URL (required in remote mode) | `http://localhost:3001` |
+| `CLAWOPS_API_URL` | API server URL (required in remote mode) | `http://localhost:4444` |
 | `CLAWOPS_AGENT_ID` | Agent identifier (used by CLI to tag tasks/ideas to this agent) | — |
-| `CLAWOPS_DB_PATH` | SQLite database path (local mode only) | `./clawops.db` |
-| `PORT` | API server port | `3001` |
+| `CLAWOPS_DB_PATH` | SQLite database path | `./clawops.db` |
+| `WEB_PORT` | Web dashboard port | `3333` |
+| `API_PORT` | API server port | `4444` |
+| `OPENCLAW_DIR` | OpenClaw directory path | `~/.openclaw` |
+| `OPENCLAW_GATEWAY_URL` | OpenClaw gateway URL | `http://localhost:3000` |
+| `OPENCLAW_GATEWAY_TOKEN` | Gateway auth token | — |
+
+## API Endpoints
+
+```
+POST /api/sync/openclaw             — Trigger a scan
+GET  /api/sync/openclaw/status      — Last sync result
+POST /api/sync/openclaw/install-skill — Install SKILL.md to workspaces
+```
 
 ## Development
-
-### Add a Package
-
-```bash
-mkdir packages/my-package
-cd packages/my-package
-pnpm init
-# Add to pnpm-workspace.yaml automatically via packages/* glob
-```
 
 ### Run Tests
 
@@ -235,13 +227,13 @@ pnpm test
 ### Typecheck
 
 ```bash
-pnpm turbo typecheck
+pnpm typecheck
 ```
 
 ### Lint
 
 ```bash
-pnpm turbo lint
+pnpm lint
 ```
 
 ## License
