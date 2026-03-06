@@ -27,9 +27,29 @@ describe("installClawOpsSkill()", () => {
     installClawOpsSkill(tmpDir);
     const skillPath = path.join(tmpDir, "skills", "clawops", "SKILL.md");
     const content = fs.readFileSync(skillPath, "utf8");
+    assert.ok(content.startsWith("---"));
+    assert.ok(content.includes("name: clawops"));
+    assert.ok(content.includes("user-invocable: true"));
     assert.ok(content.includes("clawops task"));
     assert.ok(content.includes("clawops project"));
     assert.ok(content.includes("--json"));
+  });
+
+  it("updates agents.md and TOOLS.md with skill reference", () => {
+    const agentsPath = path.join(tmpDir, "agents.md");
+    const toolsPath = path.join(tmpDir, "TOOLS.md");
+    fs.writeFileSync(agentsPath, "# Workspace Agent Notes\n", "utf8");
+    fs.writeFileSync(toolsPath, "# Workspace Tools\n", "utf8");
+
+    installClawOpsSkill(tmpDir);
+
+    const agentsContent = fs.readFileSync(agentsPath, "utf8");
+    const toolsContent = fs.readFileSync(toolsPath, "utf8");
+
+    assert.ok(agentsContent.includes("## ClawOps Skill"));
+    assert.ok(agentsContent.includes("$clawops"));
+    assert.ok(toolsContent.includes("## ClawOps Skill"));
+    assert.ok(toolsContent.includes("clawops task list --json"));
   });
 
   it("is idempotent — running twice does not error", () => {
@@ -37,6 +57,11 @@ describe("installClawOpsSkill()", () => {
     const r2 = installClawOpsSkill(tmpDir);
     assert.equal(r1.installed, true);
     assert.equal(r2.installed, true);
+
+    const agentsPath = path.join(tmpDir, "agents.md");
+    const agentsContent = fs.readFileSync(agentsPath, "utf8");
+    const markerCount = (agentsContent.match(/CLAWOPS_SKILL_REFERENCE_START/g) ?? []).length;
+    assert.equal(markerCount, 1);
   });
 
   it("returns installed:false with error message for read-only directory", () => {
