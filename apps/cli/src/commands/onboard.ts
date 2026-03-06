@@ -4,7 +4,7 @@ import { Command } from "commander";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -22,6 +22,7 @@ interface OnboardResult {
   agents: Array<{ id: string; name: string; workspacePath: string }>;
   skillsInstalled: number;
   dashboardStarted: boolean;
+  dashboardMode?: "prod";
   serviceInstalled: boolean;
 }
 
@@ -197,12 +198,28 @@ export const onboardCmd = new Command("onboard")
       );
       const apiBuild = path.join(projectRoot, "apps", "api", "dist", "index.js");
       const webBuild = path.join(projectRoot, "apps", "web", ".next", "standalone", "server.js");
+      const hasProdBuild = fs.existsSync(apiBuild) && fs.existsSync(webBuild);
 
-      if (!fs.existsSync(apiBuild) || !fs.existsSync(webBuild)) {
-        console.log(
-          "⚠ Dashboard build not found. Run `pnpm build` first, then re-run onboard.",
-        );
-      } else {
+      if (!hasProdBuild) {
+        if (!isJson) {
+          console.log("⚠ Dashboard build not found. Building project first...");
+        }
+        const pnpmCmd = os.platform() === "win32" ? "pnpm.cmd" : "pnpm";
+        const buildResult = spawnSync(pnpmCmd, ["build"], {
+          cwd: projectRoot,
+          stdio: "inherit",
+          env: process.env,
+        });
+        if (buildResult.status !== 0) {
+          if (!isJson) {
+            console.log("✗ Build failed. Dashboard was not started.");
+            console.log("");
+          }
+        }
+      }
+
+      const buildAvailable = fs.existsSync(apiBuild) && fs.existsSync(webBuild);
+      if (buildAvailable) {
         const apiProc = spawn("node", [apiBuild], {
           detached: true,
           stdio: "ignore",
@@ -218,12 +235,17 @@ export const onboardCmd = new Command("onboard")
         webProc.unref();
 
         result.dashboardStarted = true;
+        result.dashboardMode = "prod";
         if (!isJson) {
           console.log("✓ Dashboard started");
+          console.log("  Mode: production");
           console.log(`  Web: http://localhost:${webPort}`);
           console.log(`  API: http://localhost:${apiPort}`);
           console.log("");
         }
+      } else if (!isJson) {
+        console.log("✗ Production build artifacts still missing. Dashboard was not started.");
+        console.log("");
       }
     }
 
@@ -423,6 +445,9 @@ WantedBy=default.target
       console.log(
         `  Dashboard: ${result.dashboardStarted ? "running" : "not started"}`,
       );
+      if (result.dashboardStarted && result.dashboardMode) {
+        console.log(`  Dashboard mode: ${result.dashboardMode}`);
+      }
       console.log(`  Service: ${serviceLabel}`);
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     }

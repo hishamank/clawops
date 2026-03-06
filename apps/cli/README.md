@@ -59,9 +59,14 @@ clawops onboard --all --openclaw-dir /opt/openclaw --json
   "agents": [{"id": "rick", "name": "Rick", "workspacePath": "..."}],
   "skillsInstalled": 4,
   "dashboardStarted": false,
+  "dashboardMode": "prod",
   "serviceInstalled": false
 }
 ```
+
+Dashboard start behavior:
+- If production build artifacts exist, onboard starts API/Web in production mode.
+- If artifacts are missing, onboard runs `pnpm build` first, then starts API/Web in production mode.
 
 ---
 
