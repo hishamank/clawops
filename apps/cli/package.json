@@ -27,6 +27,8 @@
     "@clawops/ideas": "workspace:^",
     "@clawops/projects": "workspace:^",
     "@clawops/tasks": "workspace:^",
+    "@clawops/sync": "workspace:*",
+    "@inquirer/prompts": "^7.0.0",
     "commander": "^13.0.0",
     "@clawops/agents": "workspace:^",
     "@clawops/habits": "workspace:^"

@@ -6,6 +6,8 @@ import { habitCmd } from "./commands/habit.js";
 import { taskCmd } from "./commands/task.js";
 import { ideaCmd } from "./commands/idea.js";
 import { projectCmd } from "./commands/project.js";
+import { onboardCmd } from "./commands/onboard.js";
+import { syncCmd } from "./commands/sync.js";
 import { isLocalMode, ensureMigrated } from "./lib/client.js";
 
 const program = new Command();
@@ -21,6 +23,8 @@ program.addCommand(habitCmd);
 program.addCommand(taskCmd);
 program.addCommand(ideaCmd);
 program.addCommand(projectCmd);
+program.addCommand(onboardCmd);
+program.addCommand(syncCmd);
 
 program.hook("preAction", () => {
   // Auto-run migrations once before any command in local mode
