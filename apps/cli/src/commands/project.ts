@@ -69,6 +69,57 @@ projectCmd
   });
 
 projectCmd
+  .command("spec")
+  .description("Get or set project spec")
+  .argument("<id>", "Project ID")
+  .option("--set", "Set/replace full spec content")
+  .option("--file <path>", "Read spec from file")
+  .option("--append", "Append content to spec")
+  .option("--json", "Output raw JSON")
+  .action(async (id: string, opts) => {
+    if (opts.set) {
+      // Read from stdin or --file
+      let specContent: string;
+      if (opts.file) {
+        specContent = fs.readFileSync(opts.file, "utf-8");
+      } else {
+        // Read from stdin
+        specContent = fs.readFileSync(0, "utf-8");
+      }
+      const project = await projectSpecSet(id, specContent);
+      if (opts.json) {
+        console.log(JSON.stringify(project, null, 2));
+      } else {
+        console.log(`Updated spec for project ${project.id}`);
+      }
+    } else if (opts.append) {
+      // Read content from stdin or --file
+      let content: string;
+      if (opts.file) {
+        content = fs.readFileSync(opts.file, "utf-8");
+      } else {
+        content = fs.readFileSync(0, "utf-8");
+      }
+      const project = await projectSpecAppend(id, content);
+      if (opts.json) {
+        console.log(JSON.stringify(project, null, 2));
+      } else {
+        console.log(`Appended to spec for project ${project.id}`);
+      }
+    } else {
+      // Get spec
+      const spec = await projectSpecGet(id);
+      if (opts.json) {
+        console.log(JSON.stringify({ spec }, null, 2));
+      } else if (spec) {
+        console.log(spec);
+      } else {
+        console.log("No spec found for this project.");
+      }
+    }
+  });
+
+projectCmd
   .command("context")
   .description("Get project context snapshot for agents")
   .argument("<id>", "Project ID")

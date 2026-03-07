@@ -20,6 +20,7 @@ const createTaskBody = z.object({
   projectId: z.string().optional(),
   source: taskSourceEnum.optional(),
   dueDate: z.string().datetime().optional(),
+  specContent: z.string().optional(),
 });
 
 const listTasksQuery = z.object({
@@ -27,6 +28,7 @@ const listTasksQuery = z.object({
   assigneeId: z.string().optional(),
   projectId: z.string().optional(),
   priority: taskPriorityEnum.optional(),
+  withSpecs: z.string().transform((v) => v === "true").optional(),
 });
 
 export async function GET(req: Request): Promise<NextResponse> {
@@ -47,6 +49,8 @@ export async function POST(req: Request): Promise<NextResponse> {
       const t = createTask(tx as unknown as DB, {
         ...body,
         dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
+        specContent: body.specContent,
+        specUpdatedAt: body.specContent ? new Date() : undefined,
       });
       tx.insert(events)
         .values({
