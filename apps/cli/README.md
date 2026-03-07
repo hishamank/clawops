@@ -66,8 +66,8 @@ clawops onboard --all --openclaw-dir /opt/openclaw --json
 ```
 
 Dashboard start behavior:
-- If production build artifacts exist, onboard starts API/Web in production mode.
-- If artifacts are missing, onboard runs `pnpm build` first, then starts API/Web in production mode.
+- If production build artifacts exist, onboard starts Web in production mode.
+- If artifacts are missing, onboard runs `pnpm build` first, then starts Web in production mode.
 
 ---
 
@@ -207,10 +207,10 @@ clawops habit list --json
 
 | Variable | Description | Default |
 |---|---|---|
-| `CLAWOPS_MODE` | `local` or `remote` | `remote` |
-| `CLAWOPS_API_KEY` | API key for authentication | — |
-| `CLAWOPS_API_URL` | API server URL | `http://localhost:3001` |
+| `CLAWOPS_MODE` | Execution mode (local package mode) | `local` |
 | `CLAWOPS_AGENT_ID` | Agent identifier | — |
+| `CLAWOPS_DB_PATH` | SQLite database path | `./clawops.db` |
+| `WEB_PORT` | Dashboard port | `3333` |
 | `OPENCLAW_DIR` | OpenClaw directory | `~/.openclaw` |
 | `OPENCLAW_GATEWAY_URL` | Gateway URL | `http://localhost:3000` |
 | `OPENCLAW_GATEWAY_TOKEN` | Gateway auth token | — |

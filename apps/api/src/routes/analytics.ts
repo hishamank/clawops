@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { db } from "@clawops/core";
+import { db } from "@clawops/core/db";
 import {
   getTokenSummary,
   getCostsByAgent,

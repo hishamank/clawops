@@ -1,26 +1,6 @@
 version: "3.9"
 
 services:
-  api:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
-    ports:
-      - "3001:3001"
-    environment:
-      - CLAWOPS_MODE=local
-      - CLAWOPS_API_KEY
-      - CLAWOPS_DB_PATH=/data/clawops.db
-      - PORT=3001
-    volumes:
-      - clawops_data:/data
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
-
   web:
     build:
       context: .
@@ -28,11 +8,10 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - CLAWOPS_API_URL=http://api:3001
-      - CLAWOPS_API_KEY
-    depends_on:
-      api:
-        condition: service_healthy
+      - CLAWOPS_MODE=local
+      - CLAWOPS_DB_PATH=/data/clawops.db
+    volumes:
+      - clawops_data:/data
 
 volumes:
   clawops_data:

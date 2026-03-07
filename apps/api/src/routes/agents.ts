@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { db, events, tasks, eq, desc, type Agent, type DB } from "@clawops/core";
+import { events, tasks, eq, desc, type Agent, type DB } from "@clawops/core";
+import { db } from "@clawops/core/db";
 import {
   createAgent,
   getAgent,

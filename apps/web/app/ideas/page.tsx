@@ -1,5 +1,4 @@
 import { Lightbulb, Sparkles, ArrowUpRight } from "lucide-react";
-import { api } from "@/lib/api";
 import type { Idea } from "@/lib/types";
 import type { IdeaStatus, Source } from "@clawops/domain";
 import { timeAgo } from "@/lib/time";
@@ -9,6 +8,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { IdeaFilterTabs } from "./filter-tabs";
 import { PromoteButton } from "./promote-button";
+import { listIdeas } from "@clawops/ideas";
+import { getDb } from "@/lib/server/runtime";
 
 export const dynamic = "force-dynamic";
 
@@ -49,13 +50,10 @@ function parseTags(tags: string | null): string[] {
 }
 
 async function getIdeas(status?: string): Promise<Idea[]> {
-  try {
-    const query = status && status !== "all" ? `?status=${encodeURIComponent(status)}` : "";
-    return await api<Idea[]>(`/ideas${query}`, { tags: ["ideas"] });
-  } catch (err) {
-    if (err instanceof Error && err.message.includes("404")) return [];
-    throw err;
-  }
+  return listIdeas(
+    getDb(),
+    status && status !== "all" ? { status: status as IdeaStatus } : undefined,
+  ) as unknown as Idea[];
 }
 
 export default async function IdeasPage({ searchParams }: PageProps): Promise<React.JSX.Element> {

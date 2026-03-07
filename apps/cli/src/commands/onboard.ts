@@ -235,7 +235,6 @@ export const onboardCmd = new Command("onboard")
     }
 
     const webPort = process.env["WEB_PORT"] ?? "3333";
-    const apiPort = process.env["API_PORT"] ?? "4444";
 
     if (startDashboard && !isDryRun) {
       const projectRoot = path.resolve(
@@ -245,7 +244,6 @@ export const onboardCmd = new Command("onboard")
         "..",
         "..",
       );
-      const apiBuild = path.join(projectRoot, "apps", "api", "dist", "index.js");
       const webStandaloneBuild = path.join(
         projectRoot,
         "apps",
@@ -259,22 +257,14 @@ export const onboardCmd = new Command("onboard")
       const runtimeEnv: NodeJS.ProcessEnv = {
         ...envFromFile,
         ...process.env,
-        API_PORT: apiPort,
         WEB_PORT: webPort,
       };
-      debug("dashboard start context", { projectRoot, apiPort, webPort });
-      debug("runtime env presence", {
-        hasApiUrl: Boolean(runtimeEnv["CLAWOPS_API_URL"]),
-        hasApiKey: Boolean(runtimeEnv["CLAWOPS_API_KEY"]),
-      });
+      debug("dashboard start context", { projectRoot, webPort });
       debug("build artifacts before build", {
-        apiBuild: formatFileState(apiBuild),
         webStandaloneBuild: formatFileState(webStandaloneBuild),
         webBuildId: formatFileState(webBuildId),
       });
-      const hasProdBuild = fs.existsSync(apiBuild) && (
-        fs.existsSync(webStandaloneBuild) || fs.existsSync(webBuildId)
-      );
+      const hasProdBuild = fs.existsSync(webStandaloneBuild) || fs.existsSync(webBuildId);
 
       if (!hasProdBuild) {
         if (!isJson) {
@@ -300,11 +290,9 @@ export const onboardCmd = new Command("onboard")
         }
       }
 
-      const hasApiBuild = fs.existsSync(apiBuild);
       const hasWebStandaloneBuild = fs.existsSync(webStandaloneBuild);
       const hasWebNextBuild = fs.existsSync(webBuildId);
       debug("build artifacts after build", {
-        apiBuild: formatFileState(apiBuild),
         webStandaloneBuild: formatFileState(webStandaloneBuild),
         webBuildId: formatFileState(webBuildId),
       });
@@ -323,19 +311,8 @@ export const onboardCmd = new Command("onboard")
           debug(".next directory missing", { webNextDir });
         }
       }
-      const buildAvailable = hasApiBuild && (hasWebStandaloneBuild || hasWebNextBuild);
+      const buildAvailable = hasWebStandaloneBuild || hasWebNextBuild;
       if (buildAvailable) {
-        const apiProc = spawn("node", [apiBuild], {
-          detached: true,
-          stdio: "ignore",
-          env: runtimeEnv,
-        });
-        apiProc.on("error", (err) => {
-          debug("failed to spawn API process", { error: err.message });
-        });
-        debug("spawned API process", { cmd: "node", args: [apiBuild], pid: apiProc.pid ?? null });
-        apiProc.unref();
-
         if (hasWebStandaloneBuild) {
           const webProc = spawn("node", [webStandaloneBuild], {
             detached: true,
@@ -385,11 +362,10 @@ export const onboardCmd = new Command("onboard")
             console.log(`  Web runtime: ${result.dashboardWebRuntime}`);
           }
           console.log(`  Web: http://localhost:${webPort}`);
-          console.log(`  API: http://localhost:${apiPort}`);
           console.log("");
         }
       } else if (!isJson) {
-        debug("build artifacts check failed", { hasApiBuild, hasWebStandaloneBuild, hasWebNextBuild });
+        debug("build artifacts check failed", { hasWebStandaloneBuild, hasWebNextBuild });
         console.log("✗ Production build artifacts still missing. Dashboard was not started.");
         console.log("");
       }
@@ -442,20 +418,6 @@ export const onboardCmd = new Command("onboard")
         );
         fs.mkdirSync(serviceDir, { recursive: true });
 
-        const apiService = `[Unit]
-Description=ClawOps API Server
-After=network.target
-
-[Service]
-Type=simple
-EnvironmentFile=${path.join(projectRoot, ".env")}
-ExecStart=/usr/bin/env node ${path.join(projectRoot, "apps", "api", "dist", "index.js")}
-WorkingDirectory=${projectRoot}
-Restart=on-failure
-
-[Install]
-WantedBy=default.target
-`;
         const webService = `[Unit]
 Description=ClawOps Web Dashboard
 After=network.target
@@ -471,10 +433,6 @@ Restart=on-failure
 WantedBy=default.target
 `;
         fs.writeFileSync(
-          path.join(serviceDir, "clawops-api.service"),
-          apiService,
-        );
-        fs.writeFileSync(
           path.join(serviceDir, "clawops-web.service"),
           webService,
         );
@@ -482,20 +440,15 @@ WantedBy=default.target
         try {
           const { execSync } = await import("node:child_process");
           execSync("systemctl --user daemon-reload", { stdio: "ignore" });
-          execSync(
-            "systemctl --user enable --now clawops-api clawops-web",
-            { stdio: "ignore" },
-          );
+          execSync("systemctl --user enable --now clawops-web", { stdio: "ignore" });
           result.serviceInstalled = true;
           if (!isJson) {
-            console.log("✓ Systemd user services enabled");
+            console.log("✓ Systemd user service enabled");
           }
         } catch {
           if (!isJson) {
-            console.log("⚠ Failed to enable systemd services. Enable manually:");
-            console.log(
-              "  systemctl --user daemon-reload && systemctl --user enable --now clawops-api clawops-web",
-            );
+            console.log("⚠ Failed to enable systemd service. Enable manually:");
+            console.log("  systemctl --user daemon-reload && systemctl --user enable --now clawops-web");
           }
         }
       } else if (osPlatform === "darwin") {
@@ -507,27 +460,6 @@ WantedBy=default.target
         );
         fs.mkdirSync(launchDir, { recursive: true });
 
-        const apiPlist = `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>com.clawops.api</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/usr/bin/env</string>
-    <string>node</string>
-    <string>${path.join(projectRoot, "apps", "api", "dist", "index.js")}</string>
-  </array>
-  <key>WorkingDirectory</key>
-  <string>${projectRoot}</string>
-  <key>RunAtLoad</key>
-  <true/>
-  <key>KeepAlive</key>
-  <true/>
-</dict>
-</plist>
-`;
         const webPlist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -549,23 +481,19 @@ WantedBy=default.target
 </dict>
 </plist>
 `;
-        const apiPlistPath = path.join(launchDir, "com.clawops.api.plist");
         const webPlistPath = path.join(launchDir, "com.clawops.web.plist");
-        fs.writeFileSync(apiPlistPath, apiPlist);
         fs.writeFileSync(webPlistPath, webPlist);
 
         try {
           const { execSync } = await import("node:child_process");
-          execSync(`launchctl load ${apiPlistPath}`, { stdio: "ignore" });
           execSync(`launchctl load ${webPlistPath}`, { stdio: "ignore" });
           result.serviceInstalled = true;
           if (!isJson) {
-            console.log("✓ LaunchAgent services loaded");
+            console.log("✓ LaunchAgent service loaded");
           }
         } catch {
           if (!isJson) {
-            console.log("⚠ Failed to load LaunchAgent services. Load manually:");
-            console.log(`  launchctl load ${apiPlistPath}`);
+            console.log("⚠ Failed to load LaunchAgent service. Load manually:");
             console.log(`  launchctl load ${webPlistPath}`);
           }
         }

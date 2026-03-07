@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { ArrowLeft, CheckCircle2, Circle } from "lucide-react";
 import Link from "next/link";
-import { api } from "@/lib/api";
 import type { ProjectDetail, Task } from "@/lib/types";
 import type { ProjectStatus } from "@clawops/domain";
 import { timeAgo } from "@/lib/time";
@@ -10,6 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
 import { PriorityBadge } from "@/components/priority-badge";
 import { cn } from "@/lib/utils";
+import { getProject as getProjectByIdFromPackage } from "@clawops/projects";
+import { listTasks } from "@clawops/tasks";
+import { getDb } from "@/lib/server/runtime";
 
 export const dynamic = "force-dynamic";
 
@@ -32,27 +34,16 @@ const projectStatusLabels: Record<ProjectStatus, string> = {
 };
 
 async function getProject(id: string): Promise<ProjectDetail | null> {
-  try {
-    return await api<ProjectDetail>(`/projects/${id}`, {
-      tags: ["projects", `project-${id}`],
-      revalidate: 15,
-    });
-  } catch (err) {
-    if (err instanceof Error && err.message.includes("404")) return null;
-    throw err;
-  }
+  const project = getProjectById(id);
+  return project as unknown as ProjectDetail | null;
 }
 
 async function getProjectTasks(id: string): Promise<Task[]> {
-  try {
-    return await api<Task[]>(`/tasks?projectId=${encodeURIComponent(id)}`, {
-      tags: ["tasks"],
-      revalidate: 30,
-    });
-  } catch (err) {
-    if (err instanceof Error && err.message.includes("404")) return [];
-    throw err;
-  }
+  return listTasks(getDb(), { projectId: id }) as unknown as Task[];
+}
+
+function getProjectById(id: string): ReturnType<typeof getProjectByIdFromPackage> {
+  return getProjectByIdFromPackage(getDb(), id);
 }
 
 export default async function ProjectDetailPage({ params }: PageProps): Promise<React.JSX.Element> {

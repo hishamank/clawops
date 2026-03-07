@@ -1,33 +1,37 @@
 import { Bot, CheckSquare, Lightbulb, DollarSign, Search, Plus } from "lucide-react";
 import Link from "next/link";
-import { api } from "@/lib/api";
 import type { Agent, TokenSummary } from "@/lib/types";
 import { StatsCard } from "@/components/stats-card";
 import { AgentCard } from "@/components/agent-card";
 import { ActivityFeed } from "@/components/activity-feed";
 import { Button } from "@/components/ui/button";
 import { OnboardingBanner } from "@/components/onboarding/onboarding-banner";
+import { listAgents } from "@clawops/agents";
+import { getTokenSummary as getAnalyticsTokenSummary } from "@clawops/analytics";
+import { getDb } from "@/lib/server/runtime";
 
 export const dynamic = "force-dynamic";
 
 async function getAgents(): Promise<Agent[]> {
-  try {
-    return await api<Agent[]>("/agents", { tags: ["agents"] });
-  } catch (err) {
-    if (err instanceof Error && err.message.includes("404")) return [];
-    throw err;
-  }
+  return listAgents(getDb()) as unknown as Agent[];
 }
 
 async function getTokenSummary(): Promise<TokenSummary> {
-  try {
-    return await api<TokenSummary>("/analytics/tokens", { tags: ["analytics"] });
-  } catch (err) {
-    if (err instanceof Error && err.message.includes("404")) {
-      return { totalTokensIn: 0, totalTokensOut: 0, totalCost: 0 };
-    }
-    throw err;
-  }
+  const summary = getTokenSummaryInternal();
+  return {
+    totalTokensIn: summary.totalIn,
+    totalTokensOut: summary.totalOut,
+    totalCost: summary.totalCost,
+  };
+}
+
+function getTokenSummaryInternal(): { totalIn: number; totalOut: number; totalCost: number } {
+  const summary = getAnalyticsTokenSummary(getDb(), {});
+  return {
+    totalIn: summary.totalIn,
+    totalOut: summary.totalOut,
+    totalCost: summary.totalCost,
+  };
 }
 
 export default async function FleetOverview(): Promise<React.JSX.Element> {

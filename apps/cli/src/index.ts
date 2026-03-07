@@ -8,7 +8,7 @@ import { ideaCmd } from "./commands/idea.js";
 import { projectCmd } from "./commands/project.js";
 import { onboardCmd } from "./commands/onboard.js";
 import { syncCmd } from "./commands/sync.js";
-import { isLocalMode, ensureMigrated } from "./lib/client.js";
+import { ensureMigrated } from "./lib/client.js";
 
 const program = new Command();
 
@@ -27,14 +27,11 @@ program.addCommand(onboardCmd);
 program.addCommand(syncCmd);
 
 program.hook("preAction", () => {
-  // Auto-run migrations once before any command in local mode
-  if (isLocalMode()) {
-    try {
-      ensureMigrated();
-    } catch (err) {
-      console.error("Failed to run migrations:", err instanceof Error ? err.message : err);
-      process.exit(1);
-    }
+  try {
+    ensureMigrated();
+  } catch (err) {
+    console.error("Failed to run migrations:", err instanceof Error ? err.message : err);
+    process.exit(1);
   }
 });
 

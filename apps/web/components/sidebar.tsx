@@ -12,6 +12,7 @@ import {
   Settings,
   Cog,
   User,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,7 @@ const navItems = [
   { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/settings", label: "Settings", icon: Settings },
   { href: "/config", label: "Config", icon: Cog },
+  { href: "/docs/api", label: "API Docs", icon: BookOpen },
 ] as const;
 
 export function Sidebar(): React.JSX.Element {

@@ -11,7 +11,15 @@
     "test": "echo \"No tests yet\""
   },
   "dependencies": {
+    "@clawops/agents": "workspace:^",
+    "@clawops/analytics": "workspace:^",
     "@clawops/core": "workspace:*",
+    "@clawops/habits": "workspace:^",
+    "@clawops/ideas": "workspace:^",
+    "@clawops/notifications": "workspace:^",
+    "@clawops/projects": "workspace:^",
+    "@clawops/sync": "workspace:^",
+    "@clawops/tasks": "workspace:^",
     "@tailwindcss/postcss": "^4.2.1",
     "autoprefixer": "^10.4.27",
     "class-variance-authority": "^0.7.1",
@@ -25,7 +33,8 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwind-merge": "^3.5.0",
-    "tailwindcss": "^4.2.1"
+    "tailwindcss": "^4.2.1",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

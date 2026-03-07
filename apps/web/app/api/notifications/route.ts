@@ -1,38 +1,24 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
+import { z } from "zod";
+import { listNotifications } from "@clawops/notifications";
+import { getDb, jsonError, parseSearch } from "@/lib/server/runtime";
 
-export async function GET(): Promise<NextResponse> {
-  const apiUrl = process.env.CLAWOPS_API_URL;
-  const apiKey = process.env.CLAWOPS_API_KEY;
+const listQuery = z.object({
+  read: z.enum(["true", "false"]).optional(),
+});
 
-  if (!apiUrl || !apiKey) {
-    return NextResponse.json(
-      { error: "CLAWOPS_API_URL and CLAWOPS_API_KEY must be set" },
-      { status: 500 },
-    );
-  }
-
+export async function GET(req: Request): Promise<NextResponse> {
   try {
-    const res = await fetch(`${apiUrl}/notifications`, {
-      headers: { "x-api-key": apiKey },
-    });
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: "Failed to fetch notifications from upstream API" },
-        { status: res.status },
-      );
+    const { read } = parseSearch(req, listQuery);
+    const parsedRead = read === undefined ? undefined : read === "true";
+    const list = listNotifications(getDb(), parsedRead === undefined ? undefined : { read: parsedRead });
+    return NextResponse.json(list);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return jsonError(400, err.message, "VALIDATION_ERROR");
     }
-    const data: unknown = await res.json();
-    if (!Array.isArray(data)) {
-      return NextResponse.json(
-        { error: "Invalid response from upstream API: expected array" },
-        { status: 500 },
-      );
-    }
-    return NextResponse.json(data);
-  } catch {
-    return NextResponse.json(
-      { error: "Failed to fetch notifications from upstream API" },
-      { status: 500 },
-    );
+    return jsonError(500, err instanceof Error ? err.message : "Failed to fetch notifications", "INTERNAL_ERROR");
   }
 }

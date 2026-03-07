@@ -1,28 +1,23 @@
 import { Globe, Key, Info, CheckCircle, XCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { getDb } from "@/lib/server/runtime";
+import { agents } from "@clawops/core";
 
 export const dynamic = "force-dynamic";
 
-const API_URL = process.env.CLAWOPS_API_URL ?? "";
-const API_KEY = process.env.CLAWOPS_API_KEY ?? "";
+const DB_PATH = process.env.CLAWOPS_DB_PATH ?? "./clawops.db";
+const CLAWOPS_MODE = process.env.CLAWOPS_MODE ?? "local";
 
-function maskUrl(url: string): string {
-  try {
-    const parsed = new URL(url);
-    return `${parsed.protocol}//${parsed.hostname}:***`;
-  } catch {
-    return "***";
-  }
+function maskPath(value: string): string {
+  if (value.length <= 8) return value;
+  return `${value.slice(0, 4)}***${value.slice(-2)}`;
 }
 
 async function checkConnection(): Promise<boolean> {
   try {
-    const res = await fetch(`${API_URL}/analytics/tokens`, {
-      headers: { "x-api-key": API_KEY },
-      next: { revalidate: 0 },
-    });
-    return res.ok;
+    getDb().select().from(agents).limit(1).all();
+    return true;
   } catch {
     return false;
   }
@@ -53,10 +48,10 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
           <CardContent className="space-y-4">
             <div className="space-y-1">
               <span className="text-xs font-medium text-muted-foreground">
-                API URL
+                Database Path
               </span>
               <p className="rounded-xl bg-muted px-3 py-2 font-mono text-sm">
-                {maskUrl(API_URL)}
+                {maskPath(DB_PATH)}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -92,10 +87,10 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
               <div className="space-y-1">
                 <p className="text-sm font-medium">API key configured via environment</p>
                 <p className="text-xs text-muted-foreground">
-                  Set the <code className="rounded bg-zinc-800 px-1 py-0.5 text-primary">CLAWOPS_API_KEY</code> environment variable to authenticate with the API.
+                  ClawOps now runs web + core logic in a single Next.js runtime. No separate API key is required for dashboard reads.
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {API_KEY ? "Key is currently set." : "No key configured."}
+                  Runtime mode: <code className="rounded bg-zinc-800 px-1 py-0.5 text-primary">{CLAWOPS_MODE}</code>
                 </p>
               </div>
             </div>

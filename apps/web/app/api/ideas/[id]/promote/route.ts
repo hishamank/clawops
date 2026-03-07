@@ -1,36 +1,46 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
+import { events, type DB } from "@clawops/core";
+import { promoteIdeaToProject } from "@clawops/ideas";
+import { ConflictError, NotFoundError } from "@clawops/domain";
+import { getDb, jsonError } from "@/lib/server/runtime";
 
 export async function POST(
   _request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
-  const apiUrl = process.env.CLAWOPS_API_URL;
-  const apiKey = process.env.CLAWOPS_API_KEY;
-
-  if (!apiUrl || !apiKey) {
-    return NextResponse.json(
-      { error: "Server misconfiguration: CLAWOPS_API_URL and CLAWOPS_API_KEY must be set" },
-      { status: 500 }
-    );
-  }
-
   const { id } = await params;
+  const db = getDb();
+  try {
+    const result = db.transaction((tx) => {
+      const r = promoteIdeaToProject(tx as unknown as DB, id);
+      tx.insert(events)
+        .values({
+          action: "idea.promoted",
+          entityType: "idea",
+          entityId: r.idea.id,
+          meta: JSON.stringify({ projectId: r.project.id }),
+        })
+        .run();
+      tx.insert(events)
+        .values({
+          action: "project.created",
+          entityType: "project",
+          entityId: r.project.id,
+          meta: JSON.stringify({ name: r.project.name, ideaId: r.idea.id }),
+        })
+        .run();
+      return r;
+    });
 
-  const res = await fetch(`${apiUrl}/ideas/${id}/promote`, {
-    method: "POST",
-    headers: { "x-api-key": apiKey },
-  });
-
-  if (!res.ok) {
-    return NextResponse.json(
-      { error: "Failed to promote idea" },
-      { status: res.status }
-    );
+    revalidateTag("ideas");
+    revalidateTag("projects");
+    return NextResponse.json(result);
+  } catch (err) {
+    if (err instanceof NotFoundError) return jsonError(404, err.message, err.code);
+    if (err instanceof ConflictError) return jsonError(409, err.message, err.code);
+    return jsonError(500, err instanceof Error ? err.message : "Failed to promote idea", "INTERNAL_ERROR");
   }
-
-  const data: unknown = await res.json();
-  revalidateTag("ideas");
-  revalidateTag("projects");
-  return NextResponse.json(data);
 }

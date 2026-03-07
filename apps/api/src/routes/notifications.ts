@@ -1,7 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { db, events } from "@clawops/core";
+import { events } from "@clawops/core";
 import type { DB } from "@clawops/core";
+import { db } from "@clawops/core/db";
 import { listNotifications, markRead, markAllRead } from "@clawops/notifications";
 
 // ── Schemas ────────────────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { db, events } from "@clawops/core";
+import { events } from "@clawops/core";
+import { db } from "@clawops/core/db";
 import { getAgentByApiKey } from "@clawops/agents";
 import { hashApiKey } from "@clawops/domain";
 

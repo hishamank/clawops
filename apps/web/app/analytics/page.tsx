@@ -1,8 +1,9 @@
 import { ArrowDownRight, ArrowUpRight, DollarSign, Users } from "lucide-react";
-import { api } from "@/lib/api";
 import type { TokenSummary } from "@/lib/types";
 import { StatsCard } from "@/components/stats-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getCostsByAgent, getCostsByModel, getCostsByProject, getTokenSummary as getSummary } from "@clawops/analytics";
+import { getDb } from "@/lib/server/runtime";
 
 export const dynamic = "force-dynamic";
 
@@ -14,24 +15,39 @@ interface CostBreakdownItem {
 }
 
 async function getTokenSummary(): Promise<TokenSummary> {
-  try {
-    return await api<TokenSummary>("/analytics/tokens", { tags: ["analytics"] });
-  } catch (err) {
-    if (err instanceof Error && err.message.includes("404")) {
-      return { totalTokensIn: 0, totalTokensOut: 0, totalCost: 0 };
-    }
-    throw err;
-  }
+  const summary = getSummary(getDb(), {});
+  return {
+    totalTokensIn: summary.totalIn,
+    totalTokensOut: summary.totalOut,
+    totalCost: summary.totalCost,
+  };
 }
 
 async function getCostBreakdown(groupBy: string): Promise<CostBreakdownItem[]> {
-  try {
-    return await api<CostBreakdownItem[]>(`/analytics/costs?groupBy=${groupBy}`, {
-      tags: ["analytics"],
-    });
-  } catch (err) {
-    if (err instanceof Error && err.message.includes("404")) return [];
-    throw err;
+  const db = getDb();
+  switch (groupBy) {
+    case "model":
+      return getCostsByModel(db).map((r) => ({
+        name: r.group,
+        totalCost: r.totalCost,
+        totalTokensIn: r.totalIn,
+        totalTokensOut: r.totalOut,
+      }));
+    case "project":
+      return getCostsByProject(db).map((r) => ({
+        name: r.group,
+        totalCost: r.totalCost,
+        totalTokensIn: r.totalIn,
+        totalTokensOut: r.totalOut,
+      }));
+    case "agent":
+    default:
+      return getCostsByAgent(db).map((r) => ({
+        name: r.group,
+        totalCost: r.totalCost,
+        totalTokensIn: r.totalIn,
+        totalTokensOut: r.totalOut,
+      }));
   }
 }
 

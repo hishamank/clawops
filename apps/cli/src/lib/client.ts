@@ -1,110 +1,26 @@
 /* eslint-disable no-console -- CLI tool uses console for output */
 import type { DB, Task, Idea, Project, Milestone } from "@clawops/core";
-import { db as coreDb, runMigrations, events } from "@clawops/core";
-import {
-  createTask,
-  listTasks,
-  updateTask,
-  completeTask,
-} from "@clawops/tasks";
+import { events } from "@clawops/core";
+import { db as coreDb } from "@clawops/core/db";
+import { runMigrations } from "@clawops/core/migrate";
+import { createTask, listTasks, updateTask, completeTask } from "@clawops/tasks";
 import { createIdea, listIdeas } from "@clawops/ideas";
-import {
-  createProject,
-  getProject,
-  listProjects,
-} from "@clawops/projects";
+import { createProject, getProject, listProjects } from "@clawops/projects";
 import type { IdeaStatus } from "@clawops/domain";
 
-// ── Mode detection ──────────────────────────────────────────────────────────
-
-const mode = (process.env["CLAWOPS_MODE"] ?? "remote") as "local" | "remote";
-
 export function isLocalMode(): boolean {
-  return mode === "local";
+  return true;
 }
 
 function getDb(): DB {
   return coreDb;
 }
 
-function logReadEvent(
-  db: DB,
-  entityType: string,
-  entityId: string,
-): void {
+function logReadEvent(db: DB, entityType: string, entityId: string): void {
   db.insert(events)
     .values({ action: "read", entityType, entityId })
     .run();
 }
-
-// ── Remote helpers ──────────────────────────────────────────────────────────
-
-function getBaseUrl(): string {
-  const url = process.env["CLAWOPS_API_URL"];
-  if (mode === "local") {
-    return url ?? "http://localhost:3001";
-  }
-  if (!url) {
-    return "http://localhost:3001";
-  }
-  return url;
-}
-
-const baseUrl = getBaseUrl();
-
-function getApiKey(): string {
-  const key = process.env["CLAWOPS_API_KEY"];
-  if (!key) {
-    console.error("CLAWOPS_API_KEY is required");
-    process.exit(1);
-  }
-  return key;
-}
-
-async function request<T>(
-  method: string,
-  path: string,
-  body?: unknown,
-): Promise<T> {
-  let res: Response;
-  try {
-    res = await fetch(`${baseUrl}${path}`, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": getApiKey(),
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`Network error: ${msg}`);
-    process.exit(1);
-  }
-
-  if (!res.ok) {
-    const text = await res.text();
-    console.error(`API error ${res.status}: ${text}`);
-    process.exit(1);
-  }
-
-  const contentType = res.headers.get("content-type") ?? "";
-  const contentLength = res.headers.get("content-length");
-
-  if (contentLength === "0" || res.status === 204) {
-    return undefined as unknown as T;
-  }
-
-  if (!contentType.includes("application/json")) {
-    const text = await res.text();
-    console.error(`Unexpected response content-type: ${contentType}\n${text}`);
-    process.exit(1);
-  }
-
-  return res.json() as Promise<T>;
-}
-
-// ── Ensure migrations in local mode ─────────────────────────────────────────
 
 let migrated = false;
 export function ensureMigrated(): void {
@@ -114,8 +30,6 @@ export function ensureMigrated(): void {
   }
 }
 
-// ── Task operations ─────────────────────────────────────────────────────────
-
 export async function taskCreate(input: {
   title: string;
   description?: string;
@@ -123,11 +37,8 @@ export async function taskCreate(input: {
   projectId?: string;
   assigneeId?: string;
 }): Promise<Task> {
-  if (mode === "local") {
-    ensureMigrated();
-    return createTask(getDb(), { ...input, source: "cli" });
-  }
-  return request<Task>("POST", "/tasks", input);
+  ensureMigrated();
+  return createTask(getDb(), { ...input, source: "cli" });
 }
 
 export async function taskList(filters?: {
@@ -135,32 +46,21 @@ export async function taskList(filters?: {
   assigneeId?: string;
   projectId?: string;
 }): Promise<Task[]> {
-  if (mode === "local") {
-    ensureMigrated();
-    const db = getDb();
-    const result = listTasks(db, filters);
-    for (const t of result) {
-      logReadEvent(db, "task", t.id);
-    }
-    return result;
+  ensureMigrated();
+  const db = getDb();
+  const result = listTasks(db, filters);
+  for (const t of result) {
+    logReadEvent(db, "task", t.id);
   }
-  const params = new URLSearchParams();
-  if (filters?.status) params.set("status", filters.status);
-  if (filters?.assigneeId) params.set("assigneeId", filters.assigneeId);
-  if (filters?.projectId) params.set("projectId", filters.projectId);
-  const qs = params.toString();
-  return request<Task[]>("GET", `/tasks${qs ? `?${qs}` : ""}`);
+  return result;
 }
 
 export async function taskUpdate(
   id: string,
   updates: { status: Task["status"]; priority?: Task["priority"] },
 ): Promise<Task> {
-  if (mode === "local") {
-    ensureMigrated();
-    return updateTask(getDb(), id, updates);
-  }
-  return request<Task>("PATCH", `/tasks/${id}`, updates);
+  ensureMigrated();
+  return updateTask(getDb(), id, updates);
 }
 
 export async function taskDone(
@@ -171,91 +71,62 @@ export async function taskDone(
     artifacts?: Array<{ label: string; value: string }>;
   },
 ): Promise<Task> {
-  if (mode === "local") {
-    ensureMigrated();
-    return completeTask(getDb(), id, input);
-  }
-  return request<Task>("POST", `/tasks/${id}/complete`, input);
+  ensureMigrated();
+  return completeTask(getDb(), id, input);
 }
-
-// ── Idea operations ─────────────────────────────────────────────────────────
 
 export async function ideaAdd(input: {
   title: string;
   description?: string;
   tags?: string[];
 }): Promise<Idea> {
-  if (mode === "local") {
-    ensureMigrated();
-    return createIdea(getDb(), { ...input, source: "human" });
-  }
-  return request<Idea>("POST", "/ideas", input);
+  ensureMigrated();
+  return createIdea(getDb(), { ...input, source: "human" });
 }
 
 export async function ideaList(filters?: {
   status?: IdeaStatus;
   tag?: string;
 }): Promise<Idea[]> {
-  if (mode === "local") {
-    ensureMigrated();
-    const db = getDb();
-    const result = listIdeas(db, filters);
-    for (const i of result) {
-      logReadEvent(db, "idea", i.id);
-    }
-    return result;
+  ensureMigrated();
+  const db = getDb();
+  const result = listIdeas(db, filters);
+  for (const i of result) {
+    logReadEvent(db, "idea", i.id);
   }
-  const params = new URLSearchParams();
-  if (filters?.status) params.set("status", filters.status);
-  if (filters?.tag) params.set("tag", filters.tag);
-  const qs = params.toString();
-  return request<Idea[]>("GET", `/ideas${qs ? `?${qs}` : ""}`);
+  return result;
 }
-
-// ── Project operations ──────────────────────────────────────────────────────
 
 export async function projectCreate(input: {
   name: string;
   status?: Project["status"];
 }): Promise<Project> {
-  if (mode === "local") {
-    ensureMigrated();
-    return createProject(getDb(), input);
-  }
-  return request<Project>("POST", "/projects", input);
+  ensureMigrated();
+  return createProject(getDb(), input);
 }
 
 export async function projectList(): Promise<Project[]> {
-  if (mode === "local") {
-    ensureMigrated();
-    const db = getDb();
-    const result = listProjects(db);
-    for (const p of result) {
-      logReadEvent(db, "project", p.id);
-    }
-    return result;
+  ensureMigrated();
+  const db = getDb();
+  const result = listProjects(db);
+  for (const p of result) {
+    logReadEvent(db, "project", p.id);
   }
-  return request<Project[]>("GET", "/projects");
+  return result;
 }
 
 export async function projectInfo(
   id: string,
 ): Promise<Project & { milestones: Milestone[]; taskCount: number }> {
-  if (mode === "local") {
-    ensureMigrated();
-    const db = getDb();
-    const result = getProject(db, id);
-    if (!result) {
-      console.error(`Project not found: ${id}`);
-      process.exit(1);
-    }
-    logReadEvent(db, "project", id);
-    return result;
+  ensureMigrated();
+  const db = getDb();
+  const result = getProject(db, id);
+  if (!result) {
+    console.error(`Project not found: ${id}`);
+    process.exit(1);
   }
-  return request<Project & { milestones: Milestone[]; taskCount: number }>(
-    "GET",
-    `/projects/${id}`,
-  );
+  logReadEvent(db, "project", id);
+  return result;
 }
 
 export function getAgentId(): string {
@@ -266,11 +137,3 @@ export function getAgentId(): string {
   }
   return id;
 }
-
-export const api = {
-  get: (path: string): Promise<unknown> => request("GET", path),
-  post: (path: string, body?: unknown): Promise<unknown> =>
-    request("POST", path, body),
-  patch: (path: string, body?: unknown): Promise<unknown> =>
-    request("PATCH", path, body),
-};

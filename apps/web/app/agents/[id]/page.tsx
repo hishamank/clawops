@@ -1,12 +1,15 @@
 import { notFound } from "next/navigation";
 import { ArrowLeft, Clock, CheckCircle2, Zap } from "lucide-react";
 import Link from "next/link";
-import { api } from "@/lib/api";
 import type { Agent, Task, Habit, HabitStreak, Artifact } from "@/lib/types";
 import { timeAgo } from "@/lib/time";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { getAgent as getAgentById } from "@clawops/agents";
+import { listTasks, getTask } from "@clawops/tasks";
+import { listHabits, getHabitStreak } from "@clawops/habits";
+import { getDb } from "@/lib/server/runtime";
 
 export const dynamic = "force-dynamic";
 
@@ -63,26 +66,19 @@ function parseSkills(skills: string | null): string[] {
 }
 
 async function getAgent(id: string): Promise<AgentDetailResponse | null> {
-  try {
-    return await api<AgentDetailResponse>(`/agents/${id}`, {
-      tags: ["agents", `agent-${id}`],
-      revalidate: 15,
-    });
-  } catch (err) {
-    if (err instanceof Error && err.message.includes("404")) return null;
-    throw err;
-  }
+  const db = getDb();
+  const agent = getAgentById(db, id);
+  if (!agent) return null;
+  const recentTasks = listTasks(db, { assigneeId: id }).slice(0, 10);
+  const habits = listHabits(db, id).map((h) => ({
+    ...h,
+    streaks: getHabitStreak(db, h.id, 7) as unknown as HabitStreak[],
+  }));
+  return { ...agent, recentTasks, habits } as unknown as AgentDetailResponse;
 }
 
 async function getAgentTasks(id: string): Promise<Task[]> {
-  try {
-    return await api<Task[]>(`/tasks?assigneeId=${id}`, {
-      tags: ["tasks"],
-      revalidate: 30,
-    });
-  } catch {
-    return [];
-  }
+  return listTasks(getDb(), { assigneeId: id }) as unknown as Task[];
 }
 
 async function getAgentArtifacts(tasks: Task[]): Promise<Artifact[]> {
@@ -92,10 +88,7 @@ async function getAgentArtifacts(tasks: Task[]): Promise<Artifact[]> {
   const results = await Promise.all(
     doneTasks.slice(0, 5).map(async (task) => {
       try {
-        const taskDetail = await api<Task & { artifacts?: Artifact[] }>(
-          `/tasks/${task.id}`,
-          { tags: ["tasks"], revalidate: 60 }
-        );
+        const taskDetail = getTask(getDb(), task.id) as unknown as Task & { artifacts?: Artifact[] };
         return taskDetail.artifacts ?? [];
       } catch {
         return [];

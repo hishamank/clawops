@@ -22,7 +22,7 @@ ClawOps is the **operations layer for AI agent teams** — a framework-agnostic 
 - **Habits** — Recurring agent behaviors: heartbeats, schedules, cron jobs, hooks, watchdogs, and polling
 - **Token & Cost Analytics** — Per-agent, per-model, and per-project spend tracking with charts
 - **Notifications** — In-dashboard alerts for task completions, missed heartbeats, and milestone events
-- **CLI-first** — Agents interact via `clawops` commands as tools; supports local (SQLite) and remote (API) modes
+- **CLI-first** — Agents interact via `clawops` commands as tools with local package execution over SQLite
 
 ## Architecture
 
@@ -30,8 +30,8 @@ Turborepo + pnpm workspaces monorepo. Business logic lives in `packages/` as ind
 
 | Package / App | Responsibility |
 |---|---|
-| `apps/api` | Fastify HTTP server with REST endpoints + OpenAPI docs |
-| `apps/cli` | Commander.js CLI binary (`clawops`) — local or remote mode |
+| `apps/api` | Fastify API transport (**deprecated; retained temporarily for rollback**) |
+| `apps/cli` | Commander.js CLI binary (`clawops`) — local package mode |
 | `apps/web` | Next.js 15 App Router dashboard — shadcn/ui + Tailwind CSS |
 | `packages/core` | DB connection, Drizzle ORM schema, migrations, shared config |
 | `packages/agents` | Agent CRUD, status management, skill/memory handling |
@@ -59,8 +59,8 @@ The install script will:
 - Install all dependencies (`pnpm install --frozen-lockfile`)
 - Build all packages
 - Run database migrations
-- Check port availability for web (3333) and API (4444)
-- Generate `.env` with API key and port config
+- Check port availability for web (3333)
+- Generate `.env` with web/db config
 - Link the CLI globally
 - Verify `clawops --version`
 
@@ -83,12 +83,11 @@ clawops --version
 ### Docker
 
 ```bash
-cp .env.example .env   # fill in CLAWOPS_API_KEY
+cp .env.example .env
 docker-compose up --build
 ```
 
 This starts:
-- **API** on `http://localhost:4444`
 - **Web dashboard** on `http://localhost:3333`
 
 Data is persisted via a Docker volume at `/data/clawops.db`.
@@ -197,23 +196,49 @@ clawops sync --json                      # JSON output
 
 | Variable | Description | Default |
 |---|---|---|
-| `CLAWOPS_MODE` | `local` (direct SQLite) or `remote` (calls API) | `local` |
-| `CLAWOPS_API_KEY` | API key for authentication | — |
-| `CLAWOPS_API_URL` | API server URL (required in remote mode) | `http://localhost:4444` |
+| `CLAWOPS_MODE` | Local package execution mode | `local` |
 | `CLAWOPS_AGENT_ID` | Agent identifier (used by CLI to tag tasks/ideas to this agent) | — |
 | `CLAWOPS_DB_PATH` | SQLite database path | `./clawops.db` |
 | `WEB_PORT` | Web dashboard port | `3333` |
-| `API_PORT` | API server port | `4444` |
 | `OPENCLAW_DIR` | OpenClaw directory path | `~/.openclaw` |
 | `OPENCLAW_GATEWAY_URL` | OpenClaw gateway URL | `http://localhost:3000` |
 | `OPENCLAW_GATEWAY_TOKEN` | Gateway auth token | — |
 
-## API Endpoints
+## API Endpoints (Next Route Handlers)
 
 ```
-POST /api/sync/openclaw             — Trigger a scan
-GET  /api/sync/openclaw/status      — Last sync result
-POST /api/sync/openclaw/install-skill — Install SKILL.md to workspaces
+GET  /api/health
+POST /api/auth/login
+POST /api/auth/logout
+POST /api/agents/register
+GET  /api/agents
+GET  /api/agents/:id
+PATCH /api/agents/:id/status
+PATCH /api/agents/:id/skills
+POST /api/agents/:id/heartbeat
+POST /api/tasks
+GET  /api/tasks
+GET  /api/tasks/:id
+PATCH /api/tasks/:id
+POST /api/tasks/:id/complete
+POST /api/ideas
+GET  /api/ideas
+POST /api/ideas/:id/promote
+POST /api/projects
+GET  /api/projects
+GET  /api/projects/:id
+PATCH /api/projects/:id
+POST /api/habits
+GET  /api/habits
+POST /api/habits/:id/run
+GET  /api/analytics/tokens
+GET  /api/analytics/costs
+GET  /api/notifications
+PATCH /api/notifications/:id
+PATCH /api/notifications/read-all
+POST /api/sync/openclaw
+GET  /api/sync/openclaw
+POST /api/sync/openclaw/install-skill
 ```
 
 ## Development

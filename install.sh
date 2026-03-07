@@ -75,7 +75,6 @@ echo ""
 # ── Step 4: Port selection ──────────────────────────────────────────────────
 
 DEFAULT_WEB_PORT=3333
-DEFAULT_API_PORT=4444
 
 # Check if port is available using the built port-check utility
 check_port() {
@@ -87,7 +86,6 @@ checkPort($port).then(r => process.exit(r.available ? 0 : 1)).catch(() => proces
 }
 
 WEB_PORT=$DEFAULT_WEB_PORT
-API_PORT=$DEFAULT_API_PORT
 
 if ! check_port $WEB_PORT; then
   print_warning "Port $WEB_PORT (web) is in use"
@@ -99,40 +97,22 @@ if ! check_port $WEB_PORT; then
   fi
 fi
 print_success "Web port: $WEB_PORT"
-
-if ! check_port $API_PORT; then
-  print_warning "Port $API_PORT (api) is in use"
-  read -p "Enter alternative API port (default: 4445): " alt_api
-  API_PORT=${alt_api:-4445}
-  if ! check_port $API_PORT; then
-    print_error "Port $API_PORT is also in use. Free up a port and try again."
-    exit 1
-  fi
-fi
-print_success "API port: $API_PORT"
 echo ""
 
 # ── Step 5: Write .env ──────────────────────────────────────────────────────
 
 if [ ! -f ".env" ]; then
   print_step "Creating .env..."
-  API_KEY=$(openssl rand -hex 32 2>/dev/null || cat /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 64 | head -n 1)
 
   cat > .env <<EOF
-# ClawOps API authentication key
-CLAWOPS_API_KEY=$API_KEY
-
 # SQLite database path
 CLAWOPS_DB_PATH=./clawops.db
 
 # Web dashboard port
 WEB_PORT=$WEB_PORT
-
-# API server port
-API_PORT=$API_PORT
 EOF
 
-  print_success "Created .env with generated API key"
+  print_success "Created .env"
 else
   print_warning ".env already exists, skipping"
 fi

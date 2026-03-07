@@ -1,5 +1,5 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
-import { db } from "@clawops/core";
+import { db } from "@clawops/core/db";
 import { getAgentByApiKey } from "@clawops/agents";
 import { hashApiKey } from "@clawops/domain";
 

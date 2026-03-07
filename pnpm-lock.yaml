@@ -127,12 +127,36 @@ importers:
 
   apps/web:
     dependencies:
+      '@clawops/agents':
+        specifier: workspace:^
+        version: link:../../packages/agents
+      '@clawops/analytics':
+        specifier: workspace:^
+        version: link:../../packages/analytics
       '@clawops/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@clawops/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@clawops/habits':
+        specifier: workspace:^
+        version: link:../../packages/habits
+      '@clawops/ideas':
+        specifier: workspace:^
+        version: link:../../packages/ideas
+      '@clawops/notifications':
+        specifier: workspace:^
+        version: link:../../packages/notifications
+      '@clawops/projects':
+        specifier: workspace:^
+        version: link:../../packages/projects
+      '@clawops/sync':
+        specifier: workspace:^
+        version: link:../../packages/sync
+      '@clawops/tasks':
+        specifier: workspace:^
+        version: link:../../packages/tasks
       '@radix-ui/react-slot':
         specifier: ^1.1.1
         version: 1.2.3(@types/react@19.2.14)(react@19.2.4)
@@ -172,6 +196,9 @@ importers:
       tailwindcss:
         specifier: ^4.2.1
         version: 4.2.1
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
     devDependencies:
       '@types/react':
         specifier: ^19.0.0

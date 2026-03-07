@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { db, events, type DB } from "@clawops/core";
+import { events, type DB } from "@clawops/core";
+import { db } from "@clawops/core/db";
 import { createHabit, listHabits, logHabitRun } from "@clawops/habits";
 import { getAgent } from "@clawops/agents";
 import { HabitType, HabitStatus } from "@clawops/domain";

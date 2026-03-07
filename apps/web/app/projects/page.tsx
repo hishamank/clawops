@@ -1,6 +1,5 @@
 import { FolderKanban, Activity, FileText } from "lucide-react";
 import Link from "next/link";
-import { api } from "@/lib/api";
 import type { ProjectListItem } from "@/lib/types";
 import type { ProjectStatus } from "@clawops/domain";
 import { timeAgo } from "@/lib/time";
@@ -8,6 +7,8 @@ import { StatsCard } from "@/components/stats-card";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { listProjects } from "@clawops/projects";
+import { getDb } from "@/lib/server/runtime";
 
 export const dynamic = "force-dynamic";
 
@@ -26,12 +27,7 @@ const projectStatusLabels: Record<ProjectStatus, string> = {
 };
 
 async function getProjects(): Promise<ProjectListItem[]> {
-  try {
-    return await api<ProjectListItem[]>("/projects", { tags: ["projects"] });
-  } catch (err) {
-    if (err instanceof Error && err.message.includes("404")) return [];
-    throw err;
-  }
+  return listProjects(getDb()) as unknown as ProjectListItem[];
 }
 
 export default async function ProjectsPage(): Promise<React.JSX.Element> {

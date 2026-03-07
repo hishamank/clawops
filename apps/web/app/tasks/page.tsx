@@ -1,5 +1,4 @@
 import { CheckSquare, ListTodo, Clock } from "lucide-react";
-import { api } from "@/lib/api";
 import type { Task, Agent, ProjectListItem } from "@/lib/types";
 import { timeAgo } from "@/lib/time";
 import { StatsCard } from "@/components/stats-card";
@@ -7,6 +6,10 @@ import { StatusBadge } from "@/components/status-badge";
 import { PriorityBadge } from "@/components/priority-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { TaskFilterTabs } from "./filter-tabs";
+import { listTasks } from "@clawops/tasks";
+import { listAgents } from "@clawops/agents";
+import { listProjects } from "@clawops/projects";
+import { getDb } from "@/lib/server/runtime";
 
 export const dynamic = "force-dynamic";
 
@@ -15,31 +18,18 @@ interface PageProps {
 }
 
 async function getTasks(status?: string): Promise<Task[]> {
-  try {
-    const query = status && status !== "all" ? `?status=${encodeURIComponent(status)}` : "";
-    return await api<Task[]>(`/tasks${query}`, { tags: ["tasks"] });
-  } catch (err) {
-    if (err instanceof Error && err.message.includes("404")) return [];
-    throw err;
-  }
+  return listTasks(
+    getDb(),
+    status && status !== "all" ? { status: status as Task["status"] } : undefined,
+  ) as unknown as Task[];
 }
 
 async function getAgents(): Promise<Agent[]> {
-  try {
-    return await api<Agent[]>("/agents", { tags: ["agents"] });
-  } catch (err) {
-    if (err instanceof Error && err.message.includes("404")) return [];
-    throw err;
-  }
+  return listAgents(getDb()) as unknown as Agent[];
 }
 
 async function getProjects(): Promise<ProjectListItem[]> {
-  try {
-    return await api<ProjectListItem[]>("/projects", { tags: ["projects"] });
-  } catch (err) {
-    if (err instanceof Error && err.message.includes("404")) return [];
-    throw err;
-  }
+  return listProjects(getDb()) as unknown as ProjectListItem[];
 }
 
 function withinLast24h(dateStr: string | null): boolean {
