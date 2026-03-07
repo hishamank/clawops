@@ -34,6 +34,7 @@ if [ ! -f "package.json" ] || [ ! -f "pnpm-workspace.yaml" ]; then
   print_error "Must run from ClawOps project root directory"
   exit 1
 fi
+PROJECT_ROOT="$(pwd -P)"
 
 # ── Step 1: Check prerequisites ─────────────────────────────────────────────
 
@@ -85,15 +86,86 @@ checkPort($port).then(r => process.exit(r.available ? 0 : 1)).catch(() => proces
   " --input-type=module 2>/dev/null
 }
 
+get_listening_pid() {
+  local port=$1
+  if ! command -v lsof >/dev/null 2>&1; then
+    return 0
+  fi
+  lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | head -n 1
+}
+
+get_process_cwd() {
+  local pid=$1
+  if ! command -v lsof >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local cwd_line
+  cwd_line=$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | tail -n 1 || true)
+  printf '%s\n' "${cwd_line#n}"
+}
+
+is_clawops_web_process() {
+  local pid=$1
+  local cmd
+  local cwd
+
+  cmd=$(ps -p "$pid" -o command= 2>/dev/null || true)
+  cwd=$(get_process_cwd "$pid")
+
+  if [ -n "$cwd" ] && [[ "$cwd" == "$PROJECT_ROOT"* ]] && [[ "$cmd" == *"next"* ]]; then
+    return 0
+  fi
+  if [[ "$cmd" == *"@clawops/web"* ]] || [[ "$cmd" == *"clawops"* && "$cmd" == *"next"* ]]; then
+    return 0
+  fi
+
+  return 1
+}
+
+stop_process_for_port_if_clawops() {
+  local port=$1
+  local pid
+
+  pid=$(get_listening_pid "$port")
+  if [ -z "$pid" ]; then
+    return 1
+  fi
+
+  if ! is_clawops_web_process "$pid"; then
+    return 1
+  fi
+
+  print_warning "Port $port is used by existing ClawOps web process (PID $pid). Stopping it..."
+  kill "$pid" 2>/dev/null || true
+  sleep 1
+
+  if ! check_port "$port"; then
+    print_warning "Process $pid did not stop in time. Sending SIGKILL..."
+    kill -9 "$pid" 2>/dev/null || true
+    sleep 1
+  fi
+
+  if check_port "$port"; then
+    print_success "Freed port $port by stopping existing ClawOps process"
+    return 0
+  fi
+
+  print_warning "Could not free port $port automatically"
+  return 1
+}
+
 WEB_PORT=$DEFAULT_WEB_PORT
 
 if ! check_port $WEB_PORT; then
-  print_warning "Port $WEB_PORT (web) is in use"
-  read -p "Enter alternative web port (default: 3334): " alt_web
-  WEB_PORT=${alt_web:-3334}
-  if ! check_port $WEB_PORT; then
-    print_error "Port $WEB_PORT is also in use. Free up a port and try again."
-    exit 1
+  if ! stop_process_for_port_if_clawops "$WEB_PORT"; then
+    print_warning "Port $WEB_PORT (web) is in use"
+    read -p "Enter alternative web port (default: 3334): " alt_web
+    WEB_PORT=${alt_web:-3334}
+    if ! check_port $WEB_PORT; then
+      print_error "Port $WEB_PORT is also in use. Free up a port and try again."
+      exit 1
+    fi
   fi
 fi
 print_success "Web port: $WEB_PORT"
