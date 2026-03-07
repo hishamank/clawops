@@ -82,7 +82,7 @@ Clean list view. No kanban. Project page: PRD prominent → milestones visible �
 - Framework: Next.js 15, App Router, TypeScript
 - Styling: Tailwind CSS + shadcn/ui
 - Auth: API key in env (internal tool) — login page available but optional
-- API: Connects to ClawOps API via CLAWOPS_API_URL + CLAWOPS_API_KEY env vars
+- API: Uses Next.js route handlers within the same web runtime (single process)
 
 ---
 

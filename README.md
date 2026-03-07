@@ -30,7 +30,6 @@ Turborepo + pnpm workspaces monorepo. Business logic lives in `packages/` as ind
 
 | Package / App | Responsibility |
 |---|---|
-| `apps/api` | Fastify API transport (**deprecated; retained temporarily for rollback**) |
 | `apps/cli` | Commander.js CLI binary (`clawops`) — local package mode |
 | `apps/web` | Next.js 15 App Router dashboard — shadcn/ui + Tailwind CSS |
 | `packages/core` | DB connection, Drizzle ORM schema, migrations, shared config |

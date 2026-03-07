@@ -55,8 +55,7 @@ ClawOps uses a Turborepo \+ pnpm workspaces monorepo. Business logic lives in pa
 
 | Package / App | Responsibility |
 | :---- | :---- |
-| **apps/api** | Fastify HTTP server. Imports all packages, exposes REST endpoints \+ OpenAPI docs. |
-| **apps/cli** | Commander.js CLI binary (clawops). Runs in local mode (direct DB) or remote mode (calls API). |
+| **apps/cli** | Commander.js CLI binary (clawops). Runs in local mode (direct DB/package access). |
 | **apps/web** | Next.js 14+ App Router dashboard. Calls API. shadcn/ui \+ Tailwind CSS. |
 | **packages/core** | DB connection, Drizzle schema, migrations, shared config. |
 | **packages/agents** | Agent CRUD, status management, skill/memory handling. |
@@ -68,23 +67,17 @@ ClawOps uses a Turborepo \+ pnpm workspaces monorepo. Business logic lives in pa
 | **packages/notifications** | Notification creation, delivery, read state management. |
 | **packages/shared** | TypeScript types, constants, model pricing table, utils. |
 
-## **CLI Modes**
+## **CLI Mode**
 
-The CLI operates in two modes, configured via environment variables:
+The CLI operates in local mode, configured via environment variables:
 
 * local mode (CLAWOPS\_MODE=local) — CLI imports packages directly and writes to SQLite. Best for home server setups where CLI and DB are on the same machine.
 
-* remote mode (CLAWOPS\_MODE=remote) — CLI makes HTTP calls to the API. Best for distributed setups where agents run on separate machines.
-
 ***Environment Variables***
 
-CLAWOPS\_MODE=local|remote
+CLAWOPS\_MODE=local
 
-CLAWOPS\_API\_KEY=\<key\>          \# required in both modes
-
-CLAWOPS\_API\_URL=http://...     \# required in remote mode only
-
-CLAWOPS\_DB\_PATH=./clawops.db   \# local mode only
+CLAWOPS\_DB\_PATH=./clawops.db
 
 ## **Auth Model**
 
@@ -98,9 +91,9 @@ CLAWOPS\_DB\_PATH=./clawops.db   \# local mode only
 
 ## **Data Flow**
 
-| Agent → ClawOps | Agent calls clawops CLI as a tool → CLI writes to DB (local) or calls API (remote) |
+| Agent → ClawOps | Agent calls clawops CLI as a tool → CLI writes directly to DB |
 | :---- | :---- |
-| **Human → ClawOps** | Human uses web dashboard → dashboard calls API → API writes to DB |
+| **Human → ClawOps** | Human uses web dashboard → Next route handlers + package logic write to DB |
 | **ClawOps → Human** | Dashboard polls API → renders live state → notifications on events |
 
 | 03  Data Model |
@@ -501,7 +494,7 @@ clawops habit list \[--agent self\] \[--json\]
 | :---- | :---- |
 | **Monorepo** | Turborepo \+ pnpm workspaces |
 | **Language** | TypeScript everywhere — all apps and packages |
-| **API Framework** | Fastify with OpenAPI/Swagger auto-documentation |
+| **API Framework** | Next.js Route Handlers with Zod validation |
 | **ORM** | Drizzle ORM — type-safe, lightweight |
 | **Database** | SQLite via better-sqlite3, WAL mode enabled |
 | **Web Framework** | Next.js 14+ with App Router |
@@ -510,7 +503,7 @@ clawops habit list \[--agent self\] \[--json\]
 | **CLI** | Commander.js |
 | **Auth** | API keys (agents/CLI) \+ session cookie (web) |
 | **Containerization** | Docker \+ docker-compose.yml, SQLite volume mount |
-| **Docs** | OpenAPI/Swagger auto-generated from Fastify routes |
+| **Docs** | Static API docs page in web (`/docs/api`) backed by shared schemas/examples |
 
 | 07  Out of Scope — v0.1 |
 | :---- |

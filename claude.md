@@ -19,9 +19,8 @@ Turborepo + pnpm workspaces. Business logic lives in `packages/` as independent 
 ```
 clawops/
 ├── apps/
-│   ├── api/           → Fastify REST API + OpenAPI/Swagger docs
 │   ├── cli/           → Commander.js CLI binary (clawops)
-│   └── web/           → Next.js App Router dashboard
+│   └── web/           → Next.js App Router dashboard + route handlers
 ├── packages/
 │   ├── core/          → DB connection, Drizzle schema, migrations
 │   ├── agents/        → Agent CRUD, status, skills, memory path handling
@@ -48,7 +47,7 @@ clawops/
 |---|---|
 | Monorepo | Turborepo + pnpm workspaces |
 | Language | TypeScript strict mode everywhere |
-| API | Fastify + @fastify/swagger + @fastify/swagger-ui |
+| API | Next.js Route Handlers + Zod |
 | ORM | Drizzle ORM |
 | Database | SQLite via better-sqlite3, WAL mode |
 | Web | Next.js (latest) App Router |
@@ -60,18 +59,13 @@ clawops/
 
 ---
 
-## CLI Modes
+## CLI Mode
 
-The CLI operates in two modes:
-
-- **local** (`CLAWOPS_MODE=local`) — imports packages directly, writes to SQLite. For same-machine setups.
-- **remote** (`CLAWOPS_MODE=remote`) — makes HTTP calls to `apps/api`. For distributed setups.
+The CLI runs in local package mode and writes directly to SQLite.
 
 ```bash
-CLAWOPS_MODE=local|remote
-CLAWOPS_API_KEY=<key>           # required in both modes
-CLAWOPS_API_URL=http://...      # required in remote mode only
-CLAWOPS_DB_PATH=./clawops.db    # local mode only, defaults to ./clawops.db
+CLAWOPS_MODE=local
+CLAWOPS_DB_PATH=./clawops.db
 ```
 
 ---

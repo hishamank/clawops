@@ -22,7 +22,6 @@ If you don't understand what you're being asked to build, ask. Do not guess and 
 ## Monorepo Navigation
 
 ```
-apps/api/     → Fastify REST API
 apps/cli/     → Commander.js CLI binary
 apps/web/     → Next.js dashboard
 packages/core/        → DB + schema (everything depends on this)
@@ -59,7 +58,6 @@ pnpm install
 pnpm dev
 
 # Run a single app
-pnpm --filter @clawops/api dev
 pnpm --filter @clawops/web dev
 
 # Type check everything
@@ -114,10 +112,10 @@ export async function createTask(db: DB, input: NewTask) {
 ```
 
 ### 3. API route
-Add the route in `apps/api/src/routes/<entity>.ts`. Import from the package library. Validate input with Zod. Register the route in `apps/api/src/index.ts`.
+Add the route in `apps/web/app/api/<entity>/route.ts`. Import from the package library and validate input with Zod.
 
 ### 4. CLI command (if applicable)
-Add the command in `apps/cli/src/commands/<entity>.ts`. Import from the package library (local mode) or call the API (remote mode). Register in `apps/cli/src/index.ts`.
+Add the command in `apps/cli/src/commands/<entity>.ts`. Import from the package library in local mode and register in `apps/cli/src/index.ts`.
 
 ### 5. Web UI (if applicable)
 Add the page or component in `apps/web/`. Use shadcn/ui components. Fetch from the API — do not import package libraries directly in the web app.
@@ -153,7 +151,7 @@ If `pnpm typecheck` had zero errors before your change, it must have zero errors
 
 - Every route must have a Zod input schema
 - Every route must have a response type annotation
-- Swagger docs are auto-generated — use `schema:` on every route registration so docs stay accurate
+- API docs live under web static docs (`/docs/api`) and should be kept in sync with route behavior
 - Auth: all routes except `/health` and `/auth/login` require a valid API key in the `x-api-key` header
 - Errors: return `{ error: string, code: string }` — never expose stack traces
 - Every mutation (POST, PATCH, DELETE) must write an `events` row after the DB operation
@@ -230,7 +228,7 @@ docs: update CLAUDE.md with analytics route list
 refactor(agents): extract apiKey hashing into shared utility
 ```
 
-Scopes match package/app names: `core`, `agents`, `tasks`, `projects`, `ideas`, `habits`, `analytics`, `notifications`, `shared`, `api`, `cli`, `web`.
+Scopes match package/app names: `core`, `agents`, `tasks`, `projects`, `ideas`, `habits`, `analytics`, `notifications`, `shared`, `cli`, `web`.
 
 ---
 

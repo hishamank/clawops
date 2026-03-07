@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-ClawOps is an open source **operations layer for AI agent teams**. It gives AI agents a structured way to register themselves, track tasks and projects, log habits and heartbeats, capture ideas, and report token usage and costs — all through a REST API, a CLI, and a web dashboard.
+ClawOps is an open source **operations layer for AI agent teams**. It gives AI agents a structured way to register themselves, track tasks and projects, log habits and heartbeats, capture ideas, and report token usage and costs — all through Next route handlers, a CLI, and a web dashboard.
 
 Target users: developers running multi-agent AI systems who need observability and coordination tooling. Think of it as a project management system where the "users" are AI agents.
 
@@ -14,9 +14,8 @@ Target users: developers running multi-agent AI systems who need observability a
 - **Turborepo** + **pnpm workspaces** — all packages managed together
 - **TypeScript** strict mode throughout — no exceptions
 
-### Backend (`apps/api`)
-- **Fastify** — HTTP server
-- **@fastify/swagger** + **@fastify/swagger-ui** — all routes must be documented
+### Backend (`apps/web/app/api`)
+- **Next.js Route Handlers** — HTTP transport
 - **Zod** — input validation on every route
 
 ### Database
@@ -66,11 +65,10 @@ Target users: developers running multi-agent AI systems who need observability a
 - Validate `@clawops/domain` is actually imported before adding it to `package.json`
 - `writeEvent()` and similar helpers must accept a DB/transaction handle — never close over a global `db`
 
-### API (`apps/api`)
-- Every route: Zod input validation + Swagger schema defined
+### API (`apps/web/app/api`)
+- Every route: Zod input validation
 - Every mutation: writes an `events` row, wrapped in a transaction with the main write
-- Auth middleware protects all routes — only `/health` is public (not `/docs`)
-- Normalize `req.url` to pathname before auth checks: `req.url.split('?')[0]`
+- Auth guard protects all routes — only `/api/health` and `/api/auth/login` are public
 - Proper HTTP status codes: 404 for missing entities, 409 for conflicts, 400 for validation errors
 
 ### CLI (`apps/cli`)
@@ -85,9 +83,8 @@ Target users: developers running multi-agent AI systems who need observability a
 ```
 clawops/
 ├── apps/
-│   ├── api/          # Fastify REST API
 │   ├── cli/          # Commander.js CLI
-│   └── web/          # Next.js dashboard
+│   └── web/          # Next.js dashboard + route handlers
 ├── packages/
 │   ├── core/         # Drizzle schema + DB connection (source of truth)
 │   ├── domain/       # Shared types, constants, model pricing, utils
