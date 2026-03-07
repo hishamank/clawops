@@ -40,6 +40,7 @@ clawops onboard [options]
 | `--openclaw-dir <path>` | Path to openclaw directory | `~/.openclaw` |
 | `--all` | Auto-accept all prompts (non-interactive) | |
 | `--dry-run` | Show what would happen without writing | |
+| `--debug` | Print verbose onboarding diagnostics | |
 | `--json` | Output result as JSON (implies `--all`) | |
 
 **Example:**

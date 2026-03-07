@@ -27,18 +27,40 @@ interface OnboardResult {
   serviceInstalled: boolean;
 }
 
+function formatFileState(filePath: string): string {
+  if (!fs.existsSync(filePath)) return "missing";
+  try {
+    const st = fs.statSync(filePath);
+    if (st.isFile()) return `file (${st.size} bytes)`;
+    if (st.isDirectory()) return "dir";
+    return "other";
+  } catch (err) {
+    return `exists (stat error: ${err instanceof Error ? err.message : String(err)})`;
+  }
+}
+
 export const onboardCmd = new Command("onboard")
   .description("Interactive onboarding flow to connect ClawOps to an agent platform")
   .option("--openclaw-dir <path>", "Path to openclaw directory", "~/.openclaw")
   .option("--all", "Auto-accept all prompts (non-interactive)")
   .option("--force", "Force overwrite existing skills")
   .option("--dry-run", "Show what would happen without writing anything")
+  .option("--debug", "Print verbose onboarding diagnostics")
   .option("--json", "Output result as JSON (implies --all)")
   .action(async (opts: Record<string, unknown>) => {
     const isJson = Boolean(opts["json"]);
     const isAll = Boolean(opts["all"]) || isJson;
     const isDryRun = Boolean(opts["dryRun"]);
     const isForce = Boolean(opts["force"]);
+    const isDebug = Boolean(opts["debug"]) || process.env["CLAWOPS_DEBUG"] === "1";
+    const debug = (message: string, meta?: Record<string, unknown>): void => {
+      if (!isDebug) return;
+      if (meta) {
+        console.error(`[onboard:debug] ${message} ${JSON.stringify(meta)}`);
+        return;
+      }
+      console.error(`[onboard:debug] ${message}`);
+    };
 
     const result: OnboardResult = {
       platform: "openclaw",
@@ -77,6 +99,7 @@ export const onboardCmd = new Command("onboard")
       openclawDir = resolvePath(answer);
     }
     result.openclawDir = openclawDir;
+    debug("resolved OpenClaw directory", { openclawDir });
 
     // Validate directory
     if (!fs.existsSync(openclawDir)) {
@@ -94,10 +117,12 @@ export const onboardCmd = new Command("onboard")
       );
       process.exit(1);
     }
+    debug("OpenClaw directory validation", { hasConfig, hasWorkspaces });
 
     // Step 3 — Scan & summarize
     const { openclaw } = await import("@clawops/sync");
     const scan = openclaw.scanOpenClaw({ openclawDir, includeFiles: false });
+    debug("scan summary", { agentCount: scan.agents.length, gatewayUrl: scan.gatewayUrl });
 
     result.agents = scan.agents.map((a) => ({
       id: a.id,
@@ -207,6 +232,12 @@ export const onboardCmd = new Command("onboard")
         "server.js",
       );
       const webBuildId = path.join(projectRoot, "apps", "web", ".next", "BUILD_ID");
+      debug("dashboard start context", { projectRoot, apiPort, webPort });
+      debug("build artifacts before build", {
+        apiBuild: formatFileState(apiBuild),
+        webStandaloneBuild: formatFileState(webStandaloneBuild),
+        webBuildId: formatFileState(webBuildId),
+      });
       const hasProdBuild = fs.existsSync(apiBuild) && (
         fs.existsSync(webStandaloneBuild) || fs.existsSync(webBuildId)
       );
@@ -216,10 +247,16 @@ export const onboardCmd = new Command("onboard")
           console.log("⚠ Dashboard build not found. Building project first...");
         }
         const pnpmCmd = os.platform() === "win32" ? "pnpm.cmd" : "pnpm";
+        debug("running build command", { cmd: pnpmCmd, args: ["build"], cwd: projectRoot });
         const buildResult = spawnSync(pnpmCmd, ["build"], {
           cwd: projectRoot,
           stdio: "inherit",
           env: process.env,
+        });
+        debug("build command finished", {
+          status: buildResult.status,
+          signal: buildResult.signal,
+          error: buildResult.error ? String(buildResult.error) : undefined,
         });
         if (buildResult.status !== 0) {
           if (!isJson) {
@@ -232,6 +269,26 @@ export const onboardCmd = new Command("onboard")
       const hasApiBuild = fs.existsSync(apiBuild);
       const hasWebStandaloneBuild = fs.existsSync(webStandaloneBuild);
       const hasWebNextBuild = fs.existsSync(webBuildId);
+      debug("build artifacts after build", {
+        apiBuild: formatFileState(apiBuild),
+        webStandaloneBuild: formatFileState(webStandaloneBuild),
+        webBuildId: formatFileState(webBuildId),
+      });
+      if (isDebug) {
+        const webNextDir = path.join(projectRoot, "apps", "web", ".next");
+        if (fs.existsSync(webNextDir)) {
+          try {
+            const entries = fs.readdirSync(webNextDir).slice(0, 40);
+            debug(".next directory entries", { entries });
+          } catch (err) {
+            debug("failed listing .next directory", {
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        } else {
+          debug(".next directory missing", { webNextDir });
+        }
+      }
       const buildAvailable = hasApiBuild && (hasWebStandaloneBuild || hasWebNextBuild);
       if (buildAvailable) {
         const apiProc = spawn("node", [apiBuild], {
@@ -239,6 +296,10 @@ export const onboardCmd = new Command("onboard")
           stdio: "ignore",
           env: { ...process.env, API_PORT: apiPort },
         });
+        apiProc.on("error", (err) => {
+          debug("failed to spawn API process", { error: err.message });
+        });
+        debug("spawned API process", { cmd: "node", args: [apiBuild], pid: apiProc.pid ?? null });
         apiProc.unref();
 
         if (hasWebStandaloneBuild) {
@@ -246,6 +307,14 @@ export const onboardCmd = new Command("onboard")
             detached: true,
             stdio: "ignore",
             env: { ...process.env, WEB_PORT: webPort },
+          });
+          webProc.on("error", (err) => {
+            debug("failed to spawn web standalone process", { error: err.message });
+          });
+          debug("spawned web standalone process", {
+            cmd: "node",
+            args: [webStandaloneBuild],
+            pid: webProc.pid ?? null,
           });
           webProc.unref();
           result.dashboardWebRuntime = "standalone";
@@ -261,6 +330,14 @@ export const onboardCmd = new Command("onboard")
               env: process.env,
             },
           );
+          webProc.on("error", (err) => {
+            debug("failed to spawn web next-start process", { error: err.message });
+          });
+          debug("spawned web next-start process", {
+            cmd: pnpmCmd,
+            args: ["--filter", "@clawops/web", "exec", "next", "start", "-p", webPort],
+            pid: webProc.pid ?? null,
+          });
           webProc.unref();
           result.dashboardWebRuntime = "next-start";
         }
@@ -278,6 +355,7 @@ export const onboardCmd = new Command("onboard")
           console.log("");
         }
       } else if (!isJson) {
+        debug("build artifacts check failed", { hasApiBuild, hasWebStandaloneBuild, hasWebNextBuild });
         console.log("✗ Production build artifacts still missing. Dashboard was not started.");
         console.log("");
       }
