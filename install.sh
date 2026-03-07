@@ -86,6 +86,17 @@ checkPort($port).then(r => process.exit(r.available ? 0 : 1)).catch(() => proces
   " --input-type=module 2>/dev/null
 }
 
+stop_tracked_web_process() {
+  node -e "
+import { stopTrackedWebProcess } from './apps/cli/dist/lib/web-process.js';
+const result = stopTrackedWebProcess('$PROJECT_ROOT');
+if (result.stopped || result.staleRemoved) {
+  process.exit(0);
+}
+process.exit(1);
+  " --input-type=module 2>/dev/null
+}
+
 get_listening_pid() {
   local port=$1
   if ! command -v lsof >/dev/null 2>&1; then
@@ -158,7 +169,9 @@ stop_process_for_port_if_clawops() {
 WEB_PORT=$DEFAULT_WEB_PORT
 
 if ! check_port $WEB_PORT; then
-  if ! stop_process_for_port_if_clawops "$WEB_PORT"; then
+  if stop_tracked_web_process && check_port "$WEB_PORT"; then
+    print_success "Freed port $WEB_PORT using tracked PID file"
+  elif ! stop_process_for_port_if_clawops "$WEB_PORT"; then
     print_warning "Port $WEB_PORT (web) is in use"
     read -p "Enter alternative web port (default: 3334): " alt_web
     WEB_PORT=${alt_web:-3334}
