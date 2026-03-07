@@ -14,6 +14,8 @@ interface CreateTaskInput {
   projectId?: string;
   source?: Task["source"];
   dueDate?: Date;
+  specContent?: string;
+  specUpdatedAt?: Date | null;
 }
 
 export function createTask(db: DB, input: CreateTaskInput): Task {
@@ -28,6 +30,8 @@ export function createTask(db: DB, input: CreateTaskInput): Task {
       projectId: input.projectId,
       source: input.source,
       dueDate: input.dueDate,
+      specContent: input.specContent,
+      specUpdatedAt: input.specContent ? new Date() : null,
     })
     .returning()
     .all();
@@ -59,6 +63,7 @@ interface ListTasksFilters {
   assigneeId?: string;
   projectId?: string;
   priority?: Task["priority"];
+  withSpecs?: boolean;
 }
 
 export function listTasks(db: DB, filters?: ListTasksFilters): Task[] {
@@ -170,3 +175,55 @@ export function completeTask(
 
   return task;
 }
+
+// ── getTaskSpec ────────────────────────────────────────────────────────────
+
+export function getTaskSpec(db: DB, id: string): string | null {
+  const task = db.select().from(tasks).where(eq(tasks.id, id)).get();
+  return task?.specContent ?? null;
+}
+
+// ── setTaskSpec ────────────────────────────────────────────────────────────
+
+export function setTaskSpec(db: DB, id: string, specContent: string): Task {
+  const rows = db
+    .update(tasks)
+    .set({
+      specContent,
+      specUpdatedAt: new Date(),
+    })
+    .where(eq(tasks.id, id))
+    .returning()
+    .all();
+  return rows[0];
+}
+
+// ── appendTaskSpec ─────────────────────────────────────────────────────────
+
+export function appendTaskSpec(
+  db: DB,
+  id: string,
+  content: string,
+): Task {
+  const task = db.select().from(tasks).where(eq(tasks.id, id)).get();
+  if (!task) {
+    throw new Error(`Task not found: ${id}`);
+  }
+  const currentSpec = task.specContent ?? "";
+  const timestamp = new Date().toISOString();
+  const newSpec = currentSpec
+    ? `${currentSpec}\n\n${content}`
+    : `${content}`;
+  const rows = db
+    .update(tasks)
+    .set({
+      specContent: newSpec,
+      specUpdatedAt: new Date(),
+    })
+    .where(eq(tasks.id, id))
+    .returning()
+    .all();
+  return rows[0];
+}
+
+// ── listTasks (updated) ────────────────────────────────────────────────────
