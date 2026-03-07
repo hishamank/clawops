@@ -43,6 +43,8 @@ export const projects = sqliteTable("projects", {
   ideaId: text("idea_id"),
   prd: text("prd"),
   prdUpdatedAt: integer("prd_updated_at", { mode: "timestamp" }),
+  specContent: text("spec_content"),
+  specUpdatedAt: integer("spec_updated_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
@@ -97,6 +99,8 @@ export const tasks = sqliteTable("tasks", {
   dueDate: integer("due_date", { mode: "timestamp" }),
   completedAt: integer("completed_at", { mode: "timestamp" }),
   summary: text("summary"),
+  specContent: text("spec_content"),
+  specUpdatedAt: integer("spec_updated_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
@@ -242,6 +246,31 @@ export const notifications = sqliteTable("notifications", {
     .default(sql`(unixepoch())`),
 });
 
+// ── Agent Sessions ──────────────────────────────────────────────────────────
+
+export const agentSessions = sqliteTable("agent_sessions", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  agentId: text("agent_id")
+    .notNull()
+    .references(() => agents.id),
+  projectId: text("project_id").references(() => projects.id),
+  status: text("status", {
+    enum: ["active", "inactive"],
+  })
+    .notNull()
+    .default("inactive"),
+  lastSessionSummary: text("last_session_summary"),
+  startedAt: integer("started_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+  endedAt: integer("ended_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
+
 // ── Inferred Types ──────────────────────────────────────────────────────────
 
 export type Agent = typeof agents.$inferSelect;
@@ -276,3 +305,6 @@ export type NewEvent = typeof events.$inferInsert;
 
 export type Notification = typeof notifications.$inferSelect;
 export type NewNotification = typeof notifications.$inferInsert;
+
+export type AgentSession = typeof agentSessions.$inferSelect;
+export type NewAgentSession = typeof agentSessions.$inferInsert;
