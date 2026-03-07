@@ -16,6 +16,29 @@ function resolvePath(p: string): string {
   return p;
 }
 
+function parseEnvFile(envPath: string): Record<string, string> {
+  if (!fs.existsSync(envPath)) return {};
+  const result: Record<string, string> = {};
+  const content = fs.readFileSync(envPath, "utf8");
+  const lines = content.split(/\r?\n/);
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const eq = line.indexOf("=");
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq).trim();
+    let value = line.slice(eq + 1).trim();
+    if (
+      (value.startsWith("\"") && value.endsWith("\"")) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    result[key] = value;
+  }
+  return result;
+}
+
 interface OnboardResult {
   platform: string;
   openclawDir: string;
@@ -232,7 +255,18 @@ export const onboardCmd = new Command("onboard")
         "server.js",
       );
       const webBuildId = path.join(projectRoot, "apps", "web", ".next", "BUILD_ID");
+      const envFromFile = parseEnvFile(path.join(projectRoot, ".env"));
+      const runtimeEnv: NodeJS.ProcessEnv = {
+        ...envFromFile,
+        ...process.env,
+        API_PORT: apiPort,
+        WEB_PORT: webPort,
+      };
       debug("dashboard start context", { projectRoot, apiPort, webPort });
+      debug("runtime env presence", {
+        hasApiUrl: Boolean(runtimeEnv["CLAWOPS_API_URL"]),
+        hasApiKey: Boolean(runtimeEnv["CLAWOPS_API_KEY"]),
+      });
       debug("build artifacts before build", {
         apiBuild: formatFileState(apiBuild),
         webStandaloneBuild: formatFileState(webStandaloneBuild),
@@ -251,7 +285,7 @@ export const onboardCmd = new Command("onboard")
         const buildResult = spawnSync(pnpmCmd, ["build"], {
           cwd: projectRoot,
           stdio: "inherit",
-          env: process.env,
+          env: runtimeEnv,
         });
         debug("build command finished", {
           status: buildResult.status,
@@ -294,7 +328,7 @@ export const onboardCmd = new Command("onboard")
         const apiProc = spawn("node", [apiBuild], {
           detached: true,
           stdio: "ignore",
-          env: { ...process.env, API_PORT: apiPort },
+          env: runtimeEnv,
         });
         apiProc.on("error", (err) => {
           debug("failed to spawn API process", { error: err.message });
@@ -306,7 +340,7 @@ export const onboardCmd = new Command("onboard")
           const webProc = spawn("node", [webStandaloneBuild], {
             detached: true,
             stdio: "ignore",
-            env: { ...process.env, WEB_PORT: webPort },
+            env: runtimeEnv,
           });
           webProc.on("error", (err) => {
             debug("failed to spawn web standalone process", { error: err.message });
@@ -327,7 +361,7 @@ export const onboardCmd = new Command("onboard")
               cwd: projectRoot,
               detached: true,
               stdio: "ignore",
-              env: process.env,
+              env: runtimeEnv,
             },
           );
           webProc.on("error", (err) => {
