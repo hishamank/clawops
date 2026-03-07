@@ -107,6 +107,27 @@ export default async function ProjectDetailPage({ params }: PageProps): Promise<
         </Card>
       )}
 
+      {/* Spec section */}
+      {project.specContent && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">
+              Project Spec
+              {project.specUpdatedAt && (
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  Updated {timeAgo(project.specUpdatedAt)}
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <pre className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground font-sans">
+              {project.specContent}
+            </pre>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Task progress */}
       <Card>
         <CardContent className="py-4">

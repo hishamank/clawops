@@ -36,6 +36,8 @@ export interface Task {
   dueDate: string | null;
   completedAt: string | null;
   summary: string | null;
+  specContent: string | null;
+  specUpdatedAt: string | null;
   createdAt: string;
 }
 
@@ -109,6 +111,8 @@ export interface ProjectListItem {
   ideaId: string | null;
   prd: string | null;
   prdUpdatedAt: string | null;
+  specContent: string | null;
+  specUpdatedAt: string | null;
   createdAt: string;
 }
 
@@ -117,6 +121,8 @@ export interface ProjectDetail extends ProjectListItem {
   taskCount: number;
   completedTaskCount?: number;
   tasks?: Task[];
+  specContent?: string | null;
+  specUpdatedAt?: string | null;
 }
 
 export interface AgentDetail extends Agent {
