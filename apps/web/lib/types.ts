@@ -121,8 +121,6 @@ export interface ProjectDetail extends ProjectListItem {
   taskCount: number;
   completedTaskCount?: number;
   tasks?: Task[];
-  specContent?: string | null;
-  specUpdatedAt?: string | null;
 }
 
 export interface AgentDetail extends Agent {
