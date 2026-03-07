@@ -23,6 +23,7 @@ interface OnboardResult {
   skillsInstalled: number;
   dashboardStarted: boolean;
   dashboardMode?: "prod";
+  dashboardWebRuntime?: "standalone" | "next-start";
   serviceInstalled: boolean;
 }
 
@@ -197,8 +198,18 @@ export const onboardCmd = new Command("onboard")
         "..",
       );
       const apiBuild = path.join(projectRoot, "apps", "api", "dist", "index.js");
-      const webBuild = path.join(projectRoot, "apps", "web", ".next", "standalone", "server.js");
-      const hasProdBuild = fs.existsSync(apiBuild) && fs.existsSync(webBuild);
+      const webStandaloneBuild = path.join(
+        projectRoot,
+        "apps",
+        "web",
+        ".next",
+        "standalone",
+        "server.js",
+      );
+      const webBuildId = path.join(projectRoot, "apps", "web", ".next", "BUILD_ID");
+      const hasProdBuild = fs.existsSync(apiBuild) && (
+        fs.existsSync(webStandaloneBuild) || fs.existsSync(webBuildId)
+      );
 
       if (!hasProdBuild) {
         if (!isJson) {
@@ -218,7 +229,10 @@ export const onboardCmd = new Command("onboard")
         }
       }
 
-      const buildAvailable = fs.existsSync(apiBuild) && fs.existsSync(webBuild);
+      const hasApiBuild = fs.existsSync(apiBuild);
+      const hasWebStandaloneBuild = fs.existsSync(webStandaloneBuild);
+      const hasWebNextBuild = fs.existsSync(webBuildId);
+      const buildAvailable = hasApiBuild && (hasWebStandaloneBuild || hasWebNextBuild);
       if (buildAvailable) {
         const apiProc = spawn("node", [apiBuild], {
           detached: true,
@@ -227,18 +241,38 @@ export const onboardCmd = new Command("onboard")
         });
         apiProc.unref();
 
-        const webProc = spawn("node", [webBuild], {
-          detached: true,
-          stdio: "ignore",
-          env: { ...process.env, WEB_PORT: webPort },
-        });
-        webProc.unref();
+        if (hasWebStandaloneBuild) {
+          const webProc = spawn("node", [webStandaloneBuild], {
+            detached: true,
+            stdio: "ignore",
+            env: { ...process.env, WEB_PORT: webPort },
+          });
+          webProc.unref();
+          result.dashboardWebRuntime = "standalone";
+        } else {
+          const pnpmCmd = os.platform() === "win32" ? "pnpm.cmd" : "pnpm";
+          const webProc = spawn(
+            pnpmCmd,
+            ["--filter", "@clawops/web", "exec", "next", "start", "-p", webPort],
+            {
+              cwd: projectRoot,
+              detached: true,
+              stdio: "ignore",
+              env: process.env,
+            },
+          );
+          webProc.unref();
+          result.dashboardWebRuntime = "next-start";
+        }
 
         result.dashboardStarted = true;
         result.dashboardMode = "prod";
         if (!isJson) {
           console.log("✓ Dashboard started");
           console.log("  Mode: production");
+          if (result.dashboardWebRuntime) {
+            console.log(`  Web runtime: ${result.dashboardWebRuntime}`);
+          }
           console.log(`  Web: http://localhost:${webPort}`);
           console.log(`  API: http://localhost:${apiPort}`);
           console.log("");
@@ -447,6 +481,9 @@ WantedBy=default.target
       );
       if (result.dashboardStarted && result.dashboardMode) {
         console.log(`  Dashboard mode: ${result.dashboardMode}`);
+        if (result.dashboardWebRuntime) {
+          console.log(`  Web runtime: ${result.dashboardWebRuntime}`);
+        }
       }
       console.log(`  Service: ${serviceLabel}`);
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
