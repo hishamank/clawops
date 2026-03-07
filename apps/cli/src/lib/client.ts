@@ -1,12 +1,25 @@
 /* eslint-disable no-console -- CLI tool uses console for output */
-import type { DB, Task, Idea, Project, Milestone } from "@clawops/core";
+import type { DB, Task, Idea, Project, Milestone, AgentSession } from "@clawops/core";
 import { events } from "@clawops/core";
 import { db as coreDb } from "@clawops/core/db";
 import { runMigrations } from "@clawops/core/migrate";
-import { createTask, listTasks, updateTask, completeTask } from "@clawops/tasks";
+import { createTask, listTasks, updateTask, completeTask, getTaskSpec, setTaskSpec, appendTaskSpec } from "@clawops/tasks";
 import { createIdea, listIdeas } from "@clawops/ideas";
-import { createProject, getProject, listProjects } from "@clawops/projects";
+import {
+  createProject,
+  getProject,
+  listProjects,
+  getProjectContext,
+  activateProject,
+  deactivateProject,
+  getActiveSession,
+  getProjectSpec,
+  setProjectSpec,
+  appendProjectSpec,
+  type ProjectContext,
+} from "@clawops/projects";
 import type { IdeaStatus } from "@clawops/domain";
+import * as fs from "node:fs";
 
 export function isLocalMode(): boolean {
   return true;
@@ -36,6 +49,7 @@ export async function taskCreate(input: {
   priority?: Task["priority"];
   projectId?: string;
   assigneeId?: string;
+  specContent?: string;
 }): Promise<Task> {
   ensureMigrated();
   return createTask(getDb(), { ...input, source: "cli" });
@@ -45,6 +59,7 @@ export async function taskList(filters?: {
   status?: Task["status"];
   assigneeId?: string;
   projectId?: string;
+  withSpecs?: boolean;
 }): Promise<Task[]> {
   ensureMigrated();
   const db = getDb();
@@ -137,3 +152,88 @@ export function getAgentId(): string {
   }
   return id;
 }
+
+export async function projectContext(
+  projectId: string,
+  options?: { minimal?: boolean },
+): Promise<ProjectContext> {
+  ensureMigrated();
+  const db = getDb();
+  const result = getProjectContext(db, projectId, options);
+  if (!result) {
+    console.error(`Project not found: ${projectId}`);
+    process.exit(1);
+  }
+  logReadEvent(db, "project", projectId);
+  return result;
+}
+
+export async function projectActivate(projectId: string): Promise<AgentSession> {
+  ensureMigrated();
+  const agentId = getAgentId();
+  const db = getDb();
+  return activateProject(db, agentId, projectId);
+}
+
+export async function projectDeactivate(summary: string): Promise<AgentSession> {
+  ensureMigrated();
+  const agentId = getAgentId();
+  const db = getDb();
+  const result = deactivateProject(db, agentId, summary);
+  if (!result) {
+    console.error("No active session found");
+    process.exit(1);
+  }
+  return result;
+}
+
+export async function getActiveProjectSession(): Promise<AgentSession | null> {
+  ensureMigrated();
+  const agentId = getAgentId();
+  const db = getDb();
+  return getActiveSession(db, agentId);
+}
+
+export async function projectSpecGet(projectId: string): Promise<string | null> {
+  ensureMigrated();
+  const db = getDb();
+  const result = getProjectSpec(db, projectId);
+  logReadEvent(db, "project", projectId);
+  return result;
+}
+
+export async function projectSpecSet(projectId: string, specContent: string): Promise<Project> {
+  ensureMigrated();
+  const db = getDb();
+  return setProjectSpec(db, projectId, specContent);
+}
+
+export async function projectSpecAppend(projectId: string, content: string): Promise<Project> {
+  ensureMigrated();
+  const db = getDb();
+  return appendProjectSpec(db, projectId, content);
+}
+
+// ── Task Spec Functions ─────────────────────────────────────────────────────
+
+export async function taskSpec(id: string): Promise<string | null> {
+  ensureMigrated();
+  return getTaskSpec(getDb(), id);
+}
+
+export async function taskSpecSet(id: string, content: string): Promise<Task> {
+  ensureMigrated();
+  return setTaskSpec(getDb(), id, content);
+}
+
+export async function taskSpecSetFile(id: string, filePath: string): Promise<Task> {
+  ensureMigrated();
+  const content = fs.readFileSync(filePath, "utf-8");
+  return setTaskSpec(getDb(), id, content);
+}
+
+export async function taskSpecAppend(id: string, content: string): Promise<Task> {
+  ensureMigrated();
+  return appendTaskSpec(getDb(), id, content);
+}
+

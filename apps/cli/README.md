@@ -184,6 +184,38 @@ clawops project list --json
 
 # View project details
 clawops project info <id>
+
+# Get project context snapshot (for agents)
+clawops project context <id> --json
+
+# Get minimal context (goal + open tasks only, low token cost)
+clawops project context <id> --minimal --json
+
+# Activate a project for this session
+clawops project activate <id>
+
+# Deactivate and store session summary
+clawops project deactivate --summary "Completed initial setup and created tasks"
+
+# Show current active session
+clawops project session
+```
+
+**Context payload shape:**
+```json
+{
+  "project": { "id": "...", "name": "...", "status": "...", "goal": "..." },
+  "openTasks": [{ "id": "...", "title": "...", "priority": "...", "status": "..." }],
+  "inProgressTasks": [...],
+  "blockers": [...],
+  "lastSessionSummary": "..."
+}
+```
+
+**Agent usage pattern:**
+```bash
+# One command at session start instead of scanning workspace files
+clawops project context <id> --minimal --json
 ```
 
 ---
