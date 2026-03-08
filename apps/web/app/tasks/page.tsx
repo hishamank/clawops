@@ -1,4 +1,4 @@
-import { CheckSquare, ListTodo, Clock } from "lucide-react";
+import { CheckSquare, FileText, ListTodo, Clock } from "lucide-react";
 import type { Task, Agent, ProjectListItem } from "@/lib/types";
 import { timeAgo } from "@/lib/time";
 import { StatsCard } from "@/components/stats-card";
@@ -10,6 +10,7 @@ import { listTasks } from "@clawops/tasks";
 import { listAgents } from "@clawops/agents";
 import { listProjects } from "@clawops/projects";
 import { getDb } from "@/lib/server/runtime";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -100,24 +101,29 @@ export default async function TasksPage({ searchParams }: PageProps): Promise<Re
       ) : (
         <div className="space-y-2">
           {tasks.map((task) => (
-            <Card key={task.id} className="transition-colors hover:bg-accent/50">
-              <CardContent className="flex items-center gap-4 py-3">
-                <PriorityBadge priority={task.priority} />
-                <span className="text-sm font-medium truncate min-w-0 flex-1">
-                  {task.title}
-                </span>
-                <StatusBadge status={task.status} />
-                <span className="text-xs text-muted-foreground shrink-0 w-24 text-right">
-                  {task.assigneeId ? agentMap.get(task.assigneeId) ?? "Unknown" : "Unassigned"}
-                </span>
-                <span className="text-xs text-muted-foreground shrink-0 w-20 text-right">
-                  {task.projectId ? projectMap.get(task.projectId) ?? "—" : "—"}
-                </span>
-                <span className="text-xs text-muted-foreground shrink-0 w-16 text-right">
-                  {timeAgo(task.createdAt)}
-                </span>
-              </CardContent>
-            </Card>
+            <Link key={task.id} href={`/tasks/${task.id}`}>
+              <Card className="transition-colors hover:bg-accent/50 cursor-pointer">
+                <CardContent className="flex items-center gap-4 py-3">
+                  <PriorityBadge priority={task.priority} />
+                  <span className="text-sm font-medium truncate min-w-0 flex-1">
+                    {task.title}
+                  </span>
+                  <StatusBadge status={task.status} />
+                  {task.specContent && (
+                    <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                  )}
+                  <span className="text-xs text-muted-foreground shrink-0 w-24 text-right">
+                    {task.assigneeId ? agentMap.get(task.assigneeId) ?? "Unknown" : "Unassigned"}
+                  </span>
+                  <span className="text-xs text-muted-foreground shrink-0 w-20 text-right">
+                    {task.projectId ? projectMap.get(task.projectId) ?? "—" : "—"}
+                  </span>
+                  <span className="text-xs text-muted-foreground shrink-0 w-16 text-right">
+                    {timeAgo(task.createdAt)}
+                  </span>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
       )}

@@ -36,6 +36,8 @@ export interface Task {
   dueDate: string | null;
   completedAt: string | null;
   summary: string | null;
+  specContent: string | null;
+  specUpdatedAt: string | null;
   createdAt: string;
 }
 
@@ -109,6 +111,8 @@ export interface ProjectListItem {
   ideaId: string | null;
   prd: string | null;
   prdUpdatedAt: string | null;
+  specContent: string | null;
+  specUpdatedAt: string | null;
   createdAt: string;
 }
 

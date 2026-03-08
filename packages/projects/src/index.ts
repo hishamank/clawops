@@ -223,6 +223,7 @@ export interface ProjectContext {
     name: string;
     status: string;
     goal: string | null;
+    spec: string | null;
   };
   openTasks: Array<{
     id: string;
@@ -338,6 +339,7 @@ export function getProjectContext(
         name: project.name,
         status: project.status,
         goal: project.description ?? null,
+        spec: project.specContent ?? null,
       },
       openTasks: openTasks.map((t) => ({
         id: t.id,
@@ -357,6 +359,7 @@ export function getProjectContext(
       name: project.name,
       status: project.status,
       goal: project.description ?? null,
+      spec: project.specContent ?? null,
     },
     openTasks,
     inProgressTasks,
