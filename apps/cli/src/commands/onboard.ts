@@ -48,6 +48,7 @@ interface OnboardResult {
   platform: string;
   openclawDir: string;
   agents: Array<{ id: string; name: string; workspacePath: string }>;
+  agentsRegistered: number;
   skillsInstalled: number;
   dashboardStarted: boolean;
   dashboardMode?: "prod";
@@ -94,6 +95,7 @@ export const onboardCmd = new Command("onboard")
       platform: "openclaw",
       openclawDir: "",
       agents: [],
+      agentsRegistered: 0,
       skillsInstalled: 0,
       dashboardStarted: false,
       serviceInstalled: false,
@@ -165,6 +167,34 @@ export const onboardCmd = new Command("onboard")
       console.log(`  Workspaces:\n${wsPaths}`);
       console.log(`  Gateway: ${scan.gatewayUrl}`);
       console.log("");
+    }
+
+    // Step 3.5 — Register discovered agents in ClawOps DB
+    {
+      const { initAgent } = await import("@clawops/agents");
+      const { db } = await import("@clawops/core/db");
+      for (const discovered of scan.agents) {
+        if (isDryRun) {
+          result.agentsRegistered++;
+          continue;
+        }
+        const registered = initAgent(db, {
+          name: discovered.name,
+          model: discovered.model ?? "unknown",
+          role: discovered.role ?? "agent",
+          framework: discovered.framework ?? "openclaw",
+          memoryPath: discovered.memoryPath ?? discovered.workspacePath,
+          skills: discovered.skills,
+          avatar: discovered.avatar,
+        });
+        if (registered.created) {
+          result.agentsRegistered++;
+        }
+      }
+      if (!isJson) {
+        console.log(`✓ Agent registry updated (${result.agentsRegistered} new)`);
+        console.log("");
+      }
     }
 
     // Step 4 — Install skill
@@ -264,6 +294,11 @@ export const onboardCmd = new Command("onboard")
         ...process.env,
         WEB_PORT: webPort,
       };
+      const configuredDbPath = runtimeEnv["CLAWOPS_DB_PATH"];
+      runtimeEnv["CLAWOPS_DB_PATH"] =
+        configuredDbPath && path.isAbsolute(configuredDbPath)
+          ? configuredDbPath
+          : path.join(projectRoot, configuredDbPath ?? "clawops.db");
       const stopResult = stopTrackedWebProcess(projectRoot);
       debug("existing tracked web process stop result", { ...stopResult });
       if (!isJson && stopResult.stopped) {
@@ -542,6 +577,7 @@ WantedBy=default.target
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
       console.log(`✓ ClawOps connected to OpenClaw`);
       console.log(`  ${result.agents.length} agents found`);
+      console.log(`  ${result.agentsRegistered} agents registered`);
       console.log(`  ${result.skillsInstalled} skills installed`);
       console.log(
         `  Dashboard: ${result.dashboardStarted ? "running" : "not started"}`,

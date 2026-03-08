@@ -14,6 +14,7 @@ function resolvePath(p: string): string {
 interface SyncJsonResult {
   syncedAt: string;
   agents: { total: number; added: string[]; removed: string[] };
+  registry: { created: number };
   skills: { installed: number; skipped: number };
   cronJobs: { total: number };
 }
@@ -76,6 +77,31 @@ export const syncCmd = new Command("sync")
     const removedAgents = previousAgentIds.filter(
       (id: string) => !currentAgentIds.includes(id),
     );
+
+    // Upsert discovered agents into ClawOps DB registry
+    let registryCreated = 0;
+    {
+      const { initAgent } = await import("@clawops/agents");
+      const { db } = await import("@clawops/core/db");
+      for (const discovered of scan.agents) {
+        if (isDryRun) {
+          registryCreated++;
+          continue;
+        }
+        const registered = initAgent(db, {
+          name: discovered.name,
+          model: discovered.model ?? "unknown",
+          role: discovered.role ?? "agent",
+          framework: discovered.framework ?? "openclaw",
+          memoryPath: discovered.memoryPath ?? discovered.workspacePath,
+          skills: discovered.skills,
+          avatar: discovered.avatar,
+        });
+        if (registered.created) {
+          registryCreated++;
+        }
+      }
+    }
 
     // Install skills
     let installed = 0;
@@ -140,6 +166,7 @@ export const syncCmd = new Command("sync")
         added: addedAgents,
         removed: removedAgents,
       },
+      registry: { created: registryCreated },
       skills: { installed, skipped },
       cronJobs: { total: cronJobCount },
     };
@@ -148,7 +175,8 @@ export const syncCmd = new Command("sync")
     const nothingChanged =
       addedAgents.length === 0 &&
       removedAgents.length === 0 &&
-      installed === 0;
+      installed === 0 &&
+      registryCreated === 0;
 
     if (isJson) {
       console.log(JSON.stringify(jsonResult, null, 2));
@@ -164,6 +192,7 @@ export const syncCmd = new Command("sync")
       console.log(
         `✓ Agents: ${scan.agents.length} found${addedLabel}${removedLabel}`,
       );
+      console.log(`✓ Registry: ${registryCreated} new agent records created`);
 
       const skillLabel =
         installed > 0

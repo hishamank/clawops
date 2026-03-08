@@ -191,7 +191,7 @@ if [ ! -f ".env" ]; then
 
   cat > .env <<EOF
 # SQLite database path
-CLAWOPS_DB_PATH=./clawops.db
+CLAWOPS_DB_PATH=${PROJECT_ROOT}/clawops.db
 
 # Web dashboard port
 WEB_PORT=$WEB_PORT

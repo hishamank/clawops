@@ -4,6 +4,12 @@ export interface SyncAgent {
   workspacePath: string;
   channels: string[];
   sessionKey?: string;
+  model?: string;
+  role?: string;
+  framework?: string;
+  avatar?: string;
+  skills?: string[];
+  memoryPath?: string;
 }
 
 export interface SyncCronJob {
