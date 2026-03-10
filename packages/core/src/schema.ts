@@ -332,6 +332,10 @@ export const activityEvents = sqliteTable("activity_events", {
   projectId: text("project_id").references(() => projects.id),
   taskId: text("task_id").references(() => tasks.id),
   metadata: text("metadata"),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
 
 // ── Sync Runs ───────────────────────────────────────────────────────────────
 
