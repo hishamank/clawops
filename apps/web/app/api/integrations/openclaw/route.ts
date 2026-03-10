@@ -9,9 +9,9 @@ import {
   upsertOpenClawConnection,
 } from "@clawops/sync";
 import {
-  getAgentIdFromApiKey,
   getDb,
   jsonError,
+  requireAgentId,
 } from "@/lib/server/runtime";
 
 const connectionStatusSchema = z.enum(["active", "disconnected", "error"]);
@@ -35,7 +35,12 @@ function defaultConnectionName(rootPath: string): string {
   return `OpenClaw ${baseName}`;
 }
 
-export async function GET(): Promise<NextResponse> {
+export async function GET(req: Request): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) {
+    return auth;
+  }
+
   try {
     const connections = listOpenClawConnections(getDb());
     return NextResponse.json(connections);
@@ -49,10 +54,14 @@ export async function GET(): Promise<NextResponse> {
 }
 
 export async function POST(req: Request): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) {
+    return auth;
+  }
+
   try {
     const body = upsertConnectionBody.parse(await req.json());
     const db = getDb();
-    const agentId = getAgentIdFromApiKey(req) ?? undefined;
     const result = db.transaction((tx) => {
       const upserted = upsertOpenClawConnection(tx as unknown as DB, {
         name: body.name ?? defaultConnectionName(body.rootPath),
@@ -71,7 +80,7 @@ export async function POST(req: Request): Promise<NextResponse> {
             : "openclaw.connection.updated",
           entityType: "openclaw_connection",
           entityId: upserted.connection.id,
-          agentId,
+          agentId: auth,
           meta: JSON.stringify({
             rootPath: upserted.connection.rootPath,
             gatewayUrl: upserted.connection.gatewayUrl,

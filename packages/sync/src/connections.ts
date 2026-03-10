@@ -31,6 +31,29 @@ export interface UpdateOpenClawConnectionInput {
   lastSyncedAt?: Date | null;
 }
 
+function buildConnectionUpdateValues(
+  input: UpsertOpenClawConnectionInput | UpdateOpenClawConnectionInput,
+  existing: OpenClawConnection,
+): Pick<
+  OpenClawConnection,
+  "name" | "gatewayUrl" | "status" | "syncMode" | "hasGatewayToken" | "meta" | "lastSyncedAt"
+> & { updatedAt: Date } {
+  return {
+    name: input.name ?? existing.name,
+    gatewayUrl:
+      input.gatewayUrl === undefined ? existing.gatewayUrl : input.gatewayUrl,
+    status: input.status ?? existing.status,
+    syncMode: input.syncMode ?? existing.syncMode,
+    hasGatewayToken: input.hasGatewayToken ?? existing.hasGatewayToken,
+    meta: input.meta ? toJsonObject(input.meta) : existing.meta,
+    lastSyncedAt:
+      input.lastSyncedAt === undefined
+        ? existing.lastSyncedAt
+        : input.lastSyncedAt,
+    updatedAt: new Date(),
+  };
+}
+
 export function listOpenClawConnections(db: DB): OpenClawConnection[] {
   return db
     .select()
@@ -92,35 +115,28 @@ export function upsertOpenClawConnection(
       return { connection: inserted, created: true };
     }
 
-    // Row already existed — update it selectively within the same transaction.
     const existing = tx
       .select()
       .from(openclawConnections)
       .where(eq(openclawConnections.rootPath, input.rootPath))
       .get();
-
     if (!existing) {
-      // Should be unreachable — conflict means the row exists.
-      throw new Error(`Unexpected state: conflict on rootPath "${input.rootPath}" but no existing row found`);
+      throw new Error(
+        `Unexpected state: conflict on rootPath "${input.rootPath}" but no existing row found`,
+      );
     }
 
-    const updated = tx
+    const connection = tx
       .update(openclawConnections)
       .set({
-        name: input.name,
-        gatewayUrl: input.gatewayUrl !== undefined ? input.gatewayUrl : existing.gatewayUrl,
-        status: input.status ?? existing.status,
-        syncMode: input.syncMode ?? existing.syncMode,
-        hasGatewayToken: input.hasGatewayToken !== undefined ? input.hasGatewayToken : existing.hasGatewayToken,
-        meta: input.meta ? toJsonObject(input.meta) : existing.meta,
-        lastSyncedAt: input.lastSyncedAt !== undefined ? input.lastSyncedAt : existing.lastSyncedAt,
+        ...buildConnectionUpdateValues(input, existing),
         updatedAt: now,
       })
       .where(eq(openclawConnections.id, existing.id))
       .returning()
       .get();
 
-    return { connection: updated, created: false };
+    return { connection, created: false };
   });
 }
 
@@ -136,20 +152,7 @@ export function updateOpenClawConnection(
 
   return db
     .update(openclawConnections)
-    .set({
-      name: updates.name ?? existing.name,
-      gatewayUrl:
-        updates.gatewayUrl === undefined ? existing.gatewayUrl : updates.gatewayUrl,
-      status: updates.status ?? existing.status,
-      syncMode: updates.syncMode ?? existing.syncMode,
-      hasGatewayToken: updates.hasGatewayToken ?? existing.hasGatewayToken,
-      meta: updates.meta ? toJsonObject(updates.meta) : existing.meta,
-      lastSyncedAt:
-        updates.lastSyncedAt === undefined
-          ? existing.lastSyncedAt
-          : updates.lastSyncedAt,
-      updatedAt: new Date(),
-    })
+    .set(buildConnectionUpdateValues(updates, existing))
     .where(eq(openclawConnections.id, id))
     .returning()
     .get();

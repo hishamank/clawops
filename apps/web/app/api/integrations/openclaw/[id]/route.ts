@@ -8,9 +8,9 @@ import {
   updateOpenClawConnection,
 } from "@clawops/sync";
 import {
-  getAgentIdFromApiKey,
   getDb,
   jsonError,
+  requireAgentId,
 } from "@/lib/server/runtime";
 
 const connectionStatusSchema = z.enum(["active", "disconnected", "error"]);
@@ -28,9 +28,14 @@ const updateConnectionBody = z.object({
 });
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) {
+    return auth;
+  }
+
   try {
     const { id } = idParams.parse(await params);
     const connection = getOpenClawConnection(getDb(), id);
@@ -55,11 +60,15 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) {
+    return auth;
+  }
+
   try {
     const { id } = idParams.parse(await params);
     const body = updateConnectionBody.parse(await req.json());
     const db = getDb();
-    const agentId = getAgentIdFromApiKey(req) ?? undefined;
 
     const updated = db.transaction((tx) => {
       const connection = updateOpenClawConnection(tx as unknown as DB, id, {
@@ -86,7 +95,7 @@ export async function PATCH(
           action: "openclaw.connection.updated",
           entityType: "openclaw_connection",
           entityId: connection.id,
-          agentId,
+          agentId: auth,
           meta: JSON.stringify({
             fields: Object.keys(body),
           }),

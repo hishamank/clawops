@@ -1,9 +1,8 @@
 import { describe, it, mock } from "node:test";
 import assert from "node:assert";
+import type { DB, OpenClawConnection } from "@clawops/core";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-const FAKE_CONNECTION = {
+const FAKE_CONNECTION: OpenClawConnection = {
   id: "conn-1",
   provider: "openclaw",
   name: "Local OpenClaw",
@@ -14,27 +13,57 @@ const FAKE_CONNECTION = {
   hasGatewayToken: true,
   meta: '{"env":"dev"}',
   lastSyncedAt: null,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
+  createdAt: new Date("2026-03-10T00:00:00.000Z"),
+  updatedAt: new Date("2026-03-10T00:00:00.000Z"),
 };
 
-function makeChain(row: any = FAKE_CONNECTION, rows: any[] = [FAKE_CONNECTION]): any {
-  const c: any = {
-    all: () => rows,
-    get: () => row,
-    returning: () => c,
-    where: () => c,
-    from: () => c,
-    values: () => c,
-    set: () => c,
-    orderBy: () => c,
-  };
-  return c;
+type ConnectionPayload = Record<string, unknown>;
+
+interface StubChain {
+  all: () => OpenClawConnection[];
+  get: () => OpenClawConnection | null;
+  returning: () => StubChain;
+  where: () => StubChain;
+  from: () => StubChain;
+  values: (value: ConnectionPayload) => StubChain;
+  set: (value: ConnectionPayload) => StubChain;
+  orderBy: () => StubChain;
 }
 
-function makeDb(row?: any, rows?: any[]): any {
-  const c = makeChain(row, rows);
-  return { insert: () => c, select: () => c, update: () => c };
+interface StubDb {
+  insert: () => StubChain;
+  select: () => StubChain;
+  update: () => StubChain;
+}
+
+function makeChain(
+  row: OpenClawConnection | null = FAKE_CONNECTION,
+  rows: OpenClawConnection[] = [FAKE_CONNECTION],
+): StubChain {
+  const chain: StubChain = {
+    all: () => rows,
+    get: () => row,
+    returning: () => chain,
+    where: () => chain,
+    from: () => chain,
+    values: () => chain,
+    set: () => chain,
+    orderBy: () => chain,
+  };
+  return chain;
+}
+
+function makeDb(
+  row: OpenClawConnection | null = FAKE_CONNECTION,
+  rows: OpenClawConnection[] = [FAKE_CONNECTION],
+): DB {
+  const chain = makeChain(row, rows);
+  const db: StubDb = {
+    insert: () => chain,
+    select: () => chain,
+    update: () => chain,
+  };
+  return db as unknown as DB;
 }
 
 mock.module("@clawops/core", {
@@ -69,118 +98,90 @@ describe("getOpenClawConnection", () => {
   });
 
   it("returns null when not found", () => {
-    const chain: any = {
-      all: () => [],
-      get: () => null,
-      returning: () => chain,
-      where: () => chain,
-      from: () => chain,
-      values: () => chain,
-      set: () => chain,
-      orderBy: () => chain,
-    };
-    const db = { insert: () => chain, select: () => chain, update: () => chain };
-    const result = getOpenClawConnection(db as any, "missing");
+    const result = getOpenClawConnection(makeDb(null, []), "missing");
     assert.equal(result, null);
   });
 });
 
 describe("upsertOpenClawConnection", () => {
   it("creates a new connection when none exists", () => {
-    let capturedValues: any;
-    let selectCount = 0;
+    let capturedValues: ConnectionPayload | undefined;
     const insertRow = { ...FAKE_CONNECTION, name: "Created OpenClaw" };
-    const selectChain: any = {
-      get: () => {
-        selectCount += 1;
-        return null;
-      },
-      where: () => selectChain,
-      from: () => selectChain,
-    };
-    const insertChain: any = {
-      get: () => insertRow,
-      values: (value: any) => {
+    const selectChain = makeChain(null, []);
+    const insertChain: StubChain = {
+      ...makeChain(insertRow, [insertRow]),
+      returning: () => insertChain,
+      values: (value) => {
         capturedValues = value;
         return insertChain;
       },
-      returning: () => insertChain,
     };
     const db = {
       select: () => selectChain,
       insert: () => insertChain,
       update: () => insertChain,
-    };
+    } as unknown as DB;
 
-    const result = upsertOpenClawConnection(db as any, {
+    const result = upsertOpenClawConnection(db, {
       name: "Created OpenClaw",
       rootPath: "/tmp/new",
       hasGatewayToken: true,
       meta: { source: "wizard" },
     });
 
-    assert.equal(selectCount, 1);
     assert.equal(result.created, true);
-    assert.equal(capturedValues.name, "Created OpenClaw");
-    assert.equal(capturedValues.rootPath, "/tmp/new");
-    assert.equal(capturedValues.hasGatewayToken, true);
-    assert.equal(capturedValues.meta, '{"source":"wizard"}');
+    assert.equal(capturedValues?.["name"], "Created OpenClaw");
+    assert.equal(capturedValues?.["rootPath"], "/tmp/new");
+    assert.equal(capturedValues?.["hasGatewayToken"], true);
+    assert.equal(capturedValues?.["meta"], '{"source":"wizard"}');
   });
 
   it("updates an existing connection when rootPath matches", () => {
-    let capturedSet: any;
-    const selectChain: any = {
-      get: () => FAKE_CONNECTION,
-      where: () => selectChain,
-      from: () => selectChain,
+    let capturedSet: ConnectionPayload | undefined;
+    const updatedRow = { ...FAKE_CONNECTION, name: "Updated OpenClaw" };
+    const uniqueError = new Error(
+      "SqliteError: UNIQUE constraint failed: openclaw_connections.root_path",
+    );
+    const selectChain = makeChain(FAKE_CONNECTION, [FAKE_CONNECTION]);
+    const insertChain: StubChain = {
+      ...makeChain(updatedRow, [updatedRow]),
+      returning: () => insertChain,
+      values: () => insertChain,
+      get: () => {
+        throw uniqueError;
+      },
     };
-    const updateChain: any = {
-      get: () => ({ ...FAKE_CONNECTION, name: "Updated OpenClaw" }),
-      set: (value: any) => {
+    const updateChain: StubChain = {
+      ...makeChain(updatedRow, [updatedRow]),
+      returning: () => updateChain,
+      set: (value) => {
         capturedSet = value;
         return updateChain;
       },
-      where: () => updateChain,
-      returning: () => updateChain,
     };
     const db = {
       select: () => selectChain,
-      insert: () => updateChain,
+      insert: () => insertChain,
       update: () => updateChain,
-    };
+    } as unknown as DB;
 
-    const result = upsertOpenClawConnection(db as any, {
+    const result = upsertOpenClawConnection(db, {
       name: "Updated OpenClaw",
       rootPath: FAKE_CONNECTION.rootPath,
       syncMode: "manual",
     });
 
     assert.equal(result.created, false);
-    assert.equal(capturedSet.name, "Updated OpenClaw");
-    assert.equal(capturedSet.syncMode, "manual");
+    assert.equal(capturedSet?.["name"], "Updated OpenClaw");
+    assert.equal(capturedSet?.["syncMode"], "manual");
   });
 });
 
 describe("updateOpenClawConnection", () => {
   it("returns null when the connection does not exist", () => {
-    const selectChain: any = {
-      get: () => null,
-      where: () => selectChain,
-      from: () => selectChain,
-    };
-    const updateChain: any = {
-      get: () => null,
-      set: () => updateChain,
-      where: () => updateChain,
-      returning: () => updateChain,
-    };
-    const db = {
-      select: () => selectChain,
-      insert: () => updateChain,
-      update: () => updateChain,
-    };
-
-    const result = updateOpenClawConnection(db as any, "missing", { name: "New Name" });
+    const result = updateOpenClawConnection(makeDb(null, []), "missing", {
+      name: "New Name",
+    });
     assert.equal(result, null);
   });
 });
