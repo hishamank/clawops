@@ -173,6 +173,7 @@ export const ideas = sqliteTable("ideas", {
     .notNull()
     .default("raw"),
   tags: text("tags"), // JSON array string
+  sections: text("sections"), // JSON object string for structured sections
   projectId: text("project_id"),
   source: text("source", {
     enum: ["human", "agent"],
