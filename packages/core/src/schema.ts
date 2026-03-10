@@ -337,6 +337,58 @@ export const activityEvents = sqliteTable("activity_events", {
     .default(sql`(unixepoch())`),
 });
 
+// ── Sync Runs ───────────────────────────────────────────────────────────────
+
+export const syncRuns = sqliteTable("sync_runs", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  connectionId: text("connection_id"),
+  syncType: text("sync_type", {
+    enum: ["manual", "scheduled", "reconcile"],
+  })
+    .notNull()
+    .default("manual"),
+  status: text("status", {
+    enum: ["running", "success", "failed"],
+  })
+    .notNull()
+    .default("running"),
+  startedAt: integer("started_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+  completedAt: integer("completed_at", { mode: "timestamp" }),
+  agentCount: integer("agent_count").notNull().default(0),
+  cronJobCount: integer("cron_job_count").notNull().default(0),
+  workspaceCount: integer("workspace_count").notNull().default(0),
+  addedCount: integer("added_count").notNull().default(0),
+  updatedCount: integer("updated_count").notNull().default(0),
+  removedCount: integer("removed_count").notNull().default(0),
+  error: text("error"),
+  meta: text("meta"),
+});
+
+export const syncRunItems = sqliteTable("sync_run_items", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  syncRunId: text("sync_run_id")
+    .notNull()
+    .references(() => syncRuns.id),
+  itemType: text("item_type", {
+    enum: ["agent", "workspace", "cron_job"],
+  }).notNull(),
+  itemExternalId: text("item_external_id").notNull(),
+  changeType: text("change_type", {
+    enum: ["seen", "added", "updated", "removed", "failed"],
+  }).notNull(),
+  summary: text("summary"),
+  meta: text("meta"),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
+
 // ── Inferred Types ──────────────────────────────────────────────────────────
 
 export type Agent = typeof agents.$inferSelect;
@@ -382,3 +434,9 @@ export type ActivityEvent = typeof activityEvents.$inferSelect;
 export type NewActivityEvent = typeof activityEvents.$inferInsert;
 export type ActivityEventSeverity = NonNullable<NewActivityEvent["severity"]>;
 export type ActivityEventSource = NonNullable<NewActivityEvent["source"]>;
+
+export type SyncRun = typeof syncRuns.$inferSelect;
+export type NewSyncRun = typeof syncRuns.$inferInsert;
+
+export type SyncRunItem = typeof syncRunItems.$inferSelect;
+export type NewSyncRunItem = typeof syncRunItems.$inferInsert;

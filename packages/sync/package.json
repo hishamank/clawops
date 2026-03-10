@@ -19,8 +19,7 @@
     "typescript": "^5.7.0"
   },
   "dependencies": {
-    "@clawops/core": "workspace:*",
-    "drizzle-orm": "^0.38.0"
+    "@clawops/core": "workspace:*"
   },
   "exports": {
     ".": {

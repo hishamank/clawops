@@ -11,4 +11,4 @@ export {
   parseActivityEventMetadata,
 } from "./helpers.js";
 export type { ActivityEventFilters } from "./helpers.js";
-export { eq, desc, and, gte } from "drizzle-orm";
+export { eq, desc, and, gte, or } from "drizzle-orm";
