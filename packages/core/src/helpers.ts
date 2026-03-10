@@ -1,3 +1,13 @@
+import { eq, type SQL } from "drizzle-orm";
+import type { DB } from "./db.js";
+import {
+  activityEvents,
+  type ActivityEvent,
+  type ActivityEventSeverity,
+  type ActivityEventSource,
+  type NewActivityEvent,
+} from "./schema.js";
+
 export function parseJsonArray(val: string | null): string[] {
   if (!val) return [];
   try {
@@ -30,4 +40,106 @@ export function parseJsonObject(val: string | null): Record<string, unknown> {
 
 export function toJsonObject(obj: Record<string, unknown>): string {
   return JSON.stringify(obj);
+}
+
+// ── Activity Event Helpers ─────────────────────────────────────────────────
+
+export interface ActivityEventFilters {
+  type?: string;
+  agentId?: string;
+  entityType?: string;
+  entityId?: string;
+  projectId?: string;
+  taskId?: string;
+  severity?: ActivityEventSeverity;
+  source?: ActivityEventSource;
+  limit?: number;
+  offset?: number;
+}
+
+function normalizeActivityEventMetadata(
+  metadata: string | null | undefined,
+): string | null {
+  if (metadata == null) {
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(metadata);
+  } catch {
+    throw new Error("Activity event metadata must be a JSON object");
+  }
+
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Activity event metadata must be a JSON object");
+  }
+
+  return toJsonObject(parsed as Record<string, unknown>);
+}
+
+/**
+ * Normalizes an activity event input for insertion.
+ * Re-serializes metadata so object-shaped JSON is stored consistently.
+ *
+ * Note: this is a data-normalizer, NOT a DB insert. Call it before inserting:
+ *   `db.insert(activityEvents).values(normalizeActivityEvent(input)).run()`
+ */
+export function normalizeActivityEvent(
+  event: Omit<NewActivityEvent, "id" | "createdAt">,
+): NewActivityEvent {
+  return {
+    ...event,
+    metadata: normalizeActivityEventMetadata(event.metadata),
+  };
+}
+
+export function createActivityEvent(
+  db: DB,
+  event: Omit<NewActivityEvent, "id" | "createdAt">,
+): ActivityEvent {
+  return db
+    .insert(activityEvents)
+    .values(normalizeActivityEvent(event))
+    .returning()
+    .get();
+}
+
+export function buildActivityEventQueryConditions(
+  filters: ActivityEventFilters,
+): SQL[] {
+  const conditions: SQL[] = [];
+
+  if (filters.type) {
+    conditions.push(eq(activityEvents.type, filters.type));
+  }
+  if (filters.agentId) {
+    conditions.push(eq(activityEvents.agentId, filters.agentId));
+  }
+  if (filters.entityType) {
+    conditions.push(eq(activityEvents.entityType, filters.entityType));
+  }
+  if (filters.entityId) {
+    conditions.push(eq(activityEvents.entityId, filters.entityId));
+  }
+  if (filters.projectId) {
+    conditions.push(eq(activityEvents.projectId, filters.projectId));
+  }
+  if (filters.taskId) {
+    conditions.push(eq(activityEvents.taskId, filters.taskId));
+  }
+  if (filters.severity) {
+    conditions.push(eq(activityEvents.severity, filters.severity));
+  }
+  if (filters.source) {
+    conditions.push(eq(activityEvents.source, filters.source));
+  }
+
+  return conditions;
+}
+
+export function parseActivityEventMetadata(
+  event: ActivityEvent,
+): Record<string, unknown> {
+  return parseJsonObject(event.metadata);
 }
