@@ -39,7 +39,6 @@ function makeDb(rows: TimelineRow[]): DB {
 }
 
 const { getCostTimeline, getTokenTimeline } = await import("./index.js");
-
 describe("analytics integration timelines", () => {
   it("groups token timeline rows into current ISO week buckets", () => {
     const points = getTokenTimeline(

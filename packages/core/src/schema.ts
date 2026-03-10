@@ -390,6 +390,42 @@ export const syncRunItems = sqliteTable("sync_run_items", {
     .default(sql`(unixepoch())`),
 });
 
+// ── Task Templates ──────────────────────────────────────────────────────────
+
+export const taskTemplates = sqliteTable("task_templates", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  isBuiltIn: integer("is_built_in", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  isCustom: integer("is_custom", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
+
+// ── Task Template Stages ───────────────────────────────────────────────────
+
+export const taskTemplateStages = sqliteTable("task_template_stages", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  templateId: text("template_id")
+    .notNull()
+    .references(() => taskTemplates.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  order: integer("order").notNull().default(0),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
+
 // ── Inferred Types ──────────────────────────────────────────────────────────
 
 export type Agent = typeof agents.$inferSelect;
@@ -441,3 +477,9 @@ export type NewSyncRun = typeof syncRuns.$inferInsert;
 
 export type SyncRunItem = typeof syncRunItems.$inferSelect;
 export type NewSyncRunItem = typeof syncRunItems.$inferInsert;
+
+export type TaskTemplate = typeof taskTemplates.$inferSelect;
+export type NewTaskTemplate = typeof taskTemplates.$inferInsert;
+
+export type TaskTemplateStage = typeof taskTemplateStages.$inferSelect;
+export type NewTaskTemplateStage = typeof taskTemplateStages.$inferInsert;
