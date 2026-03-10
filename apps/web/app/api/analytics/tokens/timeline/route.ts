@@ -17,11 +17,16 @@ export async function GET(req: Request): Promise<NextResponse> {
   try {
     const auth = requireAgentId(req);
     if (auth instanceof NextResponse) return auth;
+
     const params = parseSearch(req, timelineQuery);
+    if (params.agentId && params.agentId !== auth) {
+      return jsonError(403, "Forbidden", "FORBIDDEN");
+    }
+
     const db = getDb();
 
     const timeline = getTokenTimeline(db, {
-      agentId: params.agentId,
+      agentId: params.agentId ?? auth,
       model: params.model,
       from: new Date(params.from),
       to: new Date(params.to),

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { formatBucketDateUtc } from "./index.js";
+const { formatBucketDateUtc } = await import("./index.js");
 
 describe("analytics bucket formatting", () => {
   it("uses the Monday of the current ISO week for week buckets", () => {
