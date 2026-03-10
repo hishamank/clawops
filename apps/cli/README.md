@@ -68,6 +68,7 @@ clawops onboard --all --openclaw-dir /opt/openclaw --json
 Dashboard start behavior:
 - If production build artifacts exist, onboard starts Web in production mode.
 - If artifacts are missing, onboard runs `pnpm build` first, then starts Web in production mode.
+- On start, onboard writes dashboard process metadata to `.clawops-web.pid` in the project root.
 
 ---
 
@@ -114,6 +115,21 @@ clawops sync --json
   "cronJobs": {"total": 12}
 }
 ```
+
+---
+
+### `clawops web stop`
+
+Stop the tracked dashboard process using the PID file.
+
+```bash
+clawops web stop [--project-root /path/to/clawops] [--json]
+```
+
+Behavior:
+- Reads `.clawops-web.pid` from the project root.
+- Stops the process with `SIGTERM` then `SIGKILL` if needed.
+- Removes stale PID files automatically.
 
 ---
 

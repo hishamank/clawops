@@ -8,6 +8,7 @@ import { ideaCmd } from "./commands/idea.js";
 import { projectCmd } from "./commands/project.js";
 import { onboardCmd } from "./commands/onboard.js";
 import { syncCmd } from "./commands/sync.js";
+import { webCmd } from "./commands/web.js";
 import { ensureMigrated } from "./lib/client.js";
 
 const program = new Command();
@@ -25,6 +26,7 @@ program.addCommand(ideaCmd);
 program.addCommand(projectCmd);
 program.addCommand(onboardCmd);
 program.addCommand(syncCmd);
+program.addCommand(webCmd);
 
 program.hook("preAction", () => {
   try {

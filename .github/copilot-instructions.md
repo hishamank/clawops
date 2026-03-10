@@ -37,8 +37,9 @@ Target users: developers running multi-agent AI systems who need observability a
 - `@clawops/agents`, `@clawops/tasks`, `@clawops/projects`, etc. — business logic per domain
 
 ### Testing
-- **Vitest** — unit tests for all `packages/*`
-- In-memory SQLite (`:memory:`) for DB tests — no mocking the DB
+- **Node test runner (`node:test`)** is the default in this repo
+- Prefer in-memory SQLite (`:memory:`) for DB-facing package tests
+- If a package exports runtime helpers, tests should import the built module and exercise those real exports
 
 ---
 
@@ -65,6 +66,8 @@ Target users: developers running multi-agent AI systems who need observability a
 - Validate `@clawops/domain` is actually imported before adding it to `package.json`
 - `writeEvent()` and similar helpers must accept a DB/transaction handle — never close over a global `db`
 - If a feature introduces a fixed set of valid keys or sections, define and reuse one shared constant/type across package, API, and CLI layers; do not leave runtime validation to TypeScript-only annotations
+- Schema ownership is strict: all Drizzle tables, inferred row types, and migrations belong in `packages/core`; feature packages may consume schema from `@clawops/core` but must not declare new tables locally
+- Exported validator/input contracts must match each other: if an update type is partial, the validator for that update path must also accept partial payloads and must not require create-only fields
 
 ### API (`apps/web/app/api`)
 - Every route: Zod input validation
@@ -123,6 +126,12 @@ clawops/
 - Local string union that duplicates a type already in `@clawops/domain`
 - Structured models implemented with open-ended index signatures or unvalidated dynamic route segments that allow arbitrary keys beyond the approved contract
 - New package behavior with no executable coverage in that package's `test` script
+- New helper/type described in the PR or issue exists in source but is not re-exported from the package entrypoint
+- A package adds new behavior but its `test` script is still a no-op
+- A normalizer silently drops malformed structured data instead of preserving it or rejecting it
+- New Drizzle schema or inferred row types declared outside `packages/core`
+- Package contract claims “types/interfaces only” but introduces persistence schema or migration responsibilities
+- Validator logic that rejects valid shapes promised by exported input/update types
 
 ### Warnings (recommend fix)
 - Non-null assertion (`!`) without an explanatory comment
@@ -131,9 +140,10 @@ clawops/
 - Error handling via `err.message` string matching — prefer typed errors or error codes
 - Missing 404/409 HTTP status codes on routes that can fail with known reasons
 - Tests that only mock or reimplement behavior without covering the real exported helper or route contract that changed
+- Tests that validate a reimplementation of production logic instead of the actual exported module
 
 ### Do NOT flag
 - Drizzle ORM's complex generic types in function signatures — expected
 - `pnpm-lock.yaml` changes — auto-generated
 - `dist/` output files
-- Vitest `describe`/`it`/`beforeEach` test boilerplate
+- `node:test` `describe`/`it`/`beforeEach` boilerplate

@@ -27,6 +27,43 @@ export const agents = sqliteTable("agents", {
     .default(sql`(unixepoch())`),
 });
 
+// ── OpenClaw Connections ────────────────────────────────────────────────────
+
+export const openclawConnections = sqliteTable("openclaw_connections", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  provider: text("provider", {
+    enum: ["openclaw"],
+  })
+    .notNull()
+    .default("openclaw"),
+  name: text("name").notNull(),
+  rootPath: text("root_path").notNull().unique(),
+  gatewayUrl: text("gateway_url"),
+  status: text("status", {
+    enum: ["active", "disconnected", "error"],
+  })
+    .notNull()
+    .default("disconnected"),
+  syncMode: text("sync_mode", {
+    enum: ["manual", "hybrid"],
+  })
+    .notNull()
+    .default("manual"),
+  hasGatewayToken: integer("has_gateway_token", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  meta: text("meta"),
+  lastSyncedAt: integer("last_synced_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
+
 // ── Projects ────────────────────────────────────────────────────────────────
 
 export const projects = sqliteTable("projects", {
@@ -272,10 +309,94 @@ export const agentSessions = sqliteTable("agent_sessions", {
     .default(sql`(unixepoch())`),
 });
 
+// ── Activity Events ────────────────────────────────────────────────────────
+
+export const activityEvents = sqliteTable("activity_events", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  source: text("source", {
+    enum: ["system", "agent", "user", "sync", "workflow", "hook"],
+  })
+    .notNull(),
+  severity: text("severity", {
+    enum: ["info", "warning", "error", "critical"],
+  })
+    .notNull()
+    .default("info"),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  body: text("body"),
+  agentId: text("agent_id").references(() => agents.id),
+  entityType: text("entity_type"),
+  entityId: text("entity_id"),
+  projectId: text("project_id").references(() => projects.id),
+  taskId: text("task_id").references(() => tasks.id),
+  metadata: text("metadata"),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
+
+// ── Sync Runs ───────────────────────────────────────────────────────────────
+
+export const syncRuns = sqliteTable("sync_runs", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  connectionId: text("connection_id"),
+  syncType: text("sync_type", {
+    enum: ["manual", "scheduled", "reconcile"],
+  })
+    .notNull()
+    .default("manual"),
+  status: text("status", {
+    enum: ["running", "success", "failed"],
+  })
+    .notNull()
+    .default("running"),
+  startedAt: integer("started_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+  completedAt: integer("completed_at", { mode: "timestamp" }),
+  agentCount: integer("agent_count").notNull().default(0),
+  cronJobCount: integer("cron_job_count").notNull().default(0),
+  workspaceCount: integer("workspace_count").notNull().default(0),
+  addedCount: integer("added_count").notNull().default(0),
+  updatedCount: integer("updated_count").notNull().default(0),
+  removedCount: integer("removed_count").notNull().default(0),
+  error: text("error"),
+  meta: text("meta"),
+});
+
+export const syncRunItems = sqliteTable("sync_run_items", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  syncRunId: text("sync_run_id")
+    .notNull()
+    .references(() => syncRuns.id),
+  itemType: text("item_type", {
+    enum: ["agent", "workspace", "cron_job"],
+  }).notNull(),
+  itemExternalId: text("item_external_id").notNull(),
+  changeType: text("change_type", {
+    enum: ["seen", "added", "updated", "removed", "failed"],
+  }).notNull(),
+  summary: text("summary"),
+  meta: text("meta"),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
+
 // ── Inferred Types ──────────────────────────────────────────────────────────
 
 export type Agent = typeof agents.$inferSelect;
 export type NewAgent = typeof agents.$inferInsert;
+
+export type OpenClawConnection = typeof openclawConnections.$inferSelect;
+export type NewOpenClawConnection = typeof openclawConnections.$inferInsert;
 
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
@@ -309,3 +430,14 @@ export type NewNotification = typeof notifications.$inferInsert;
 
 export type AgentSession = typeof agentSessions.$inferSelect;
 export type NewAgentSession = typeof agentSessions.$inferInsert;
+
+export type ActivityEvent = typeof activityEvents.$inferSelect;
+export type NewActivityEvent = typeof activityEvents.$inferInsert;
+export type ActivityEventSeverity = NonNullable<NewActivityEvent["severity"]>;
+export type ActivityEventSource = NonNullable<NewActivityEvent["source"]>;
+
+export type SyncRun = typeof syncRuns.$inferSelect;
+export type NewSyncRun = typeof syncRuns.$inferInsert;
+
+export type SyncRunItem = typeof syncRunItems.$inferSelect;
+export type NewSyncRunItem = typeof syncRunItems.$inferInsert;

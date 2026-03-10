@@ -11,3 +11,4 @@ dist/
 out/
 coverage/
 *.tsbuildinfo
+self-notes

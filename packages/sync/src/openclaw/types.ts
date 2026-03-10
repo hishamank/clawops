@@ -1,15 +1,33 @@
-export interface OpenClawConfig {
-  agent?: {
-    workspace?: string;
+export interface OpenClawAgentConfig {
+  workspace?: string;
+  default?: boolean;
+  id?: string;
+  name?: string;
+  model?: string | { primary?: string; fallbacks?: string[] };
+  role?: string;
+  framework?: string;
+  avatar?: string;
+  memoryPath?: string;
+  skills?: string[] | string;
+  channels?: Record<string, unknown>;
+  identity?: {
+    name?: string;
+    avatar?: string;
+    [key: string]: unknown;
   };
+  llm?: {
+    provider?: string;
+    model?: string;
+  };
+  [key: string]: unknown;
+}
+
+export interface OpenClawConfig {
+  agent?: OpenClawAgentConfig;
   agents?: {
-    defaults?: {
-      workspace?: string;
-    };
-    [agentId: string]: {
-      workspace?: string;
-      channels?: Record<string, unknown>;
-    } | undefined;
+    defaults?: OpenClawAgentConfig;
+    list?: OpenClawAgentConfig[];
+    [agentId: string]: OpenClawAgentConfig | OpenClawAgentConfig[] | undefined;
   };
   gateway?: {
     port?: number;

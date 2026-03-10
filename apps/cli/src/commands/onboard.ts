@@ -6,6 +6,11 @@ import path from "node:path";
 import os from "node:os";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import {
+  stopTrackedWebProcess,
+  writeWebProcessRecord,
+  getWebPidFilePath,
+} from "../lib/web-process.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -43,6 +48,7 @@ interface OnboardResult {
   platform: string;
   openclawDir: string;
   agents: Array<{ id: string; name: string; workspacePath: string }>;
+  agentsRegistered: number;
   skillsInstalled: number;
   dashboardStarted: boolean;
   dashboardMode?: "prod";
@@ -89,6 +95,7 @@ export const onboardCmd = new Command("onboard")
       platform: "openclaw",
       openclawDir: "",
       agents: [],
+      agentsRegistered: 0,
       skillsInstalled: 0,
       dashboardStarted: false,
       serviceInstalled: false,
@@ -160,6 +167,34 @@ export const onboardCmd = new Command("onboard")
       console.log(`  Workspaces:\n${wsPaths}`);
       console.log(`  Gateway: ${scan.gatewayUrl}`);
       console.log("");
+    }
+
+    // Step 3.5 — Register discovered agents in ClawOps DB
+    {
+      const { initAgent } = await import("@clawops/agents");
+      const { db } = await import("@clawops/core/db");
+      for (const discovered of scan.agents) {
+        if (isDryRun) {
+          result.agentsRegistered++;
+          continue;
+        }
+        const registered = initAgent(db, {
+          name: discovered.name,
+          model: discovered.model ?? "unknown",
+          role: discovered.role ?? "agent",
+          framework: discovered.framework ?? "openclaw",
+          memoryPath: discovered.memoryPath ?? discovered.workspacePath,
+          skills: discovered.skills,
+          avatar: discovered.avatar,
+        });
+        if (registered.created) {
+          result.agentsRegistered++;
+        }
+      }
+      if (!isJson) {
+        console.log(`✓ Agent registry updated (${result.agentsRegistered} new)`);
+        console.log("");
+      }
     }
 
     // Step 4 — Install skill
@@ -259,6 +294,16 @@ export const onboardCmd = new Command("onboard")
         ...process.env,
         WEB_PORT: webPort,
       };
+      const configuredDbPath = runtimeEnv["CLAWOPS_DB_PATH"];
+      runtimeEnv["CLAWOPS_DB_PATH"] =
+        configuredDbPath && path.isAbsolute(configuredDbPath)
+          ? configuredDbPath
+          : path.join(projectRoot, configuredDbPath ?? "clawops.db");
+      const stopResult = stopTrackedWebProcess(projectRoot);
+      debug("existing tracked web process stop result", { ...stopResult });
+      if (!isJson && stopResult.stopped) {
+        console.log("⚠ Stopped existing tracked dashboard process before restart");
+      }
       debug("dashboard start context", { projectRoot, webPort });
       debug("build artifacts before build", {
         webStandaloneBuild: formatFileState(webStandaloneBuild),
@@ -327,6 +372,14 @@ export const onboardCmd = new Command("onboard")
             args: [webStandaloneBuild],
             pid: webProc.pid ?? null,
           });
+          if (webProc.pid) {
+            const pidFilePath = writeWebProcessRecord(projectRoot, {
+              pid: webProc.pid,
+              port: Number(webPort),
+              runtime: "standalone",
+            });
+            debug("wrote web process pid file", { pidFilePath, pid: webProc.pid });
+          }
           webProc.unref();
           result.dashboardWebRuntime = "standalone";
         } else {
@@ -349,6 +402,14 @@ export const onboardCmd = new Command("onboard")
             args: ["--filter", "@clawops/web", "exec", "next", "start", "-p", webPort],
             pid: webProc.pid ?? null,
           });
+          if (webProc.pid) {
+            const pidFilePath = writeWebProcessRecord(projectRoot, {
+              pid: webProc.pid,
+              port: Number(webPort),
+              runtime: "next-start",
+            });
+            debug("wrote web process pid file", { pidFilePath, pid: webProc.pid });
+          }
           webProc.unref();
           result.dashboardWebRuntime = "next-start";
         }
@@ -362,6 +423,7 @@ export const onboardCmd = new Command("onboard")
             console.log(`  Web runtime: ${result.dashboardWebRuntime}`);
           }
           console.log(`  Web: http://localhost:${webPort}`);
+          console.log(`  PID file: ${getWebPidFilePath(projectRoot)}`);
           console.log("");
         }
       } else if (!isJson) {
@@ -515,6 +577,7 @@ WantedBy=default.target
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
       console.log(`✓ ClawOps connected to OpenClaw`);
       console.log(`  ${result.agents.length} agents found`);
+      console.log(`  ${result.agentsRegistered} agents registered`);
       console.log(`  ${result.skillsInstalled} skills installed`);
       console.log(
         `  Dashboard: ${result.dashboardStarted ? "running" : "not started"}`,

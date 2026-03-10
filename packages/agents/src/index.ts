@@ -22,6 +22,7 @@ interface InitAgentInput {
   framework: string;
   memoryPath?: string;
   skills?: string[];
+  avatar?: string;
 }
 
 // ── createAgent ────────────────────────────────────────────────────────────
@@ -146,7 +147,22 @@ export function initAgent(
     .all();
 
   if (existing[0]) {
-    return { agent: existing[0], created: false };
+    const current = existing[0];
+    const rows = db
+      .update(agents)
+      .set({
+        name: input.name,
+        model: input.model,
+        role: input.role,
+        framework: input.framework,
+        memoryPath: input.memoryPath ?? current.memoryPath,
+        skills: input.skills ? toJsonArray(input.skills) : current.skills,
+        avatar: input.avatar ?? current.avatar,
+      })
+      .where(eq(agents.id, current.id))
+      .returning()
+      .all();
+    return { agent: rows[0] ?? current, created: false };
   }
 
   const rawKey = generateId();

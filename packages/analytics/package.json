@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
     "lint": "eslint src/",
-    "test": "echo \"No tests yet\""
+    "test": "pnpm --filter @clawops/core build && pnpm build && node --test dist/index.test.mjs dist/analytics.integration.test.mjs"
   },
   "dependencies": {
     "@clawops/core": "workspace:*",
@@ -17,9 +17,7 @@
     "drizzle-orm": "^0.38.4"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.0.0",
-    "better-sqlite3": "^11.10.0",
     "typescript": "^5.7.0"
   },
   "exports": {
