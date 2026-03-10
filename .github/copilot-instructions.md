@@ -64,6 +64,8 @@ Target users: developers running multi-agent AI systems who need observability a
 - Shared constants/types must come from `@clawops/domain` — never duplicate local string unions
 - Validate `@clawops/domain` is actually imported before adding it to `package.json`
 - `writeEvent()` and similar helpers must accept a DB/transaction handle — never close over a global `db`
+- Schema ownership is strict: all Drizzle tables, inferred row types, and migrations belong in `packages/core`; feature packages may consume schema from `@clawops/core` but must not declare new tables locally
+- Exported validator/input contracts must match each other: if an update type is partial, the validator for that update path must also accept partial payloads and must not require create-only fields
 
 ### API (`apps/web/app/api`)
 - Every route: Zod input validation
@@ -118,6 +120,9 @@ clawops/
 - `writeEvent()` or similar closing over global `db` instead of accepting a handle
 - Package listed in `package.json` with no actual imports in source
 - Local string union that duplicates a type already in `@clawops/domain`
+- New Drizzle schema or inferred row types declared outside `packages/core`
+- Package contract claims “types/interfaces only” but introduces persistence schema or migration responsibilities
+- Validator logic that rejects valid shapes promised by exported input/update types
 
 ### Warnings (recommend fix)
 - Non-null assertion (`!`) without an explanatory comment

@@ -1,144 +1,88 @@
-import { sql } from "drizzle-orm";
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import crypto from "node:crypto";
+export type WorkflowStatus = "draft" | "active" | "paused" | "deprecated";
 
-// ── Workflows ───────────────────────────────────────────────────────────────
+export type WorkflowTriggerType = "manual" | "scheduled" | "event" | "webhook";
 
-/**
- * A workflow is a reusable sequence of steps that can be executed to achieve
- * a specific goal. Workflows are defined once and can be run multiple times.
- */
-export const workflows = sqliteTable("workflows", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  name: text("name").notNull(),
-  description: text("description"),
-  version: text("version").notNull().default("1.0.0"),
-  status: text("status", {
-    enum: ["draft", "active", "paused", "deprecated"],
-  })
-    .notNull()
-    .default("draft"),
-  projectId: text("project_id"),
-  triggerType: text("trigger_type", {
-    enum: ["manual", "scheduled", "event", "webhook"],
-  })
-    .notNull()
-    .default("manual"),
-  triggerConfig: text("trigger_config"), // JSON object for schedule/event/webhook config
-  steps: text("steps").notNull(), // JSON array of step definitions
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .default(sql`(unixepoch())`),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
-    .notNull()
-    .default(sql`(unixepoch())`),
-});
+export type WorkflowRunStatus =
+  | "pending"
+  | "running"
+  | "paused"
+  | "completed"
+  | "failed"
+  | "cancelled";
 
-// ── Workflow Runs ───────────────────────────────────────────────────────────
+export type WorkflowStepRunStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed"
+  | "skipped";
 
-/**
- * A workflow run is a single execution of a workflow.
- * Tracks the overall state and timing of the execution.
- */
-export const workflowRuns = sqliteTable("workflow_runs", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  workflowId: text("workflow_id")
-    .notNull()
-    .references(() => workflows.id),
-  status: text("status", {
-    enum: ["pending", "running", "paused", "completed", "failed", "cancelled"],
-  })
-    .notNull()
-    .default("pending"),
-  triggeredBy: text("triggered_by"), // "human", "agent", "schedule", "event"
-  triggeredById: text("triggered_by_id"), // agentId, userId, etc.
-  startedAt: integer("started_at", { mode: "timestamp" }),
-  completedAt: integer("completed_at", { mode: "timestamp" }),
-  error: text("error"), // Error message if failed
-  metadata: text("metadata"), // JSON object for run-specific context
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .default(sql`(unixepoch())`),
-});
+export type WorkflowStepType =
+  | "task"
+  | "agent"
+  | "script"
+  | "condition"
+  | "parallel"
+  | "wait"
+  | "webhook"
+  | "notification";
 
-// ── Workflow Steps ──────────────────────────────────────────────────────────
+export interface WorkflowRecord {
+  id: string;
+  name: string;
+  description: string | null;
+  version: string;
+  status: WorkflowStatus;
+  projectId: string | null;
+  triggerType: WorkflowTriggerType;
+  triggerConfig: string | null;
+  steps: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
-/**
- * Individual step execution records within a workflow run.
- * Each step in a workflow definition gets one record per run.
- */
-export const workflowStepRuns = sqliteTable("workflow_step_runs", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  runId: text("run_id")
-    .notNull()
-    .references(() => workflowRuns.id),
-  stepIndex: integer("step_index").notNull(), // Order in the workflow
-  name: text("name").notNull(), // Step name from definition
-  type: text("type").notNull(), // Step type: "task", "agent", "script", "condition", etc.
-  status: text("status", {
-    enum: ["pending", "running", "completed", "failed", "skipped"],
-  })
-    .notNull()
-    .default("pending"),
-  input: text("input"), // JSON object - input passed to the step
-  output: text("output"), // JSON object - output from the step
-  error: text("error"), // Error message if failed
-  startedAt: integer("started_at", { mode: "timestamp" }),
-  completedAt: integer("completed_at", { mode: "timestamp" }),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .default(sql`(unixepoch())`),
-});
+export interface WorkflowRunRecord {
+  id: string;
+  workflowId: string;
+  status: WorkflowRunStatus;
+  triggeredBy: string | null;
+  triggeredById: string | null;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  error: string | null;
+  metadata: string | null;
+  createdAt: Date;
+}
 
-// ── Inferred Types ──────────────────────────────────────────────────────────
+export interface WorkflowStepRunRecord {
+  id: string;
+  runId: string;
+  stepIndex: number;
+  name: string;
+  type: string;
+  status: WorkflowStepRunStatus;
+  input: string | null;
+  output: string | null;
+  error: string | null;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  createdAt: Date;
+}
 
-export type Workflow = typeof workflows.$inferSelect;
-export type NewWorkflow = typeof workflows.$inferInsert;
-
-export type WorkflowRun = typeof workflowRuns.$inferSelect;
-export type NewWorkflowRun = typeof workflowRuns.$inferInsert;
-
-export type WorkflowStepRun = typeof workflowStepRuns.$inferSelect;
-export type NewWorkflowStepRun = typeof workflowStepRuns.$inferInsert;
-
-// ── Step Type Definitions ───────────────────────────────────────────────────
-
-/**
- * Base step definition used in workflow.steps JSON array.
- */
 export interface WorkflowStepDefinition {
   name: string;
   type: WorkflowStepType;
   config?: Record<string, unknown>;
-  condition?: string; // Optional condition expression
+  condition?: string;
   onError?: "stop" | "continue" | "retry";
   retryCount?: number;
 }
 
-export type WorkflowStepType =
-  | "task"        // Create/update a task
-  | "agent"       // Invoke an agent
-  | "script"      // Run a script/command
-  | "condition"   // Conditional branching
-  | "parallel"    // Run steps in parallel
-  | "wait"        // Wait for event or duration
-  | "webhook"     // Call external webhook
-  | "notification"; // Send notification
-
-/**
- * Runtime step state during execution.
- */
 export interface WorkflowStepState {
   index: number;
   name: string;
   type: WorkflowStepType;
-  status: "pending" | "running" | "completed" | "failed" | "skipped";
+  status: WorkflowStepRunStatus;
   input?: Record<string, unknown>;
   output?: Record<string, unknown>;
   error?: string;
@@ -146,89 +90,23 @@ export interface WorkflowStepState {
   completedAt?: Date;
 }
 
-// ── Workflow Execution Context ──────────────────────────────────────────────
-
-/**
- * Context passed through workflow execution.
- * Accumulates outputs from completed steps.
- */
 export interface WorkflowContext {
   workflowId: string;
   runId: string;
   triggeredBy: string;
   triggeredById?: string;
   variables: Record<string, unknown>;
-  stepOutputs: Record<string, Record<string, unknown>>; // keyed by step name
+  stepOutputs: Record<string, Record<string, unknown>>;
   metadata?: Record<string, unknown>;
 }
-
-// ── Workflow Service Interfaces ─────────────────────────────────────────────
-
-/**
- * Service interface for workflow operations.
- * Implemented by the workflows package.
- */
-export interface WorkflowService {
-  /**
-   * Create a new workflow definition.
-   */
-  createWorkflow(input: CreateWorkflowInput): Workflow;
-
-  /**
-   * Get a workflow by ID with its run history.
-   */
-  getWorkflow(id: string): WorkflowWithRuns | null;
-
-  /**
-   * List workflows with optional filters.
-   */
-  listWorkflows(filters?: ListWorkflowsFilters): Workflow[];
-
-  /**
-   * Update a workflow definition.
-   */
-  updateWorkflow(id: string, updates: UpdateWorkflowInput): Workflow;
-
-  /**
-   * Delete a workflow (soft delete by setting status to deprecated).
-   */
-  deleteWorkflow(id: string): void;
-
-  /**
-   * Execute a workflow.
-   */
-  runWorkflow(id: string, input: RunWorkflowInput): WorkflowRun;
-
-  /**
-   * Get a specific workflow run.
-   */
-  getWorkflowRun(runId: string): WorkflowRunWithSteps | null;
-
-  /**
-   * List runs for a workflow.
-   */
-  listWorkflowRuns(workflowId: string): WorkflowRun[];
-
-  /**
-   * Cancel a running workflow.
-   */
-  cancelWorkflowRun(runId: string): WorkflowRun;
-
-  /**
-   * Get step executions for a run.
-   */
-  getWorkflowStepRuns(runId: string): WorkflowStepRun[];
-}
-
-// ── Input Types ─────────────────────────────────────────────────────────────
 
 export interface CreateWorkflowInput {
   name: string;
   description?: string;
   version?: string;
-  status?: Workflow["status"];
+  status?: WorkflowStatus;
   projectId?: string;
-  triggerType?: Workflow["triggerType"];
+  triggerType?: WorkflowTriggerType;
   triggerConfig?: Record<string, unknown>;
   steps: WorkflowStepDefinition[];
 }
@@ -237,15 +115,16 @@ export interface UpdateWorkflowInput {
   name?: string;
   description?: string;
   version?: string;
-  status?: Workflow["status"];
+  status?: WorkflowStatus;
+  triggerType?: WorkflowTriggerType;
   triggerConfig?: Record<string, unknown>;
   steps?: WorkflowStepDefinition[];
 }
 
 export interface ListWorkflowsFilters {
-  status?: Workflow["status"];
+  status?: WorkflowStatus;
   projectId?: string;
-  triggerType?: Workflow["triggerType"];
+  triggerType?: WorkflowTriggerType;
 }
 
 export interface RunWorkflowInput {
@@ -255,22 +134,65 @@ export interface RunWorkflowInput {
   metadata?: Record<string, unknown>;
 }
 
-// ── Enriched Types ──────────────────────────────────────────────────────────
-
-export interface WorkflowWithRuns extends Workflow {
-  runs: WorkflowRun[];
+export interface WorkflowWithRuns extends WorkflowRecord {
+  runs: WorkflowRunRecord[];
 }
 
-export interface WorkflowRunWithSteps extends WorkflowRun {
-  steps: WorkflowStepRun[];
+export interface WorkflowRunWithSteps extends WorkflowRunRecord {
+  steps: WorkflowStepRunRecord[];
 }
 
-// ── Validators ──────────────────────────────────────────────────────────────
+export interface WorkflowService {
+  createWorkflow(input: CreateWorkflowInput): WorkflowRecord;
+  getWorkflow(id: string): WorkflowWithRuns | null;
+  listWorkflows(filters?: ListWorkflowsFilters): WorkflowRecord[];
+  updateWorkflow(id: string, updates: UpdateWorkflowInput): WorkflowRecord;
+  deleteWorkflow(id: string): void;
+  runWorkflow(id: string, input: RunWorkflowInput): WorkflowRunRecord;
+  getWorkflowRun(runId: string): WorkflowRunWithSteps | null;
+  listWorkflowRuns(workflowId: string): WorkflowRunRecord[];
+  cancelWorkflowRun(runId: string): WorkflowRunRecord;
+  getWorkflowStepRuns(runId: string): WorkflowStepRunRecord[];
+}
 
-/**
- * Validate a workflow step definition.
- * Returns true if valid, throws error with details if invalid.
- */
+const VALID_STEP_TYPES: WorkflowStepType[] = [
+  "task",
+  "agent",
+  "script",
+  "condition",
+  "parallel",
+  "wait",
+  "webhook",
+  "notification",
+];
+
+function validateParallelStepConfig(
+  step: WorkflowStepDefinition,
+  index: number,
+): void {
+  if (step.type !== "parallel") {
+    return;
+  }
+
+  const nestedSteps = step.config?.["steps"];
+  if (!Array.isArray(nestedSteps)) {
+    throw new Error(
+      `Step ${index} (${step.name}): parallel steps must have a "steps" array in config`,
+    );
+  }
+}
+
+function validateWorkflowStepArray(steps: WorkflowStepDefinition[]): void {
+  if (steps.length === 0) {
+    throw new Error("Workflow must have at least one step");
+  }
+
+  for (const [index, step] of steps.entries()) {
+    validateWorkflowStep(step, index);
+    validateParallelStepConfig(step, index);
+  }
+}
+
 export function validateWorkflowStep(
   step: WorkflowStepDefinition,
   index: number,
@@ -279,20 +201,9 @@ export function validateWorkflowStep(
     throw new Error(`Step ${index}: name is required and must be a string`);
   }
 
-  const validTypes: WorkflowStepType[] = [
-    "task",
-    "agent",
-    "script",
-    "condition",
-    "parallel",
-    "wait",
-    "webhook",
-    "notification",
-  ];
-
-  if (!validTypes.includes(step.type)) {
+  if (!VALID_STEP_TYPES.includes(step.type)) {
     throw new Error(
-      `Step ${index} (${step.name}): invalid type "${step.type}". Must be one of: ${validTypes.join(", ")}`,
+      `Step ${index} (${step.name}): invalid type "${step.type}". Must be one of: ${VALID_STEP_TYPES.join(", ")}`,
     );
   }
 
@@ -309,51 +220,55 @@ export function validateWorkflowStep(
   }
 }
 
-/**
- * Validate a complete workflow definition.
- */
-export function validateWorkflow(
-  input: CreateWorkflowInput | UpdateWorkflowInput,
-): void {
+export function validateCreateWorkflow(input: CreateWorkflowInput): void {
   if (!input.name || input.name.trim().length === 0) {
     throw new Error("Workflow name is required");
   }
 
-  if (!input.steps || !Array.isArray(input.steps)) {
+  if (!Array.isArray(input.steps)) {
     throw new Error("Workflow steps must be an array");
   }
 
-  if (input.steps.length === 0) {
-    throw new Error("Workflow must have at least one step");
-  }
-
-  // Validate each step
-  input.steps.forEach((step, index) => {
-    validateWorkflowStep(step, index);
-  });
-
-  // Validate parallel steps have nested steps
-  input.steps.forEach((step, index) => {
-    if (step.type === "parallel") {
-      const config = step.config as { steps?: unknown } | undefined;
-      if (!config?.steps || !Array.isArray(config.steps)) {
-        throw new Error(
-          `Step ${index} (${step.name}): parallel steps must have a "steps" array in config`,
-        );
-      }
-    }
-  });
+  validateWorkflowStepArray(input.steps);
 }
 
-/**
- * Validate workflow trigger configuration based on trigger type.
- */
+export function validateUpdateWorkflow(input: UpdateWorkflowInput): void {
+  if (input.name !== undefined && input.name.trim().length === 0) {
+    throw new Error("Workflow name cannot be empty");
+  }
+
+  if (input.steps !== undefined) {
+    if (!Array.isArray(input.steps)) {
+      throw new Error("Workflow steps must be an array");
+    }
+
+    validateWorkflowStepArray(input.steps);
+  }
+}
+
+export function validateWorkflow(
+  input: CreateWorkflowInput | UpdateWorkflowInput,
+): void {
+  if ("steps" in input && Array.isArray(input.steps) && "name" in input) {
+    if (input.name === undefined) {
+      validateUpdateWorkflow(input);
+      return;
+    }
+  }
+
+  if ("name" in input && input.name !== undefined && "steps" in input && input.steps !== undefined) {
+    validateCreateWorkflow(input as CreateWorkflowInput);
+    return;
+  }
+
+  validateUpdateWorkflow(input as UpdateWorkflowInput);
+}
+
 export function validateTriggerConfig(
-  triggerType: Workflow["triggerType"],
+  triggerType: WorkflowTriggerType,
   triggerConfig?: Record<string, unknown>,
 ): void {
   if (triggerType === "manual") {
-    // No config needed for manual trigger
     return;
   }
 
@@ -365,21 +280,19 @@ export function validateTriggerConfig(
 
   switch (triggerType) {
     case "scheduled":
-      if (!triggerConfig.cronExpr && !triggerConfig.interval) {
+      if (!triggerConfig["cronExpr"] && !triggerConfig["interval"]) {
         throw new Error(
           'Scheduled trigger requires "cronExpr" or "interval" in config',
         );
       }
       break;
-
     case "event":
-      if (!triggerConfig.eventType) {
+      if (!triggerConfig["eventType"]) {
         throw new Error('Event trigger requires "eventType" in config');
       }
       break;
-
     case "webhook":
-      if (!triggerConfig.path) {
+      if (!triggerConfig["path"]) {
         throw new Error('Webhook trigger requires "path" in config');
       }
       break;

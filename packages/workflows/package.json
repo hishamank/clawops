@@ -9,10 +9,7 @@
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
     "lint": "eslint src/",
-    "test": "echo \"No tests yet\""
-  },
-  "dependencies": {
-    "drizzle-orm": "^0.38.0"
+    "test": "pnpm build && node --test test/*.test.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
