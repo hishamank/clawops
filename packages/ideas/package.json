@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
     "lint": "eslint src/",
-    "test": "node --experimental-test-module-mocks --import tsx/esm --test src/ideas.test.mts src/ideas.integration.test.mts",
+    "test": "node --experimental-test-module-mocks --test-concurrency=1 --import tsx/esm --test src/ideas.test.mts src/ideas.integration.test.mts",
     "test:integration": "node --import tsx/esm --test src/*.integration.test.mts"
   },
   "dependencies": {
