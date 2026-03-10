@@ -65,48 +65,63 @@ export function upsertOpenClawConnection(
   db: DB,
   input: UpsertOpenClawConnectionInput,
 ): { connection: OpenClawConnection; created: boolean } {
-  const existing = getOpenClawConnectionByRootPath(db, input.rootPath);
+  // Use a transaction + INSERT with ON CONFLICT to avoid the read-then-insert race condition.
+  // SQLite's unique constraint on rootPath ensures atomicity.
+  return db.transaction((tx) => {
+    const now = new Date();
 
-  if (existing) {
-    const connection = db
+    // Attempt insert; conflict means the row already exists.
+    const inserted = tx
+      .insert(openclawConnections)
+      .values({
+        name: input.name,
+        rootPath: input.rootPath,
+        gatewayUrl: input.gatewayUrl ?? null,
+        status: input.status ?? "disconnected",
+        syncMode: input.syncMode ?? "manual",
+        hasGatewayToken: input.hasGatewayToken ?? false,
+        meta: input.meta ? toJsonObject(input.meta) : null,
+        lastSyncedAt: input.lastSyncedAt ?? null,
+        updatedAt: now,
+      })
+      .onConflictDoNothing()
+      .returning()
+      .get();
+
+    if (inserted) {
+      return { connection: inserted, created: true };
+    }
+
+    // Row already existed — update it selectively within the same transaction.
+    const existing = tx
+      .select()
+      .from(openclawConnections)
+      .where(eq(openclawConnections.rootPath, input.rootPath))
+      .get();
+
+    if (!existing) {
+      // Should be unreachable — conflict means the row exists.
+      throw new Error(`Unexpected state: conflict on rootPath "${input.rootPath}" but no existing row found`);
+    }
+
+    const updated = tx
       .update(openclawConnections)
       .set({
         name: input.name,
-        gatewayUrl: input.gatewayUrl ?? existing.gatewayUrl,
+        gatewayUrl: input.gatewayUrl !== undefined ? input.gatewayUrl : existing.gatewayUrl,
         status: input.status ?? existing.status,
         syncMode: input.syncMode ?? existing.syncMode,
-        hasGatewayToken: input.hasGatewayToken ?? existing.hasGatewayToken,
+        hasGatewayToken: input.hasGatewayToken !== undefined ? input.hasGatewayToken : existing.hasGatewayToken,
         meta: input.meta ? toJsonObject(input.meta) : existing.meta,
-        lastSyncedAt:
-          input.lastSyncedAt === undefined
-            ? existing.lastSyncedAt
-            : input.lastSyncedAt,
-        updatedAt: new Date(),
+        lastSyncedAt: input.lastSyncedAt !== undefined ? input.lastSyncedAt : existing.lastSyncedAt,
+        updatedAt: now,
       })
       .where(eq(openclawConnections.id, existing.id))
       .returning()
       .get();
 
-    return { connection, created: false };
-  }
-
-  const connection = db
-    .insert(openclawConnections)
-    .values({
-      name: input.name,
-      rootPath: input.rootPath,
-      gatewayUrl: input.gatewayUrl ?? null,
-      status: input.status ?? "disconnected",
-      syncMode: input.syncMode ?? "manual",
-      hasGatewayToken: input.hasGatewayToken ?? false,
-      meta: input.meta ? toJsonObject(input.meta) : null,
-      lastSyncedAt: input.lastSyncedAt ?? null,
-      updatedAt: new Date(),
-    })
-    .returning()
-    .get();
-
-  return { connection, created: true };
+    return { connection: updated, created: false };
+  });
 }
 
 export function updateOpenClawConnection(
