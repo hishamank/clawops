@@ -328,6 +328,10 @@ importers:
         version: 5.9.3
 
   packages/sync:
+    dependencies:
+      '@clawops/core':
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
