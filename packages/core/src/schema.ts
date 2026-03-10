@@ -473,7 +473,6 @@ export type NewSyncRun = typeof syncRuns.$inferInsert;
 
 export type SyncRunItem = typeof syncRunItems.$inferSelect;
 export type NewSyncRunItem = typeof syncRunItems.$inferInsert;
-
 export type TaskTemplate = typeof taskTemplates.$inferSelect;
 export type NewTaskTemplate = typeof taskTemplates.$inferInsert;
 

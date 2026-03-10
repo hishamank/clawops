@@ -1,4 +1,4 @@
-import { eq, and, asc } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 import type { DB, TaskTemplate, TaskTemplateStage } from "@clawops/core";
 import { taskTemplates, taskTemplateStages } from "@clawops/core";
 
@@ -121,8 +121,8 @@ interface CreateTemplateInput {
 }
 
 export function createTemplate(db: DB, input: CreateTemplateInput): TaskTemplate {
-  return db.transaction(() => {
-    const template = db
+  return db.transaction((tx) => {
+    const template = tx
       .insert(taskTemplates)
       .values({
         name: input.name,
@@ -134,12 +134,12 @@ export function createTemplate(db: DB, input: CreateTemplateInput): TaskTemplate
       .get();
 
     if (input.stages && input.stages.length > 0) {
-      for (const stage of input.stages) {
-        db.insert(taskTemplateStages).values({
+      for (const [stageIndex, stage] of input.stages.entries()) {
+        tx.insert(taskTemplateStages).values({
           templateId: template.id,
           name: stage.name,
           description: stage.description,
-          order: stage.order ?? 0,
+          order: stage.order ?? stageIndex,
         }).run();
       }
     }
@@ -172,10 +172,10 @@ export function getStage(db: DB, id: string): TaskTemplateStage | null {
 // ── seedBuiltInTemplates ────────────────────────────────────────────────────
 
 export function seedBuiltInTemplates(db: DB): void {
-  db.transaction(() => {
+  db.transaction((tx) => {
     for (const templateDef of BUILTIN_TEMPLATES) {
       // Check if template already exists
-      const existing = db
+      const existing = tx
         .select()
         .from(taskTemplates)
         .where(eq(taskTemplates.name, templateDef.name))
@@ -187,7 +187,7 @@ export function seedBuiltInTemplates(db: DB): void {
       }
 
       // Create the template
-      const template = db
+      const template = tx
         .insert(taskTemplates)
         .values({
           name: templateDef.name,
@@ -200,7 +200,7 @@ export function seedBuiltInTemplates(db: DB): void {
 
       // Create the stages
       for (const stageDef of templateDef.stages) {
-        db.insert(taskTemplateStages).values({
+        tx.insert(taskTemplateStages).values({
           templateId: template.id,
           name: stageDef.name,
           description: stageDef.description,
