@@ -210,7 +210,6 @@ export function appendTaskSpec(
     throw new Error(`Task not found: ${id}`);
   }
   const currentSpec = task.specContent ?? "";
-  const timestamp = new Date().toISOString();
   const newSpec = currentSpec
     ? `${currentSpec}\n\n${content}`
     : `${content}`;

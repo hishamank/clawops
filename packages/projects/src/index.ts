@@ -7,7 +7,6 @@ import {
   agentSessions,
   type Project,
   type Milestone,
-  type Task,
   type AgentSession,
 } from "@clawops/core";
 import type { ProjectStatus, MilestoneStatus } from "@clawops/domain";
