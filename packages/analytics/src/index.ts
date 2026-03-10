@@ -204,8 +204,10 @@ function truncateToGranularity(granularity: Granularity): SQL {
     case "day":
       return sql`strftime('%Y-%m-%d', datetime(usage_logs.created_at, 'unixepoch'))`;
     case "week":
-      // Week: truncate to Monday of the week
-      return sql`strftime('%Y-%m-%d', datetime(usage_logs.created_at, 'unixepoch', 'weekday 1'))`;
+      // Week: truncate to Monday of the current week.
+      // 'weekday 0' advances to Sunday (or stays if already Sunday), then '-6 days' steps back to the preceding Monday.
+      // This correctly handles all weekdays including Sunday (ISO week start = Monday).
+      return sql`strftime('%Y-%m-%d', datetime(usage_logs.created_at, 'unixepoch', 'weekday 0', '-6 days'))`;
     case "month":
       return sql`strftime('%Y-%m-01', datetime(usage_logs.created_at, 'unixepoch'))`;
   }
