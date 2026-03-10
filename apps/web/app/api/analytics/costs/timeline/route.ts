@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCostTimeline, type Granularity } from "@clawops/analytics";
-import { getDb, jsonError, parseSearch } from "@/lib/server/runtime";
+import { getDb, jsonError, parseSearch, requireAgentId } from "@/lib/server/runtime";
 
 const timelineQuery = z.object({
   agentId: z.string().optional(),
@@ -15,6 +15,8 @@ const timelineQuery = z.object({
 
 export async function GET(req: Request): Promise<NextResponse> {
   try {
+    const auth = requireAgentId(req);
+    if (auth instanceof NextResponse) return auth;
     const params = parseSearch(req, timelineQuery);
     const db = getDb();
 

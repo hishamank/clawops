@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
     "lint": "eslint src/",
-    "test": "echo \"No tests yet\""
+    "test": "pnpm build && node --test dist/**/*.test.js"
   },
   "dependencies": {
     "@clawops/core": "workspace:*",

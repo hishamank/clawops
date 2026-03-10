@@ -190,6 +190,32 @@ export interface CostTimelinePoint {
   count: number;
 }
 
+function padDatePart(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+export function formatBucketDateUtc(date: Date, granularity: Granularity): string {
+  const year = date.getUTCFullYear();
+  const month = padDatePart(date.getUTCMonth() + 1);
+  const day = padDatePart(date.getUTCDate());
+
+  switch (granularity) {
+    case "hour":
+      return `${year}-${month}-${day} ${padDatePart(date.getUTCHours())}:00:00`;
+    case "day":
+      return `${year}-${month}-${day}`;
+    case "week": {
+      const weekStart = new Date(date);
+      const dayOfWeek = weekStart.getUTCDay();
+      const offset = (dayOfWeek + 6) % 7;
+      weekStart.setUTCDate(weekStart.getUTCDate() - offset);
+      return `${weekStart.getUTCFullYear()}-${padDatePart(weekStart.getUTCMonth() + 1)}-${padDatePart(weekStart.getUTCDate())}`;
+    }
+    case "month":
+      return `${year}-${month}-01`;
+  }
+}
+
 // ── Time-series aggregations ───────────────────────────────────────────────
 
 /**
@@ -200,16 +226,14 @@ export interface CostTimelinePoint {
 function truncateToGranularity(granularity: Granularity): SQL {
   switch (granularity) {
     case "hour":
-      return sql`strftime('%Y-%m-%d %H:00:00', datetime(usage_logs.created_at, 'unixepoch'))`;
+      return sql`strftime('%Y-%m-%d %H:00:00', datetime(${usageLogs.createdAt}, 'unixepoch'))`;
     case "day":
-      return sql`strftime('%Y-%m-%d', datetime(usage_logs.created_at, 'unixepoch'))`;
+      return sql`strftime('%Y-%m-%d', datetime(${usageLogs.createdAt}, 'unixepoch'))`;
     case "week":
-      // Week: truncate to Monday of the current week.
-      // 'weekday 0' advances to Sunday (or stays if already Sunday), then '-6 days' steps back to the preceding Monday.
-      // This correctly handles all weekdays including Sunday (ISO week start = Monday).
-      return sql`strftime('%Y-%m-%d', datetime(usage_logs.created_at, 'unixepoch', 'weekday 0', '-6 days'))`;
+      // Week: truncate to Monday of the current week (ISO week start = Monday).
+      return sql`strftime('%Y-%m-%d', datetime(${usageLogs.createdAt}, 'unixepoch', printf('-%d days', (CAST(strftime('%w', datetime(${usageLogs.createdAt}, 'unixepoch')) AS integer) + 6) % 7)))`;
     case "month":
-      return sql`strftime('%Y-%m-01', datetime(usage_logs.created_at, 'unixepoch'))`;
+      return sql`strftime('%Y-%m-01', datetime(${usageLogs.createdAt}, 'unixepoch'))`;
   }
 }
 
