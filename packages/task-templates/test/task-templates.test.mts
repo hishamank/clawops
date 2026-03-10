@@ -16,15 +16,34 @@ import {
 } from "../dist/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const coreMigrationsDir = path.resolve(__dirname, "../../core/migrations");
+
+function findTaskTemplateMigrationSql(): string {
+  const migrationFile = fs
+    .readdirSync(coreMigrationsDir)
+    .sort()
+    .find((entry) => {
+      if (!entry.endsWith(".sql")) {
+        return false;
+      }
+
+      const sql = fs.readFileSync(path.join(coreMigrationsDir, entry), "utf8");
+      return sql.includes("CREATE TABLE `task_templates`");
+    });
+
+  if (!migrationFile) {
+    throw new Error("Task template migration file not found");
+  }
+
+  return fs.readFileSync(path.join(coreMigrationsDir, migrationFile), "utf8");
+}
 
 let db: DB;
 
 before(() => {
   const sqlite = new Database(":memory:");
   db = drizzle(sqlite, { schema }) as DB;
-  sqlite.exec(
-    fs.readFileSync(path.resolve(__dirname, "../../core/migrations/0003_romantic_garia.sql"), "utf8"),
-  );
+  sqlite.exec(findTaskTemplateMigrationSql());
 });
 
 describe("task templates (integration)", () => {
