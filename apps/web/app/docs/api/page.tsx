@@ -36,9 +36,8 @@ const routes = [
   "GET /api/integrations/openclaw/:id",
   "PATCH /api/integrations/openclaw/:id",
   "POST /api/sync/openclaw",
-  "GET /api/sync/openclaw",
-  "POST /api/sync/openclaw/install-skill",
   "GET /api/sync/openclaw  (latest status + recent sync runs)",
+  "POST /api/sync/openclaw/install-skill",
 ];
 
 export default function ApiDocsPage(): React.JSX.Element {

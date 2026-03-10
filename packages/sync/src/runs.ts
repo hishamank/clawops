@@ -1,6 +1,7 @@
 import {
   desc,
   eq,
+  or,
   parseJsonObject,
   syncRunItems,
   syncRuns,
@@ -42,6 +43,39 @@ export interface SyncRunSummary extends SyncRun {
   items: Array<SyncRunItem & { metaObject: Record<string, unknown> }>;
 }
 
+function buildSyncRunSummary(
+  run: SyncRun,
+  items: SyncRunItem[],
+): SyncRunSummary {
+  return {
+    ...run,
+    metaObject: parseJsonObject(run.meta),
+    items: items.map((item) => ({
+      ...item,
+      metaObject: parseJsonObject(item.meta),
+    })),
+  };
+}
+
+function listSyncRunItemsByRunIds(db: DB, runIds: string[]): SyncRunItem[] {
+  if (runIds.length === 0) {
+    return [];
+  }
+
+  const filters = runIds.map((runId) => eq(syncRunItems.syncRunId, runId));
+  const whereClause = filters.length === 1 ? filters[0] : or(...filters);
+
+  if (!whereClause) {
+    return [];
+  }
+
+  return db
+    .select()
+    .from(syncRunItems)
+    .where(whereClause)
+    .all();
+}
+
 export function startSyncRun(db: DB, input: StartSyncRunInput = {}): SyncRun {
   const rows = db
     .insert(syncRuns)
@@ -63,50 +97,48 @@ export function startSyncRun(db: DB, input: StartSyncRunInput = {}): SyncRun {
 }
 
 export function finishSyncRun(db: DB, id: string, input: FinishSyncRunInput): SyncRunSummary {
-  const rows = db
-    .update(syncRuns)
-    .set({
-      status: input.status,
-      completedAt: new Date(),
-      agentCount: input.agentCount ?? 0,
-      cronJobCount: input.cronJobCount ?? 0,
-      workspaceCount: input.workspaceCount ?? 0,
-      addedCount: input.addedCount ?? 0,
-      updatedCount: input.updatedCount ?? 0,
-      removedCount: input.removedCount ?? 0,
-      error: input.error ?? null,
-      meta: input.meta ? toJsonObject(input.meta) : null,
-    })
-    .where(eq(syncRuns.id, id))
-    .returning()
-    .all();
+  return db.transaction((tx) => {
+    const rows = tx
+      .update(syncRuns)
+      .set({
+        status: input.status,
+        completedAt: new Date(),
+        agentCount: input.agentCount ?? 0,
+        cronJobCount: input.cronJobCount ?? 0,
+        workspaceCount: input.workspaceCount ?? 0,
+        addedCount: input.addedCount ?? 0,
+        updatedCount: input.updatedCount ?? 0,
+        removedCount: input.removedCount ?? 0,
+        error: input.error ?? null,
+        meta: input.meta ? toJsonObject(input.meta) : null,
+      })
+      .where(eq(syncRuns.id, id))
+      .returning()
+      .all();
 
-  const run = rows[0];
-  if (!run) {
-    throw new Error(`Sync run not found: ${id}`);
-  }
+    const run = rows[0];
+    if (!run) {
+      throw new Error(`Sync run not found: ${id}`);
+    }
 
-  if (input.items && input.items.length > 0) {
-    db.insert(syncRunItems)
-      .values(
-        input.items.map((item) => ({
-          syncRunId: run.id,
-          itemType: item.itemType,
-          itemExternalId: item.itemExternalId,
-          changeType: item.changeType,
-          summary: item.summary ?? null,
-          meta: item.meta ? toJsonObject(item.meta) : null,
-        })),
-      )
-      .run();
-  }
+    if (input.items && input.items.length > 0) {
+      tx.insert(syncRunItems)
+        .values(
+          input.items.map((item) => ({
+            syncRunId: run.id,
+            itemType: item.itemType,
+            itemExternalId: item.itemExternalId,
+            changeType: item.changeType,
+            summary: item.summary ?? null,
+            meta: item.meta ? toJsonObject(item.meta) : null,
+          })),
+        )
+        .run();
+    }
 
-  const summary = getSyncRun(db, run.id);
-  if (!summary) {
-    throw new Error(`Sync run not found after completion: ${run.id}`);
-  }
-
-  return summary;
+    const items = listSyncRunItemsByRunIds(tx as unknown as DB, [run.id]);
+    return buildSyncRunSummary(run, items);
+  });
 }
 
 export function getSyncRun(db: DB, id: string): SyncRunSummary | null {
@@ -115,32 +147,23 @@ export function getSyncRun(db: DB, id: string): SyncRunSummary | null {
     return null;
   }
 
-  const items = db
-    .select()
-    .from(syncRunItems)
-    .where(eq(syncRunItems.syncRunId, id))
-    .all();
-
-  return {
-    ...run,
-    metaObject: parseJsonObject(run.meta),
-    items: items.map((item) => ({
-      ...item,
-      metaObject: parseJsonObject(item.meta),
-    })),
-  };
+  const items = listSyncRunItemsByRunIds(db, [id]);
+  return buildSyncRunSummary(run, items);
 }
 
 export function listSyncRuns(db: DB, limit = 10): SyncRunSummary[] {
   const runs = db.select().from(syncRuns).orderBy(desc(syncRuns.startedAt)).limit(limit).all();
-  const summaries: SyncRunSummary[] = [];
+  const items = listSyncRunItemsByRunIds(
+    db,
+    runs.map((run) => run.id),
+  );
+  const itemsByRunId = new Map<string, SyncRunItem[]>();
 
-  for (const run of runs) {
-    const summary = getSyncRun(db, run.id);
-    if (summary) {
-      summaries.push(summary);
-    }
+  for (const item of items) {
+    const existing = itemsByRunId.get(item.syncRunId) ?? [];
+    existing.push(item);
+    itemsByRunId.set(item.syncRunId, existing);
   }
 
-  return summaries;
+  return runs.map((run) => buildSyncRunSummary(run, itemsByRunId.get(run.id) ?? []));
 }

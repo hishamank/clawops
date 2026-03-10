@@ -15,10 +15,20 @@ const syncRequestSchema = z.object({
 
 export async function POST(req: Request): Promise<NextResponse> {
   const db = getDb();
+  let body: z.infer<typeof syncRequestSchema>;
+
+  try {
+    body = syncRequestSchema.parse(await req.json());
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return jsonError(400, err.message, "VALIDATION_ERROR");
+    }
+    return jsonError(400, "Invalid request body", "VALIDATION_ERROR");
+  }
+
   const run = startSyncRun(db, { syncType: "manual", meta: { source: "api.sync.openclaw" } });
 
   try {
-    const body = syncRequestSchema.parse(await req.json());
     const scanResult = openclaw.scanOpenClaw({
       openclawDir: body.openclawDir,
       gatewayUrl: body.gatewayUrl,
@@ -106,26 +116,21 @@ export async function POST(req: Request): Promise<NextResponse> {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    db.transaction((tx) => {
-      finishSyncRun(tx as unknown as DB, run.id, {
-        status: "failed",
-        error: message,
-        meta: { source: "api.sync.openclaw" },
-      });
-      tx.insert(events)
-        .values({
-          id: crypto.randomUUID(),
-          action: "sync.run.failed",
-          entityType: "sync_run",
-          entityId: run.id,
-          meta: JSON.stringify({ error: message }),
-          createdAt: new Date(),
-        })
-        .run();
+    finishSyncRun(db, run.id, {
+      status: "failed",
+      error: message,
+      meta: { source: "api.sync.openclaw" },
     });
-    if (err instanceof z.ZodError) {
-      return jsonError(400, err.message, "VALIDATION_ERROR");
-    }
+    db.insert(events)
+      .values({
+        id: crypto.randomUUID(),
+        action: "sync.run.failed",
+        entityType: "sync_run",
+        entityId: run.id,
+        meta: JSON.stringify({ error: message }),
+        createdAt: new Date(),
+      })
+      .run();
     return jsonError(500, message, "INTERNAL_ERROR");
   }
 }
