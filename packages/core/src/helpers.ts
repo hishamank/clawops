@@ -1,4 +1,5 @@
 import { eq, type SQL } from "drizzle-orm";
+import type { DB } from "./db.js";
 import {
   activityEvents,
   type ActivityEvent,
@@ -56,9 +57,30 @@ export interface ActivityEventFilters {
   offset?: number;
 }
 
+function normalizeActivityEventMetadata(
+  metadata: string | null | undefined,
+): string | null {
+  if (metadata == null) {
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(metadata);
+  } catch {
+    throw new Error("Activity event metadata must be a JSON object");
+  }
+
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Activity event metadata must be a JSON object");
+  }
+
+  return toJsonObject(parsed as Record<string, unknown>);
+}
+
 /**
  * Normalizes an activity event input for insertion.
- * Re-serializes metadata via parseJsonObject to safely handle malformed JSON input.
+ * Re-serializes metadata so object-shaped JSON is stored consistently.
  *
  * Note: this is a data-normalizer, NOT a DB insert. Call it before inserting:
  *   `db.insert(activityEvents).values(normalizeActivityEvent(input)).run()`
@@ -68,15 +90,20 @@ export function normalizeActivityEvent(
 ): NewActivityEvent {
   return {
     ...event,
-    metadata: event.metadata ? toJsonObject(parseJsonObject(event.metadata)) : null,
+    metadata: normalizeActivityEventMetadata(event.metadata),
   };
 }
 
-/**
- * @deprecated Renamed to normalizeActivityEvent for clarity.
- * Will be removed in a follow-up — update callers to use normalizeActivityEvent.
- */
-export const createActivityEvent = normalizeActivityEvent;
+export function createActivityEvent(
+  db: DB,
+  event: Omit<NewActivityEvent, "id" | "createdAt">,
+): ActivityEvent {
+  return db
+    .insert(activityEvents)
+    .values(normalizeActivityEvent(event))
+    .returning()
+    .get();
+}
 
 export function buildActivityEventQueryConditions(
   filters: ActivityEventFilters,

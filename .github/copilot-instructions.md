@@ -37,8 +37,9 @@ Target users: developers running multi-agent AI systems who need observability a
 - `@clawops/agents`, `@clawops/tasks`, `@clawops/projects`, etc. — business logic per domain
 
 ### Testing
-- **Vitest** — unit tests for all `packages/*`
-- In-memory SQLite (`:memory:`) for DB tests — no mocking the DB
+- **Node test runner (`node:test`)** is the default in this repo
+- Prefer in-memory SQLite (`:memory:`) for DB-facing package tests
+- If a package exports runtime helpers, tests should import the built module and exercise those real exports
 
 ---
 
@@ -118,6 +119,9 @@ clawops/
 - `writeEvent()` or similar closing over global `db` instead of accepting a handle
 - Package listed in `package.json` with no actual imports in source
 - Local string union that duplicates a type already in `@clawops/domain`
+- New helper/type described in the PR or issue exists in source but is not re-exported from the package entrypoint
+- A package adds new behavior but its `test` script is still a no-op
+- A normalizer silently drops malformed structured data instead of preserving it or rejecting it
 
 ### Warnings (recommend fix)
 - Non-null assertion (`!`) without an explanatory comment
@@ -125,9 +129,10 @@ clawops/
 - Async function in a `packages/*` file (should be sync)
 - Error handling via `err.message` string matching — prefer typed errors or error codes
 - Missing 404/409 HTTP status codes on routes that can fail with known reasons
+- Tests that validate a reimplementation of production logic instead of the actual exported module
 
 ### Do NOT flag
 - Drizzle ORM's complex generic types in function signatures — expected
 - `pnpm-lock.yaml` changes — auto-generated
 - `dist/` output files
-- Vitest `describe`/`it`/`beforeEach` test boilerplate
+- `node:test` `describe`/`it`/`beforeEach` boilerplate

@@ -5,6 +5,10 @@ export {
   toJsonArray,
   parseJsonObject,
   toJsonObject,
+  createActivityEvent,
   normalizeActivityEvent,
+  buildActivityEventQueryConditions,
+  parseActivityEventMetadata,
 } from "./helpers.js";
+export type { ActivityEventFilters } from "./helpers.js";
 export { eq, desc, and, gte } from "drizzle-orm";
