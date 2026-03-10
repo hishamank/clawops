@@ -308,6 +308,35 @@ export const agentSessions = sqliteTable("agent_sessions", {
     .default(sql`(unixepoch())`),
 });
 
+// ── Activity Events ────────────────────────────────────────────────────────
+
+export const activityEvents = sqliteTable("activity_events", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  source: text("source", {
+    enum: ["system", "agent", "user", "sync", "workflow", "hook"],
+  })
+    .notNull(),
+  severity: text("severity", {
+    enum: ["info", "warning", "error", "critical"],
+  })
+    .notNull()
+    .default("info"),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  body: text("body"),
+  agentId: text("agent_id").references(() => agents.id),
+  entityType: text("entity_type"),
+  entityId: text("entity_id"),
+  projectId: text("project_id").references(() => projects.id),
+  taskId: text("task_id").references(() => tasks.id),
+  metadata: text("metadata"),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
+
 // ── Inferred Types ──────────────────────────────────────────────────────────
 
 export type Agent = typeof agents.$inferSelect;
@@ -348,3 +377,8 @@ export type NewNotification = typeof notifications.$inferInsert;
 
 export type AgentSession = typeof agentSessions.$inferSelect;
 export type NewAgentSession = typeof agentSessions.$inferInsert;
+
+export type ActivityEvent = typeof activityEvents.$inferSelect;
+export type NewActivityEvent = typeof activityEvents.$inferInsert;
+export type ActivityEventSeverity = NonNullable<NewActivityEvent["severity"]>;
+export type ActivityEventSource = NonNullable<NewActivityEvent["source"]>;

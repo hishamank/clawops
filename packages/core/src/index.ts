@@ -5,5 +5,6 @@ export {
   toJsonArray,
   parseJsonObject,
   toJsonObject,
+  normalizeActivityEvent,
 } from "./helpers.js";
 export { eq, desc, and, gte } from "drizzle-orm";
