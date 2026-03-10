@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events, type DB } from "@clawops/core";
+import { events, createActivityEvent, type DB } from "@clawops/core";
 import { completeTask } from "@clawops/tasks";
 import { createNotification } from "@clawops/notifications";
 import { getDb, jsonError } from "@/lib/server/runtime";
@@ -43,6 +43,16 @@ export async function POST(
           meta: JSON.stringify({ summary: body.summary }),
         })
         .run();
+      createActivityEvent(tx as unknown as DB, {
+        source: "agent",
+        type: "task.completed",
+        title: `Task completed: ${t.title}`,
+        entityType: "task",
+        entityId: t.id,
+        projectId: t.projectId ?? undefined,
+        taskId: t.id,
+        metadata: JSON.stringify({ summary: body.summary, model: body.model }),
+      });
       return t;
     });
     if (!task) return jsonError(404, "Task not found", "TASK_NOT_FOUND");

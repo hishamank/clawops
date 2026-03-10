@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events, type DB } from "@clawops/core";
+import { events, createActivityEvent, type DB } from "@clawops/core";
 import { getProject, getProjectSpec, setProjectSpec, appendProjectSpec } from "@clawops/projects";
 import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
 
@@ -61,6 +61,16 @@ export async function PUT(
           meta: JSON.stringify({ specLength: body.specContent.length }),
         })
         .run();
+      createActivityEvent(tx as unknown as DB, {
+        source: agentId ? "agent" : "user",
+        type: "project.spec_updated",
+        title: `Project spec updated: ${project.name}`,
+        entityType: "project",
+        entityId: p.id,
+        projectId: p.id,
+        agentId,
+        metadata: JSON.stringify({ specLength: body.specContent.length }),
+      });
       return p;
     });
 
@@ -99,6 +109,16 @@ export async function POST(
           meta: JSON.stringify({ appendedLength: body.content.length }),
         })
         .run();
+      createActivityEvent(tx as unknown as DB, {
+        source: agentId ? "agent" : "user",
+        type: "project.spec_appended",
+        title: `Project spec appended: ${project.name}`,
+        entityType: "project",
+        entityId: p.id,
+        projectId: p.id,
+        agentId,
+        metadata: JSON.stringify({ appendedLength: body.content.length }),
+      });
       return p;
     });
 

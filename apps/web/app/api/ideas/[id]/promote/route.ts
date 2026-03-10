@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { events, type DB } from "@clawops/core";
+import { events, createActivityEvent, type DB } from "@clawops/core";
 import { promoteIdeaToProject } from "@clawops/ideas";
 import { ConflictError, NotFoundError } from "@clawops/domain";
 import { getDb, jsonError } from "@/lib/server/runtime";
@@ -32,6 +32,24 @@ export async function POST(
           meta: JSON.stringify({ name: r.project.name, ideaId: r.idea.id }),
         })
         .run();
+      createActivityEvent(tx as unknown as DB, {
+        source: "user",
+        type: "idea.promoted",
+        title: `Idea promoted to project: ${r.idea.title}`,
+        entityType: "idea",
+        entityId: r.idea.id,
+        projectId: r.project.id,
+        metadata: JSON.stringify({ ideaTitle: r.idea.title, projectId: r.project.id, projectName: r.project.name }),
+      });
+      createActivityEvent(tx as unknown as DB, {
+        source: "user",
+        type: "project.created",
+        title: `Project created from idea: ${r.project.name}`,
+        entityType: "project",
+        entityId: r.project.id,
+        projectId: r.project.id,
+        metadata: JSON.stringify({ name: r.project.name, ideaId: r.idea.id, ideaTitle: r.idea.title }),
+      });
       return r;
     });
 

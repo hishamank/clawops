@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { eq, events, tasks, type DB } from "@clawops/core";
+import { eq, events, tasks, createActivityEvent, type DB } from "@clawops/core";
 import { getTaskSpec, setTaskSpec } from "@clawops/tasks";
 import { getDb, jsonError } from "@/lib/server/runtime";
 
@@ -50,6 +50,16 @@ export async function PUT(
           meta: JSON.stringify({ specLength: body.specContent.length }),
         })
         .run();
+      createActivityEvent(tx as unknown as DB, {
+        source: "user",
+        type: "task.spec_updated",
+        title: `Task spec updated: ${t.title}`,
+        entityType: "task",
+        entityId: t.id,
+        projectId: t.projectId ?? undefined,
+        taskId: t.id,
+        metadata: JSON.stringify({ specLength: body.specContent.length }),
+      });
       return t;
     });
     return NextResponse.json(task);

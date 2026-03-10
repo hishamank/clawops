@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events, type DB } from "@clawops/core";
+import { events, createActivityEvent, type DB } from "@clawops/core";
 import { ProjectStatus } from "@clawops/domain";
 import { getProject, updateProject } from "@clawops/projects";
 import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
@@ -48,6 +48,16 @@ export async function PATCH(
           meta: JSON.stringify({ fields: Object.keys(body) }),
         })
         .run();
+      createActivityEvent(tx as unknown as DB, {
+        source: agentId ? "agent" : "user",
+        type: "project.updated",
+        title: `Project updated: ${p.name}`,
+        entityType: "project",
+        entityId: p.id,
+        projectId: p.id,
+        agentId,
+        metadata: JSON.stringify({ fields: Object.keys(body), status: body.status }),
+      });
       return p;
     });
     return NextResponse.json(project);

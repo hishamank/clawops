@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { TaskPriority, TaskStatus } from "@clawops/domain";
-import { events, type DB } from "@clawops/core";
+import { events, createActivityEvent, type DB } from "@clawops/core";
 import { getTask, updateTask } from "@clawops/tasks";
 import { getDb, jsonError } from "@/lib/server/runtime";
 
@@ -53,6 +53,16 @@ export async function PATCH(
           meta: JSON.stringify({ fields: Object.keys(body) }),
         })
         .run();
+      createActivityEvent(tx as unknown as DB, {
+        source: "user",
+        type: "task.updated",
+        title: `Task updated: ${t.title}`,
+        entityType: "task",
+        entityId: t.id,
+        projectId: t.projectId ?? undefined,
+        taskId: t.id,
+        metadata: JSON.stringify({ fields: Object.keys(body), status: body.status, priority: body.priority }),
+      });
       return t;
     });
     if (!task) return jsonError(404, "Task not found", "TASK_NOT_FOUND");

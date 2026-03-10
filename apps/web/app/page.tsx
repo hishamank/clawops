@@ -124,7 +124,7 @@ export default async function FleetOverview(): Promise<React.JSX.Element> {
 
         {/* Activity Feed */}
         <div className="space-y-4">
-          <ActivityFeed agents={agents} />
+          <ActivityFeed agents={agents} embedded />
         </div>
       </div>
 
