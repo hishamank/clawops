@@ -132,6 +132,9 @@ clawops/
 - New Drizzle schema or inferred row types declared outside `packages/core`
 - Package contract claims “types/interfaces only” but introduces persistence schema or migration responsibilities
 - Validator logic that rejects valid shapes promised by exported input/update types
+- Schema changes in `packages/core/src/schema.ts` without a matching forward-only migration in `packages/core/migrations`
+- Runtime bootstrap/seed helpers that are never wired into a real initialization or migration path while the PR claims built-in data will exist
+- Unrelated schema changes bundled into a feature PR without being required for the issue being implemented
 
 ### Warnings (recommend fix)
 - Non-null assertion (`!`) without an explanatory comment

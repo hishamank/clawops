@@ -169,48 +169,6 @@ export function getStage(db: DB, id: string): TaskTemplateStage | null {
     .get() ?? null;
 }
 
-// ── seedBuiltInTemplates ────────────────────────────────────────────────────
-
-export function seedBuiltInTemplates(db: DB): void {
-  db.transaction((tx) => {
-    for (const templateDef of BUILTIN_TEMPLATES) {
-      // Check if template already exists
-      const existing = tx
-        .select()
-        .from(taskTemplates)
-        .where(eq(taskTemplates.name, templateDef.name))
-        .get();
-
-      if (existing) {
-        // Template exists, skip
-        continue;
-      }
-
-      // Create the template
-      const template = tx
-        .insert(taskTemplates)
-        .values({
-          name: templateDef.name,
-          description: templateDef.description,
-          isBuiltIn: true,
-          isCustom: false,
-        })
-        .returning()
-        .get();
-
-      // Create the stages
-      for (const stageDef of templateDef.stages) {
-        tx.insert(taskTemplateStages).values({
-          templateId: template.id,
-          name: stageDef.name,
-          description: stageDef.description,
-          order: stageDef.order,
-        }).run();
-      }
-    }
-  });
-}
-
 // ── getBuiltInTemplateNames ─────────────────────────────────────────────────
 
 export function getBuiltInTemplateNames(): string[] {

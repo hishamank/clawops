@@ -385,6 +385,10 @@ export const syncRunItems = sqliteTable("sync_run_items", {
   }).notNull(),
   summary: text("summary"),
   meta: text("meta"),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
 
 // ── Task Templates ──────────────────────────────────────────────────────────
 
@@ -473,6 +477,7 @@ export type NewSyncRun = typeof syncRuns.$inferInsert;
 
 export type SyncRunItem = typeof syncRunItems.$inferSelect;
 export type NewSyncRunItem = typeof syncRunItems.$inferInsert;
+
 export type TaskTemplate = typeof taskTemplates.$inferSelect;
 export type NewTaskTemplate = typeof taskTemplates.$inferInsert;
 
