@@ -1,3 +1,5 @@
+-- NOTE: This migration intentionally duplicates 0004_structured_activity_events.
+-- Using IF NOT EXISTS keeps fresh-db migration replays resilient when both files are present.
 CREATE TABLE IF NOT EXISTS `activity_events` (
 	`id` text PRIMARY KEY NOT NULL,
 	`source` text NOT NULL,
