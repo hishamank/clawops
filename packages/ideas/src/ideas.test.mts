@@ -38,7 +38,9 @@ mock.module("@clawops/core", {
     ideas: Symbol("ideas"),
     projects: Symbol("projects"),
     parseJsonArray: (v: string | null) => (v ? JSON.parse(v) : []),
+    parseJsonObject: (v: string | null) => (v ? JSON.parse(v) : {}),
     toJsonArray: (v: string[]) => JSON.stringify(v),
+    toJsonObject: (v: Record<string, string | undefined>) => JSON.stringify(v),
     eq: () => ({}),
   },
 });

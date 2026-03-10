@@ -64,9 +64,11 @@ Target users: developers running multi-agent AI systems who need observability a
 - Shared constants/types must come from `@clawops/domain` — never duplicate local string unions
 - Validate `@clawops/domain` is actually imported before adding it to `package.json`
 - `writeEvent()` and similar helpers must accept a DB/transaction handle — never close over a global `db`
+- If a feature introduces a fixed set of valid keys or sections, define and reuse one shared constant/type across package, API, and CLI layers; do not leave runtime validation to TypeScript-only annotations
 
 ### API (`apps/web/app/api`)
 - Every route: Zod input validation
+- Validate route params at runtime too, not just request bodies
 - Every mutation: writes an `events` row, wrapped in a transaction with the main write
 - Auth guard protects all routes — only `/api/health` and `/api/auth/login` are public
 - Proper HTTP status codes: 404 for missing entities, 409 for conflicts, 400 for validation errors
@@ -110,6 +112,7 @@ clawops/
 ### Errors (block merge)
 - Missing `db.transaction()` on any function that does 2+ DB writes
 - `.returning().all()[0]` without a not-found check (silent `undefined`)
+- Read helpers that collapse "row missing" and "field unset" into the same return value when routes need to distinguish `404` from an empty resource
 - `any` type introduced
 - Exported function missing return type
 - Raw SQL outside `packages/analytics` or migration files
@@ -118,6 +121,8 @@ clawops/
 - `writeEvent()` or similar closing over global `db` instead of accepting a handle
 - Package listed in `package.json` with no actual imports in source
 - Local string union that duplicates a type already in `@clawops/domain`
+- Structured models implemented with open-ended index signatures or unvalidated dynamic route segments that allow arbitrary keys beyond the approved contract
+- New package behavior with no executable coverage in that package's `test` script
 
 ### Warnings (recommend fix)
 - Non-null assertion (`!`) without an explanatory comment
@@ -125,6 +130,7 @@ clawops/
 - Async function in a `packages/*` file (should be sync)
 - Error handling via `err.message` string matching — prefer typed errors or error codes
 - Missing 404/409 HTTP status codes on routes that can fail with known reasons
+- Tests that only mock or reimplement behavior without covering the real exported helper or route contract that changed
 
 ### Do NOT flag
 - Drizzle ORM's complex generic types in function signatures — expected

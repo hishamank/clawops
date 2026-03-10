@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { ideaAdd, ideaList, ideaGetSections, ideaGetSection, ideaUpdateSection, ideaUpdateSections, ideaGetDraftPrd, ideaSetDraftPrd } from "../lib/client.js";
-import type { IdeaSections } from "@clawops/ideas";
+import { IDEA_SECTION_KEYS, type IdeaSectionKey, type IdeaSections } from "@clawops/ideas";
 
 export const ideaCmd = new Command("idea").description("Manage ideas");
 
@@ -55,7 +55,7 @@ ideaCmd
     const sections = await ideaGetSections(id);
     if (opts.json) {
       console.log(JSON.stringify(sections, null, 2));
-    } else if (!sections) {
+    } else if (Object.keys(sections).length === 0) {
       console.log("No sections found for this idea.");
     } else {
       for (const [key, value] of Object.entries(sections)) {
@@ -75,21 +75,20 @@ ideaCmd
   .option("--set <content>", "Set section content")
   .option("--json", "Output raw JSON")
   .action(async (id, section, opts) => {
-    const validSections = ["brainstorming", "research", "similarIdeas", "draftPrd", "notes"];
-    if (!validSections.includes(section)) {
-      console.error(`Invalid section: ${section}. Valid sections: ${validSections.join(", ")}`);
+    if (!IDEA_SECTION_KEYS.includes(section as IdeaSectionKey)) {
+      console.error(`Invalid section: ${section}. Valid sections: ${IDEA_SECTION_KEYS.join(", ")}`);
       process.exit(1);
     }
 
     if (opts.set) {
-      const idea = await ideaUpdateSection(id, section as keyof IdeaSections, opts.set as string);
+      const idea = await ideaUpdateSection(id, section as IdeaSectionKey, opts.set as string);
       if (opts.json) {
         console.log(JSON.stringify(idea, null, 2));
       } else {
         console.log(`Updated section '${section}' for idea ${id}`);
       }
     } else {
-      const content = await ideaGetSection(id, section as keyof IdeaSections);
+      const content = await ideaGetSection(id, section as IdeaSectionKey);
       if (opts.json) {
         console.log(JSON.stringify({ section, content }, null, 2));
       } else if (!content) {

@@ -14,7 +14,7 @@ const sectionSchema = z.object({
   similarIdeas: z.string().optional(),
   draftPrd: z.string().optional(),
   notes: z.string().optional(),
-});
+}).strict();
 
 const updateSectionsBody = z.object({
   sections: sectionSchema.partial(),
@@ -28,9 +28,6 @@ export async function GET(
   try {
     const db = getDb();
     const sections = getIdeaSections(db, id);
-    if (!sections) {
-      return NextResponse.json({ sections: {} });
-    }
     return NextResponse.json({ sections });
   } catch (err) {
     if (err instanceof NotFoundError) return jsonError(404, err.message, err.code);

@@ -4,21 +4,33 @@ import { ideas, projects, parseJsonArray, toJsonArray, parseJsonObject, toJsonOb
 import type { IdeaStatus } from "@clawops/domain";
 import { NotFoundError, ConflictError } from "@clawops/domain";
 
+export const IDEA_SECTION_KEYS = [
+  "brainstorming",
+  "research",
+  "similarIdeas",
+  "draftPrd",
+  "notes",
+] as const;
+
+export type IdeaSectionKey = (typeof IDEA_SECTION_KEYS)[number];
+
 /**
  * Structured sections for idea incubation
  */
-export interface IdeaSections {
-  /** Free-form brainstorming notes */
-  brainstorming?: string;
-  /** Research findings and references */
-  research?: string;
-  /** Links to similar or related ideas */
-  similarIdeas?: string;
-  /** Draft product requirements document */
-  draftPrd?: string;
-  /** Additional custom notes */
-  notes?: string;
-  [key: string]: string | undefined;
+export type IdeaSections = Partial<Record<IdeaSectionKey, string>>;
+
+function getIdeaSectionsRow(db: DB, id: string): { sections: string | null } {
+  const [idea] = db
+    .select({ sections: ideas.sections })
+    .from(ideas)
+    .where(eq(ideas.id, id))
+    .all();
+
+  if (!idea) {
+    throw new NotFoundError(`Idea not found: ${id}`);
+  }
+
+  return idea;
 }
 
 export function createIdea(
@@ -93,28 +105,19 @@ export function updateIdea(
 /**
  * Get all sections for an idea
  */
-export function getIdeaSections(db: DB, id: string): IdeaSections | null {
-  const [idea] = db
-    .select({ sections: ideas.sections })
-    .from(ideas)
-    .where(eq(ideas.id, id))
-    .all();
-
-  if (!idea || !idea.sections) {
-    return null;
+export function getIdeaSections(db: DB, id: string): IdeaSections {
+  const idea = getIdeaSectionsRow(db, id);
+  if (!idea.sections) {
+    return {};
   }
-
   return parseJsonObject(idea.sections) as IdeaSections;
 }
 
 /**
  * Get a specific section from an idea
  */
-export function getIdeaSection(db: DB, id: string, section: keyof IdeaSections): string | null {
+export function getIdeaSection(db: DB, id: string, section: IdeaSectionKey): string | null {
   const sections = getIdeaSections(db, id);
-  if (!sections) {
-    return null;
-  }
   return sections[section] ?? null;
 }
 
@@ -124,10 +127,10 @@ export function getIdeaSection(db: DB, id: string, section: keyof IdeaSections):
 export function updateIdeaSection(
   db: DB,
   id: string,
-  section: keyof IdeaSections,
+  section: IdeaSectionKey,
   content: string,
 ): Idea {
-  const existingSections = getIdeaSections(db, id) ?? {};
+  const existingSections = getIdeaSections(db, id);
   const updatedSections = { ...existingSections, [section]: content };
 
   const [idea] = db
@@ -152,7 +155,7 @@ export function updateIdeaSections(
   id: string,
   sections: Partial<IdeaSections>,
 ): Idea {
-  const existingSections = getIdeaSections(db, id) ?? {};
+  const existingSections = getIdeaSections(db, id);
   const updatedSections = { ...existingSections, ...sections };
 
   const [idea] = db

@@ -4,7 +4,7 @@ import { events } from "@clawops/core";
 import { db as coreDb } from "@clawops/core/db";
 import { runMigrations } from "@clawops/core/migrate";
 import { createTask, listTasks, updateTask, completeTask, getTaskSpec, setTaskSpec, appendTaskSpec } from "@clawops/tasks";
-import { createIdea, listIdeas, getIdeaSections, getIdeaSection, updateIdeaSection, updateIdeaSections, getIdeaDraftPrd, setIdeaDraftPrd, type IdeaSections } from "@clawops/ideas";
+import { createIdea, listIdeas, getIdeaSections, getIdeaSection, updateIdeaSection, updateIdeaSections, getIdeaDraftPrd, setIdeaDraftPrd, type IdeaSectionKey, type IdeaSections } from "@clawops/ideas";
 import {
   createProject,
   getProject,
@@ -112,7 +112,7 @@ export async function ideaList(filters?: {
   return result;
 }
 
-export async function ideaGetSections(id: string): Promise<IdeaSections | null> {
+export async function ideaGetSections(id: string): Promise<IdeaSections> {
   ensureMigrated();
   const db = getDb();
   const result = getIdeaSections(db, id);
@@ -120,7 +120,7 @@ export async function ideaGetSections(id: string): Promise<IdeaSections | null> 
   return result;
 }
 
-export async function ideaGetSection(id: string, section: keyof IdeaSections): Promise<string | null> {
+export async function ideaGetSection(id: string, section: IdeaSectionKey): Promise<string | null> {
   ensureMigrated();
   const db = getDb();
   const result = getIdeaSection(db, id, section);
@@ -130,7 +130,7 @@ export async function ideaGetSection(id: string, section: keyof IdeaSections): P
 
 export async function ideaUpdateSection(
   id: string,
-  section: keyof IdeaSections,
+  section: IdeaSectionKey,
   content: string,
 ): Promise<Idea> {
   ensureMigrated();
@@ -285,4 +285,3 @@ export async function taskSpecAppend(id: string, content: string): Promise<Task>
   ensureMigrated();
   return appendTaskSpec(getDb(), id, content);
 }
-

@@ -7,17 +7,19 @@ import { ConflictError, IdeaStatus, NotFoundError, Source } from "@clawops/domai
 import { createIdea, listIdeas } from "@clawops/ideas";
 import { getDb, jsonError, parseSearch } from "@/lib/server/runtime";
 
+const sectionSchema = z.object({
+  brainstorming: z.string().optional(),
+  research: z.string().optional(),
+  similarIdeas: z.string().optional(),
+  draftPrd: z.string().optional(),
+  notes: z.string().optional(),
+}).strict();
+
 const createIdeaBody = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
   tags: z.array(z.string()).optional(),
-  sections: z.object({
-    brainstorming: z.string().optional(),
-    research: z.string().optional(),
-    similarIdeas: z.string().optional(),
-    draftPrd: z.string().optional(),
-    notes: z.string().optional(),
-  }).optional(),
+  sections: sectionSchema.optional(),
   source: z.enum([Source.human, Source.agent]).optional(),
 });
 
