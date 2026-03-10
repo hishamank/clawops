@@ -11,6 +11,13 @@ const createIdeaBody = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
   tags: z.array(z.string()).optional(),
+  sections: z.object({
+    brainstorming: z.string().optional(),
+    research: z.string().optional(),
+    similarIdeas: z.string().optional(),
+    draftPrd: z.string().optional(),
+    notes: z.string().optional(),
+  }).optional(),
   source: z.enum([Source.human, Source.agent]).optional(),
 });
 

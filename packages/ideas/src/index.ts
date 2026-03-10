@@ -1,12 +1,29 @@
 import { eq } from "drizzle-orm";
 import type { DB, Idea, NewIdea, Project } from "@clawops/core";
-import { ideas, projects, parseJsonArray, toJsonArray } from "@clawops/core";
+import { ideas, projects, parseJsonArray, toJsonArray, parseJsonObject, toJsonObject } from "@clawops/core";
 import type { IdeaStatus } from "@clawops/domain";
 import { NotFoundError, ConflictError } from "@clawops/domain";
 
+/**
+ * Structured sections for idea incubation
+ */
+export interface IdeaSections {
+  /** Free-form brainstorming notes */
+  brainstorming?: string;
+  /** Research findings and references */
+  research?: string;
+  /** Links to similar or related ideas */
+  similarIdeas?: string;
+  /** Draft product requirements document */
+  draftPrd?: string;
+  /** Additional custom notes */
+  notes?: string;
+  [key: string]: string | undefined;
+}
+
 export function createIdea(
   db: DB,
-  input: { title: string; description?: string; tags?: string[]; source?: NewIdea["source"] },
+  input: { title: string; description?: string; tags?: string[]; sections?: IdeaSections; source?: NewIdea["source"] },
 ): Idea {
   const [idea] = db
     .insert(ideas)
@@ -14,6 +31,7 @@ export function createIdea(
       title: input.title,
       description: input.description ?? null,
       tags: input.tags ? toJsonArray(input.tags) : null,
+      sections: input.sections ? toJsonObject(input.sections) : null,
       source: input.source ?? "human",
     })
     .returning()
@@ -53,6 +71,7 @@ export function updateIdea(
     description: string;
     status: IdeaStatus;
     tags: string[];
+    sections: IdeaSections;
   }>,
 ): Idea {
   const values: Record<string, unknown> = {};
@@ -60,6 +79,7 @@ export function updateIdea(
   if (updates.description !== undefined) values["description"] = updates.description;
   if (updates.status !== undefined) values["status"] = updates.status;
   if (updates.tags !== undefined) values["tags"] = toJsonArray(updates.tags);
+  if (updates.sections !== undefined) values["sections"] = toJsonObject(updates.sections);
 
   const [idea] = db
     .update(ideas)
@@ -68,6 +88,99 @@ export function updateIdea(
     .returning()
     .all();
   return idea;
+}
+
+/**
+ * Get all sections for an idea
+ */
+export function getIdeaSections(db: DB, id: string): IdeaSections | null {
+  const [idea] = db
+    .select({ sections: ideas.sections })
+    .from(ideas)
+    .where(eq(ideas.id, id))
+    .all();
+
+  if (!idea || !idea.sections) {
+    return null;
+  }
+
+  return parseJsonObject(idea.sections) as IdeaSections;
+}
+
+/**
+ * Get a specific section from an idea
+ */
+export function getIdeaSection(db: DB, id: string, section: keyof IdeaSections): string | null {
+  const sections = getIdeaSections(db, id);
+  if (!sections) {
+    return null;
+  }
+  return sections[section] ?? null;
+}
+
+/**
+ * Update a specific section of an idea
+ */
+export function updateIdeaSection(
+  db: DB,
+  id: string,
+  section: keyof IdeaSections,
+  content: string,
+): Idea {
+  const existingSections = getIdeaSections(db, id) ?? {};
+  const updatedSections = { ...existingSections, [section]: content };
+
+  const [idea] = db
+    .update(ideas)
+    .set({ sections: toJsonObject(updatedSections) })
+    .where(eq(ideas.id, id))
+    .returning()
+    .all();
+
+  if (!idea) {
+    throw new NotFoundError(`Idea not found: ${id}`);
+  }
+
+  return idea;
+}
+
+/**
+ * Update multiple sections of an idea at once
+ */
+export function updateIdeaSections(
+  db: DB,
+  id: string,
+  sections: Partial<IdeaSections>,
+): Idea {
+  const existingSections = getIdeaSections(db, id) ?? {};
+  const updatedSections = { ...existingSections, ...sections };
+
+  const [idea] = db
+    .update(ideas)
+    .set({ sections: toJsonObject(updatedSections) })
+    .where(eq(ideas.id, id))
+    .returning()
+    .all();
+
+  if (!idea) {
+    throw new NotFoundError(`Idea not found: ${id}`);
+  }
+
+  return idea;
+}
+
+/**
+ * Get the draft PRD content from an idea
+ */
+export function getIdeaDraftPrd(db: DB, id: string): string | null {
+  return getIdeaSection(db, id, "draftPrd");
+}
+
+/**
+ * Set the draft PRD content for an idea
+ */
+export function setIdeaDraftPrd(db: DB, id: string, content: string): Idea {
+  return updateIdeaSection(db, id, "draftPrd", content);
 }
 
 export function promoteIdeaToProject(

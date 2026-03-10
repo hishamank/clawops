@@ -4,7 +4,7 @@ import { events } from "@clawops/core";
 import { db as coreDb } from "@clawops/core/db";
 import { runMigrations } from "@clawops/core/migrate";
 import { createTask, listTasks, updateTask, completeTask, getTaskSpec, setTaskSpec, appendTaskSpec } from "@clawops/tasks";
-import { createIdea, listIdeas } from "@clawops/ideas";
+import { createIdea, listIdeas, getIdeaSections, getIdeaSection, updateIdeaSection, updateIdeaSections, getIdeaDraftPrd, setIdeaDraftPrd, type IdeaSections } from "@clawops/ideas";
 import {
   createProject,
   getProject,
@@ -110,6 +110,55 @@ export async function ideaList(filters?: {
     logReadEvent(db, "idea", i.id);
   }
   return result;
+}
+
+export async function ideaGetSections(id: string): Promise<IdeaSections | null> {
+  ensureMigrated();
+  const db = getDb();
+  const result = getIdeaSections(db, id);
+  logReadEvent(db, "idea", id);
+  return result;
+}
+
+export async function ideaGetSection(id: string, section: keyof IdeaSections): Promise<string | null> {
+  ensureMigrated();
+  const db = getDb();
+  const result = getIdeaSection(db, id, section);
+  logReadEvent(db, "idea", id);
+  return result;
+}
+
+export async function ideaUpdateSection(
+  id: string,
+  section: keyof IdeaSections,
+  content: string,
+): Promise<Idea> {
+  ensureMigrated();
+  const db = getDb();
+  return updateIdeaSection(db, id, section, content);
+}
+
+export async function ideaUpdateSections(
+  id: string,
+  sections: Partial<IdeaSections>,
+): Promise<Idea> {
+  ensureMigrated();
+  const db = getDb();
+  return updateIdeaSections(db, id, sections);
+}
+
+export async function ideaGetDraftPrd(id: string): Promise<string | null> {
+  ensureMigrated();
+  const db = getDb();
+  const result = getIdeaDraftPrd(db, id);
+  logReadEvent(db, "idea", id);
+  return result;
+}
+
+export async function ideaSetDraftPrd(id: string, content: string): Promise<Idea> {
+  ensureMigrated();
+  const db = getDb();
+  return setIdeaDraftPrd(db, id, content);
 }
 
 export async function projectCreate(input: {
