@@ -1,4 +1,4 @@
-import { eq, and, gte, lte, sum, count, type SQL } from "drizzle-orm";
+import { eq, and, gte, lte, sum, count, sql, type SQL } from "drizzle-orm";
 import type { DB } from "@clawops/core";
 import { usageLogs, tasks } from "@clawops/core";
 
@@ -159,5 +159,184 @@ export function getCostsByProject(db: DB): CostByGroup[] {
     totalIn: Number(r.totalIn ?? 0),
     totalOut: Number(r.totalOut ?? 0),
     count: r.count,
+  }));
+}
+
+// ── Time-series types ──────────────────────────────────────────────────────
+
+export type Granularity = "hour" | "day" | "week" | "month";
+
+export interface TimelineFilters {
+  agentId?: string;
+  model?: string;
+  from: Date;
+  to: Date;
+  granularity?: Granularity;
+}
+
+export interface TimelinePoint {
+  timestamp: string;
+  tokensIn: number;
+  tokensOut: number;
+  cost: number;
+  count: number;
+}
+
+export interface CostTimelinePoint {
+  timestamp: string;
+  totalCost: number;
+  tokensIn: number;
+  tokensOut: number;
+  count: number;
+}
+
+function padDatePart(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+export function formatBucketDateUtc(date: Date, granularity: Granularity): string {
+  const year = date.getUTCFullYear();
+  const month = padDatePart(date.getUTCMonth() + 1);
+  const day = padDatePart(date.getUTCDate());
+
+  switch (granularity) {
+    case "hour":
+      return `${year}-${month}-${day} ${padDatePart(date.getUTCHours())}:00:00`;
+    case "day":
+      return `${year}-${month}-${day}`;
+    case "week": {
+      const weekStart = new Date(date);
+      const dayOfWeek = weekStart.getUTCDay();
+      const offset = (dayOfWeek + 6) % 7;
+      weekStart.setUTCDate(weekStart.getUTCDate() - offset);
+      return `${weekStart.getUTCFullYear()}-${padDatePart(weekStart.getUTCMonth() + 1)}-${padDatePart(weekStart.getUTCDate())}`;
+    }
+    case "month":
+      return `${year}-${month}-01`;
+  }
+}
+
+// ── Time-series aggregations ───────────────────────────────────────────────
+
+/**
+ * Build a SQL expression for truncating timestamps to the specified granularity.
+ *
+ * SQLite uses strftime for date formatting.
+ */
+function truncateToGranularity(granularity: Granularity): SQL {
+  switch (granularity) {
+    case "hour":
+      return sql`strftime('%Y-%m-%d %H:00:00', datetime(${usageLogs.createdAt}, 'unixepoch'))`;
+    case "day":
+      return sql`strftime('%Y-%m-%d', datetime(${usageLogs.createdAt}, 'unixepoch'))`;
+    case "week":
+      // Week: truncate to Monday of the current week (ISO week start = Monday).
+      return sql`strftime('%Y-%m-%d', datetime(${usageLogs.createdAt}, 'unixepoch', printf('-%d days', (CAST(strftime('%w', datetime(${usageLogs.createdAt}, 'unixepoch')) AS integer) + 6) % 7)))`;
+    case "month":
+      return sql`strftime('%Y-%m-01', datetime(${usageLogs.createdAt}, 'unixepoch'))`;
+  }
+}
+
+/**
+ * Get token usage timeline grouped by granularity.
+ *
+ * Returns time-series data for token consumption over a date range.
+ *
+ * @param db - Drizzle database handle.
+ * @param filters - Filters including required date range and optional granularity (default: "day").
+ * @returns Array of timeline points ordered by timestamp.
+ */
+export function getTokenTimeline(
+  db: DB,
+  filters: TimelineFilters,
+): TimelinePoint[] {
+  const { from, to, granularity = "day" } = filters;
+  const conditions: SQL[] = [
+    gte(usageLogs.createdAt, from),
+    lte(usageLogs.createdAt, to),
+  ];
+
+  if (filters.agentId) {
+    conditions.push(eq(usageLogs.agentId, filters.agentId));
+  }
+  if (filters.model) {
+    conditions.push(eq(usageLogs.model, filters.model));
+  }
+
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+  const timeBucket = truncateToGranularity(granularity);
+
+  const rows = db
+    .select({
+      timestamp: timeBucket,
+      tokensIn: sum(usageLogs.tokensIn),
+      tokensOut: sum(usageLogs.tokensOut),
+      cost: sum(usageLogs.cost),
+      count: count(),
+    })
+    .from(usageLogs)
+    .where(where)
+    .groupBy(timeBucket)
+    .orderBy(timeBucket)
+    .all();
+
+  return rows.map((r) => ({
+    timestamp: r.timestamp as string,
+    tokensIn: Number(r.tokensIn ?? 0),
+    tokensOut: Number(r.tokensOut ?? 0),
+    cost: Number(r.cost ?? 0),
+    count: r.count ?? 0,
+  }));
+}
+
+/**
+ * Get cost timeline grouped by granularity.
+ *
+ * Returns time-series data for cost accumulation over a date range.
+ *
+ * @param db - Drizzle database handle.
+ * @param filters - Filters including required date range and optional granularity (default: "day").
+ * @returns Array of cost timeline points ordered by timestamp.
+ */
+export function getCostTimeline(
+  db: DB,
+  filters: TimelineFilters,
+): CostTimelinePoint[] {
+  const { from, to, granularity = "day" } = filters;
+  const conditions: SQL[] = [
+    gte(usageLogs.createdAt, from),
+    lte(usageLogs.createdAt, to),
+  ];
+
+  if (filters.agentId) {
+    conditions.push(eq(usageLogs.agentId, filters.agentId));
+  }
+  if (filters.model) {
+    conditions.push(eq(usageLogs.model, filters.model));
+  }
+
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+  const timeBucket = truncateToGranularity(granularity);
+
+  const rows = db
+    .select({
+      timestamp: timeBucket,
+      totalCost: sum(usageLogs.cost),
+      tokensIn: sum(usageLogs.tokensIn),
+      tokensOut: sum(usageLogs.tokensOut),
+      count: count(),
+    })
+    .from(usageLogs)
+    .where(where)
+    .groupBy(timeBucket)
+    .orderBy(timeBucket)
+    .all();
+
+  return rows.map((r) => ({
+    timestamp: r.timestamp as string,
+    totalCost: Number(r.totalCost ?? 0),
+    tokensIn: Number(r.tokensIn ?? 0),
+    tokensOut: Number(r.tokensOut ?? 0),
+    count: r.count ?? 0,
   }));
 }
