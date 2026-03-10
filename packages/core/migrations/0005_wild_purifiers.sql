@@ -1,4 +1,4 @@
-CREATE TABLE `activity_events` (
+CREATE TABLE IF NOT EXISTS `activity_events` (
 	`id` text PRIMARY KEY NOT NULL,
 	`source` text NOT NULL,
 	`severity` text DEFAULT 'info' NOT NULL,
