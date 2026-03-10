@@ -22,6 +22,7 @@ type ConnectionPayload = Record<string, unknown>;
 interface StubChain {
   all: () => OpenClawConnection[];
   get: () => OpenClawConnection | null;
+  onConflictDoNothing: () => StubChain;
   returning: () => StubChain;
   where: () => StubChain;
   from: () => StubChain;
@@ -33,6 +34,7 @@ interface StubChain {
 interface StubDb {
   insert: () => StubChain;
   select: () => StubChain;
+  transaction: <T>(cb: (tx: DB) => T) => T;
   update: () => StubChain;
 }
 
@@ -43,6 +45,7 @@ function makeChain(
   const chain: StubChain = {
     all: () => rows,
     get: () => row,
+    onConflictDoNothing: () => chain,
     returning: () => chain,
     where: () => chain,
     from: () => chain,
@@ -61,6 +64,7 @@ function makeDb(
   const db: StubDb = {
     insert: () => chain,
     select: () => chain,
+    transaction: (cb) => cb(db as unknown as DB),
     update: () => chain,
   };
   return db as unknown as DB;
@@ -119,6 +123,7 @@ describe("upsertOpenClawConnection", () => {
     const db = {
       select: () => selectChain,
       insert: () => insertChain,
+      transaction: (cb: (tx: DB) => unknown) => cb(db as unknown as DB),
       update: () => insertChain,
     } as unknown as DB;
 
@@ -139,17 +144,13 @@ describe("upsertOpenClawConnection", () => {
   it("updates an existing connection when rootPath matches", () => {
     let capturedSet: ConnectionPayload | undefined;
     const updatedRow = { ...FAKE_CONNECTION, name: "Updated OpenClaw" };
-    const uniqueError = new Error(
-      "SqliteError: UNIQUE constraint failed: openclaw_connections.root_path",
-    );
     const selectChain = makeChain(FAKE_CONNECTION, [FAKE_CONNECTION]);
     const insertChain: StubChain = {
       ...makeChain(updatedRow, [updatedRow]),
+      onConflictDoNothing: () => insertChain,
       returning: () => insertChain,
       values: () => insertChain,
-      get: () => {
-        throw uniqueError;
-      },
+      get: () => null,
     };
     const updateChain: StubChain = {
       ...makeChain(updatedRow, [updatedRow]),
@@ -162,6 +163,7 @@ describe("upsertOpenClawConnection", () => {
     const db = {
       select: () => selectChain,
       insert: () => insertChain,
+      transaction: (cb: (tx: DB) => unknown) => cb(db as unknown as DB),
       update: () => updateChain,
     } as unknown as DB;
 
