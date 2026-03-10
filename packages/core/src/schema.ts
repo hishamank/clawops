@@ -27,6 +27,43 @@ export const agents = sqliteTable("agents", {
     .default(sql`(unixepoch())`),
 });
 
+// ── OpenClaw Connections ────────────────────────────────────────────────────
+
+export const openclawConnections = sqliteTable("openclaw_connections", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  provider: text("provider", {
+    enum: ["openclaw"],
+  })
+    .notNull()
+    .default("openclaw"),
+  name: text("name").notNull(),
+  rootPath: text("root_path").notNull().unique(),
+  gatewayUrl: text("gateway_url"),
+  status: text("status", {
+    enum: ["active", "disconnected", "error"],
+  })
+    .notNull()
+    .default("disconnected"),
+  syncMode: text("sync_mode", {
+    enum: ["manual", "hybrid"],
+  })
+    .notNull()
+    .default("manual"),
+  hasGatewayToken: integer("has_gateway_token", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  meta: text("meta"),
+  lastSyncedAt: integer("last_synced_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
+
 // ── Projects ────────────────────────────────────────────────────────────────
 
 export const projects = sqliteTable("projects", {
@@ -275,6 +312,9 @@ export const agentSessions = sqliteTable("agent_sessions", {
 
 export type Agent = typeof agents.$inferSelect;
 export type NewAgent = typeof agents.$inferInsert;
+
+export type OpenClawConnection = typeof openclawConnections.$inferSelect;
+export type NewOpenClawConnection = typeof openclawConnections.$inferInsert;
 
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;

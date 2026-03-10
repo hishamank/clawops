@@ -6,17 +6,21 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "rm -rf dist && tsc",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
     "clean": "rm -rf dist",
-    "test": "node --import tsx/esm --test src/**/*.test.mts"
+    "test": "node --experimental-test-module-mocks --import tsx/esm --test src/*.test.mts src/**/*.test.mts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "@clawops/core": "workspace:*",
+    "drizzle-orm": "^0.38.0"
   },
   "exports": {
     ".": {
