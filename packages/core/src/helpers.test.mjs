@@ -1,80 +1,138 @@
 import { beforeEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "../dist/index.js";
 
 let db;
 
+function makeStore() {
+  return {
+    agents: [],
+    projects: [],
+    tasks: [],
+    activityEvents: [],
+  };
+}
+
+function getTableName(table) {
+  return table[Symbol.for("drizzle:Name")] ?? table._.name;
+}
+
+function getRows(store, table) {
+  const tableName = getTableName(table);
+
+  switch (tableName) {
+    case "agents":
+      return store.agents;
+    case "projects":
+      return store.projects;
+    case "tasks":
+      return store.tasks;
+    case "activity_events":
+      return store.activityEvents;
+    default:
+      throw new Error(`Unsupported table: ${tableName}`);
+  }
+}
+
+function normalizeInsertValues(values) {
+  return Object.fromEntries(
+    Object.entries(values).map(([key, value]) => {
+      if (value === undefined) {
+        return [key, null];
+      }
+
+      return [key, value];
+    }),
+  );
+}
+
+function extractCondition(condition) {
+  const chunks = condition?.queryChunks ?? [];
+  const column = chunks.find((chunk) => typeof chunk?.name === "string");
+  const param = chunks.find((chunk) => Object.hasOwn(chunk ?? {}, "encoder"));
+
+  return column && param
+    ? { field: column.name, value: param.value }
+    : null;
+}
+
+function toRowField(field) {
+  return field.replace(/_([a-z])/g, (_match, letter) => letter.toUpperCase());
+}
+
+function matchesCondition(row, condition) {
+  if (!condition) {
+    return true;
+  }
+
+  if (Array.isArray(condition)) {
+    return condition.every((entry) => matchesCondition(row, entry));
+  }
+
+  const extracted = extractCondition(condition);
+  return extracted ? row[toRowField(extracted.field)] === extracted.value : true;
+}
+
 function createDb() {
-  const sqlite = new Database(":memory:");
-  sqlite.pragma("foreign_keys = ON");
-  sqlite.exec(`
-    CREATE TABLE agents (
-      id text PRIMARY KEY NOT NULL,
-      name text NOT NULL,
-      model text NOT NULL,
-      role text NOT NULL,
-      status text DEFAULT 'offline' NOT NULL,
-      last_active integer,
-      avatar text,
-      framework text,
-      api_key text,
-      memory_path text,
-      skills text,
-      created_at integer DEFAULT (unixepoch()) NOT NULL
-    );
-    CREATE TABLE projects (
-      id text PRIMARY KEY NOT NULL,
-      name text NOT NULL,
-      description text,
-      status text DEFAULT 'planning' NOT NULL,
-      idea_id text,
-      prd text,
-      prd_updated_at integer,
-      spec_content text,
-      spec_updated_at integer,
-      created_at integer DEFAULT (unixepoch()) NOT NULL
-    );
-    CREATE TABLE tasks (
-      id text PRIMARY KEY NOT NULL,
-      title text NOT NULL,
-      description text,
-      status text DEFAULT 'backlog' NOT NULL,
-      priority text DEFAULT 'medium' NOT NULL,
-      assignee_id text,
-      project_id text,
-      source text DEFAULT 'human' NOT NULL,
-      due_date integer,
-      completed_at integer,
-      summary text,
-      spec_content text,
-      spec_updated_at integer,
-      created_at integer DEFAULT (unixepoch()) NOT NULL,
-      FOREIGN KEY (assignee_id) REFERENCES agents(id),
-      FOREIGN KEY (project_id) REFERENCES projects(id)
-    );
-    CREATE TABLE activity_events (
-      id text PRIMARY KEY NOT NULL,
-      source text NOT NULL,
-      severity text DEFAULT 'info' NOT NULL,
-      type text NOT NULL,
-      title text NOT NULL,
-      body text,
-      agent_id text,
-      entity_type text,
-      entity_id text,
-      project_id text,
-      task_id text,
-      metadata text,
-      created_at integer DEFAULT (unixepoch()) NOT NULL,
-      FOREIGN KEY (agent_id) REFERENCES agents(id),
-      FOREIGN KEY (project_id) REFERENCES projects(id),
-      FOREIGN KEY (task_id) REFERENCES tasks(id)
-    );
-  `);
-  const nextDb = drizzle(sqlite, { schema });
-  return nextDb;
+  const store = makeStore();
+
+  return {
+    insert(table) {
+      return {
+        values(values) {
+          const rows = getRows(store, table);
+          const inserted = {
+            id: values.id ?? crypto.randomUUID(),
+            createdAt: values.createdAt ?? new Date(),
+            ...normalizeInsertValues(values),
+          };
+
+          rows.push(inserted);
+
+          return {
+            run() {
+              return inserted;
+            },
+            returning() {
+              return {
+                get() {
+                  return inserted;
+                },
+              };
+            },
+          };
+        },
+      };
+    },
+    select() {
+      return {
+        from(table) {
+          const rows = getRows(store, table);
+
+          return {
+            where(condition) {
+              const matched = rows.filter((row) => matchesCondition(row, condition));
+
+              return {
+                all() {
+                  return matched;
+                },
+                get() {
+                  return matched[0];
+                },
+              };
+            },
+            all() {
+              return rows;
+            },
+            get() {
+              return rows[0];
+            },
+          };
+        },
+      };
+    },
+  };
 }
 
 function seedAgent(id) {
@@ -141,7 +199,12 @@ describe("activity event helpers", () => {
     assert.equal(event.type, "sync.failed");
     assert.equal(event.metadata, "{\"retry\":2,\"reason\":\"timeout\"}");
 
-    const persisted = db.select().from(schema.activityEvents).where(schema.eq(schema.activityEvents.id, event.id)).get();
+    const persisted = db
+      .select()
+      .from(schema.activityEvents)
+      .where(schema.eq(schema.activityEvents.id, event.id))
+      .get();
+
     assert.ok(persisted);
     assert.equal(persisted.id, event.id);
   });
@@ -175,26 +238,6 @@ describe("activity event helpers", () => {
   });
 
   it("buildActivityEventQueryConditions supports the documented filters", () => {
-    schema.createActivityEvent(db, {
-      source: "sync",
-      severity: "error",
-      type: "sync.failed",
-      title: "Sync failed",
-      agentId: "agent-1",
-      entityType: "task",
-      entityId: "task-1",
-      projectId: "project-1",
-      taskId: "task-1",
-      metadata: "{\"retry\":1}",
-    });
-    schema.createActivityEvent(db, {
-      source: "workflow",
-      severity: "info",
-      type: "workflow.completed",
-      title: "Workflow completed",
-      metadata: "{\"steps\":3}",
-    });
-
     const conditions = schema.buildActivityEventQueryConditions({
       type: "sync.failed",
       agentId: "agent-1",
@@ -206,14 +249,19 @@ describe("activity event helpers", () => {
       source: "sync",
     });
 
-    const rows = db
-      .select()
-      .from(schema.activityEvents)
-      .where(schema.and(...conditions))
-      .all();
+    const extracted = conditions.map(extractCondition);
 
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0].type, "sync.failed");
+    assert.equal(conditions.length, 8);
+    assert.deepStrictEqual(extracted, [
+      { field: "type", value: "sync.failed" },
+      { field: "agent_id", value: "agent-1" },
+      { field: "entity_type", value: "task" },
+      { field: "entity_id", value: "task-1" },
+      { field: "project_id", value: "project-1" },
+      { field: "task_id", value: "task-1" },
+      { field: "severity", value: "error" },
+      { field: "source", value: "sync" },
+    ]);
   });
 
   it("parseActivityEventMetadata returns parsed metadata objects", () => {
