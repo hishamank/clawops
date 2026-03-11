@@ -8,6 +8,7 @@
   "exclude": [
     "src/*.test.ts",
     "src/*.test.mts",
+    "src/*.integration.test.mts",
     "dist"
   ]
 }
