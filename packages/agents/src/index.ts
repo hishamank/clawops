@@ -3,6 +3,9 @@ import type { Agent, DB, OpenClawAgent } from "@clawops/core";
 import { agents, openclawAgents, toJsonArray } from "@clawops/core";
 import { generateId, hashApiKey, type AgentStatus } from "@clawops/domain";
 
+/** Subset of DB that both the root connection and a transaction satisfy. */
+type Queryable = Pick<DB, "insert" | "update" | "select" | "delete">;
+
 interface CreateAgentInput {
   name: string;
   model: string;
@@ -92,12 +95,12 @@ function findSingleAgentByNameAndFramework(
 }
 
 export function upsertOpenClawAgentIdentity(
-  db: DB,
+  db: Queryable,
   input: NonNullable<InitAgentInput["openclaw"]> & { linkedAgentId: string },
 ): OpenClawAgent {
   const now = new Date();
   const lastSeenAt = input.lastSeenAt ?? now;
-  const rows = db
+  const row = db
     .insert(openclawAgents)
     .values({
       connectionId: input.connectionId,
@@ -127,9 +130,14 @@ export function upsertOpenClawAgentIdentity(
       },
     })
     .returning()
-    .all();
+    .get();
 
-  return rows[0]!;
+  if (!row) {
+    throw new Error(
+      `Failed to upsert OpenClaw agent identity for ${input.connectionId}/${input.externalAgentId}`,
+    );
+  }
+  return row;
 }
 
 export function createAgent(
@@ -228,6 +236,17 @@ export function getAgentByApiKey(db: DB, hashedKey: string): Agent | null {
   return rows[0] ?? null;
 }
 
+/**
+ * Initialise (find-or-create) an agent, optionally linking it to an OpenClaw
+ * identity.
+ *
+ * **OpenClaw identity coverage:**
+ * The durable identity lookup only activates when `input.openclaw` is provided.
+ * Currently the CLI `onboard` and `sync` commands do NOT pass OpenClaw fields
+ * because they run before a connection record exists.  Duplicate-on-rename
+ * prevention therefore only works for callers that supply OpenClaw identity
+ * (e.g. the web connect-wizard flow).
+ */
 export function initAgent(
   db: DB,
   input: InitAgentInput,
@@ -241,25 +260,65 @@ export function initAgent(
       : null) ?? findSingleAgentByNameAndFramework(db, input);
 
   if (existing) {
-    const current = existing;
-    const rows = db
-      .update(agents)
-      .set({
+    return db.transaction((tx) => {
+      const current = existing;
+      const rows = tx
+        .update(agents)
+        .set({
+          name: input.name,
+          model: input.model,
+          role: input.role,
+          framework: input.framework,
+          memoryPath: input.memoryPath ?? current.memoryPath,
+          skills: input.skills ? toJsonArray(input.skills) : current.skills,
+          avatar: input.avatar ?? current.avatar,
+        })
+        .where(eq(agents.id, current.id))
+        .returning()
+        .all();
+      const agent = rows[0] ?? current;
+
+      if (input.openclaw) {
+        upsertOpenClawAgentIdentity(tx, {
+          ...input.openclaw,
+          linkedAgentId: agent.id,
+          memoryPath:
+            input.openclaw.memoryPath ?? input.memoryPath ?? agent.memoryPath ?? undefined,
+          defaultModel: input.openclaw.defaultModel ?? input.model,
+          role: input.openclaw.role ?? input.role,
+          avatar: input.openclaw.avatar ?? input.avatar ?? agent.avatar ?? undefined,
+        });
+      }
+
+      return { agent, created: false };
+    });
+  }
+
+  return db.transaction((tx) => {
+    const rawKey = generateId();
+    const hashed = hashApiKey(rawKey);
+
+    const agent = tx
+      .insert(agents)
+      .values({
         name: input.name,
         model: input.model,
         role: input.role,
         framework: input.framework,
-        memoryPath: input.memoryPath ?? current.memoryPath,
-        skills: input.skills ? toJsonArray(input.skills) : current.skills,
-        avatar: input.avatar ?? current.avatar,
+        memoryPath: input.memoryPath ?? null,
+        skills: input.skills ? toJsonArray(input.skills) : null,
+        apiKey: hashed,
+        status: "offline",
       })
-      .where(eq(agents.id, current.id))
       .returning()
-      .all();
-    const agent = rows[0] ?? current;
+      .get();
+
+    if (!agent) {
+      throw new Error(`Failed to insert agent '${input.name}'`);
+    }
 
     if (input.openclaw) {
-      upsertOpenClawAgentIdentity(db, {
+      upsertOpenClawAgentIdentity(tx, {
         ...input.openclaw,
         linkedAgentId: agent.id,
         memoryPath:
@@ -270,40 +329,6 @@ export function initAgent(
       });
     }
 
-    return { agent, created: false };
-  }
-
-  const rawKey = generateId();
-  const hashed = hashApiKey(rawKey);
-
-  const rows = db
-    .insert(agents)
-    .values({
-      name: input.name,
-      model: input.model,
-      role: input.role,
-      framework: input.framework,
-      memoryPath: input.memoryPath ?? null,
-      skills: input.skills ? toJsonArray(input.skills) : null,
-      apiKey: hashed,
-      status: "offline",
-    })
-    .returning()
-    .all();
-
-  const agent = rows[0]!;
-
-  if (input.openclaw) {
-    upsertOpenClawAgentIdentity(db, {
-      ...input.openclaw,
-      linkedAgentId: agent.id,
-      memoryPath:
-        input.openclaw.memoryPath ?? input.memoryPath ?? agent.memoryPath ?? undefined,
-      defaultModel: input.openclaw.defaultModel ?? input.model,
-      role: input.openclaw.role ?? input.role,
-      avatar: input.openclaw.avatar ?? input.avatar ?? agent.avatar ?? undefined,
-    });
-  }
-
-  return { agent, apiKey: rawKey, created: true };
+    return { agent, apiKey: rawKey, created: true };
+  });
 }
