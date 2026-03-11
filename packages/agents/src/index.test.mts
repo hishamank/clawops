@@ -1,7 +1,7 @@
 import assert from "node:assert";
 import { describe, it } from "node:test";
-import { agents, openclawAgents } from "@clawops/core";
-import { initAgent } from "./index.js";
+import { openclawAgents } from "@clawops/core";
+const { initAgent } = await import("./index.js");
 
 type AgentRow = {
   id: string;
