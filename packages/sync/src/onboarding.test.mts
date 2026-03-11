@@ -1,5 +1,5 @@
 import assert from "node:assert";
-import { describe, it, mock } from "node:test";
+import { beforeEach, describe, it, mock } from "node:test";
 
 const eventsInserted: Array<Record<string, unknown>> = [];
 const initAgentCalls: Array<Record<string, unknown>> = [];
@@ -24,6 +24,15 @@ const mockDb = {
     };
   },
 } as const;
+
+beforeEach(() => {
+  eventsInserted.length = 0;
+  initAgentCalls.length = 0;
+  finishSyncRunCalls.length = 0;
+  upsertConnectionCalls.length = 0;
+  fetchGatewayCronJobsCalls.length = 0;
+  startSyncRunCalls.length = 0;
+});
 
 mock.module("@clawops/agents", {
   namedExports: {
@@ -197,11 +206,7 @@ describe("onboardOpenClaw", () => {
 
     assert.deepEqual(
       eventsInserted.map((event) => event["action"]),
-      [
-        "openclaw.connection.created",
-        "agent.registered",
-        "sync.run.completed",
-      ],
+      ["openclaw.connection.created", "agent.registered", "sync.run.completed"],
     );
   });
 });
