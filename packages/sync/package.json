@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
     "clean": "rm -rf dist",
-    "test": "node --experimental-test-module-mocks --import tsx/esm --test src/*.test.mts src/**/*.test.mts"
+    "test": "pnpm --filter @clawops/agents build && node --experimental-test-module-mocks --import tsx/esm --test src/*.test.mts src/**/*.test.mts"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
