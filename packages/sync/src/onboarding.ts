@@ -125,9 +125,7 @@ export async function onboardOpenClaw(
       ? await dependencies.fetchGatewayCronJobs(
           scanResult.gatewayUrl,
           input.gatewayToken,
-        ).catch(
-          () => [],
-        )
+        ).catch(() => [])
       : [];
     const syncedAt = new Date();
 
@@ -271,7 +269,6 @@ export async function onboardOpenClaw(
           agentId: input.actorAgentId ?? null,
           meta: JSON.stringify({
             source: input.source,
-            status: "success",
             connectionId: connection.connection.id,
             agentCount: scanResult.agents.length,
             cronJobCount: cronJobs.length,
@@ -296,7 +293,6 @@ export async function onboardOpenClaw(
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-
     dependencies.finishSyncRun(db, run.id, {
       status: "failed",
       error: message,
@@ -305,7 +301,6 @@ export async function onboardOpenClaw(
         openclawDir,
       },
     });
-
     db.insert(events)
       .values({
         id: crypto.randomUUID(),
@@ -320,7 +315,6 @@ export async function onboardOpenClaw(
         createdAt: new Date(),
       })
       .run();
-
     throw error;
   }
 }
