@@ -128,7 +128,7 @@ export function ActivityFeed({
   };
 
   const clearFilters = () => {
-    const nextFilters = {
+    const nextFilters: ActivityFilterState = {
       agentId: "",
       type: "",
       severity: "",

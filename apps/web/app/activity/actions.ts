@@ -46,7 +46,8 @@ function serializeActivityEvent(
 export async function listActivityEvents(
   input: ActivityFiltersInput = {},
 ): Promise<ActivityEvent[]> {
-  const apiKey = headers().get("x-api-key");
+  const requestHeaders = await headers();
+  const apiKey = requestHeaders.get("x-api-key");
   if (!apiKey) {
     return [];
   }
