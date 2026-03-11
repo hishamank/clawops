@@ -132,7 +132,6 @@ export function upsertOpenClawAgentIdentity(
     .returning()
     .get();
 
-  const row = rows[0];
   if (!row) {
     throw new Error(
       `Failed to upsert OpenClaw agent identity for connection=${input.connectionId}, externalAgent=${input.externalAgentId}`,

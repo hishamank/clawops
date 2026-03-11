@@ -169,17 +169,17 @@ export const onboardCmd = new Command("onboard")
     debug("scan summary", { agentCount: discoveredAgents.length, gatewayUrl });
 
     result.openclawDir = onboardingSummary?.openclawDir ?? openclawDir;
-    result.agents = discoveredAgents.map((agent) => ({
+    result.agents = (discoveredAgents as Array<{ id: string; name: string; workspacePath?: string }>).map((agent) => ({
       id: agent.id,
       name: agent.name,
-      workspacePath: agent.workspacePath,
+      workspacePath: agent.workspacePath ?? "",
     }));
     result.agentsRegistered = onboardingSummary?.agentsRegistered ?? discoveredAgents.length;
 
     if (!isJson) {
-      const names = discoveredAgents.map((agent) => agent.id).join(", ");
+      const names = discoveredAgents.map((agent: { id: string }) => agent.id).join(", ");
       console.log(`✓ Found ${discoveredAgents.length} agents: ${names}`);
-      const wsPaths = discoveredAgents.map((agent) => `  ${agent.workspacePath}`).join("\n");
+      const wsPaths = discoveredAgents.map((agent: { workspacePath?: string }) => `  ${agent.workspacePath}`).join("\n");
       console.log(`  Workspaces:\n${wsPaths}`);
       console.log(`  Gateway: ${gatewayUrl}`);
       console.log("");
