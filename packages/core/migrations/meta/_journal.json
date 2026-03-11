@@ -43,6 +43,13 @@
       "when": 1773181238461,
       "tag": "0005_wild_purifiers",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1773215400000,
+      "tag": "0006_durable_openclaw_identity",
+      "breakpoints": true
     }
   ]
 }
