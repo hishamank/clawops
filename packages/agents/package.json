@@ -5,11 +5,12 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "rm -rf dist && tsc",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
     "lint": "eslint src/",
-    "test": "echo \"No tests yet\""
+    "test": "node --import tsx/esm --test src/index.test.mts",
+    "test:integration": "node --import tsx/esm --test src/index.integration.test.mts"
   },
   "dependencies": {
     "@clawops/core": "workspace:*",
@@ -17,7 +18,10 @@
     "drizzle-orm": "^0.38.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.0.0",
+    "better-sqlite3": "^11.7.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.0"
   },
   "exports": {

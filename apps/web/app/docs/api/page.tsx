@@ -31,14 +31,13 @@ const routes = [
   "PATCH /api/notifications/:id",
   "PATCH /api/notifications/:id/read",
   "PATCH /api/notifications/read-all",
-  "GET /api/activity",
   "GET /api/integrations/openclaw",
   "POST /api/integrations/openclaw",
   "GET /api/integrations/openclaw/:id",
   "PATCH /api/integrations/openclaw/:id",
   "GET /api/activity",
   "POST /api/sync/openclaw",
-  "GET /api/sync/openclaw  (latest status + recent sync runs)",
+  "GET /api/sync/openclaw",
   "POST /api/sync/openclaw/install-skill",
 ];
 
@@ -48,6 +47,11 @@ export default function ApiDocsPage(): React.JSX.Element {
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">API Docs</h1>
         <p className="mt-1 text-muted-foreground">Static route reference for the Next.js transport layer.</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          <code>POST /api/sync/openclaw</code> persists the OpenClaw connection, records the
+          sync run, and registers or updates discovered agents through the shared sync
+          onboarding service.
+        </p>
       </div>
       <Card>
         <CardHeader>

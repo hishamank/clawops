@@ -149,52 +149,47 @@ export const onboardCmd = new Command("onboard")
     }
     debug("OpenClaw directory validation", { hasConfig, hasWorkspaces });
 
-    // Step 3 — Scan & summarize
-    const { openclaw } = await import("@clawops/sync");
-    const scan = openclaw.scanOpenClaw({ openclawDir, includeFiles: false });
-    debug("scan summary", { agentCount: scan.agents.length, gatewayUrl: scan.gatewayUrl });
+    // Step 3 — Scan and run shared onboarding side effects
+    const syncMod = await import("@clawops/sync");
+    const scan = isDryRun
+      ? syncMod.openclaw.scanOpenClaw({ openclawDir, includeFiles: false })
+      : null;
+    const onboarding = isDryRun
+      ? null
+      : await syncMod.onboardOpenClaw((await import("@clawops/core/db")).db, {
+          openclawDir,
+          includeFiles: false,
+          source: "cli.onboard",
+        });
+    const discoveredAgents = onboarding?.agents ?? scan?.agents ?? [];
+    const gatewayUrl = onboarding?.gatewayUrl ?? scan?.gatewayUrl ?? "";
+    debug("scan summary", { agentCount: discoveredAgents.length, gatewayUrl });
 
-    result.agents = scan.agents.map((a) => ({
-      id: a.id,
-      name: a.name,
-      workspacePath: a.workspacePath,
+    result.openclawDir = onboarding?.openclawDir ?? openclawDir;
+    result.agents = discoveredAgents.map((agent) => ({
+      id: agent.id,
+      name: agent.name,
+      workspacePath: agent.workspacePath,
     }));
+    result.agentsRegistered = onboarding
+      ? onboarding.agentRegistrations.filter((registration) => registration.created).length
+      : discoveredAgents.length;
 
     if (!isJson) {
-      const names = scan.agents.map((a) => a.id).join(", ");
-      console.log(`✓ Found ${scan.agents.length} agents: ${names}`);
-      const wsPaths = scan.agents.map((a) => `  ${a.workspacePath}`).join("\n");
+      const names = discoveredAgents.map((agent) => agent.id).join(", ");
+      console.log(`✓ Found ${discoveredAgents.length} agents: ${names}`);
+      const wsPaths = discoveredAgents
+        .map((agent) => `  ${agent.workspacePath}`)
+        .join("\n");
       console.log(`  Workspaces:\n${wsPaths}`);
-      console.log(`  Gateway: ${scan.gatewayUrl}`);
+      console.log(`  Gateway: ${gatewayUrl}`);
       console.log("");
-    }
-
-    // Step 3.5 — Register discovered agents in ClawOps DB
-    {
-      const { initAgent } = await import("@clawops/agents");
-      const { db } = await import("@clawops/core/db");
-      for (const discovered of scan.agents) {
-        if (isDryRun) {
-          result.agentsRegistered++;
-          continue;
-        }
-        const registered = initAgent(db, {
-          name: discovered.name,
-          model: discovered.model ?? "unknown",
-          role: discovered.role ?? "agent",
-          framework: discovered.framework ?? "openclaw",
-          memoryPath: discovered.memoryPath ?? discovered.workspacePath,
-          skills: discovered.skills,
-          avatar: discovered.avatar,
-        });
-        if (registered.created) {
-          result.agentsRegistered++;
-        }
-      }
-      if (!isJson) {
-        console.log(`✓ Agent registry updated (${result.agentsRegistered} new)`);
-        console.log("");
-      }
+      console.log(
+        isDryRun
+          ? `✓ Agent registry would be updated (${result.agentsRegistered} discovered)`
+          : `✓ Agent registry updated (${result.agentsRegistered} new)`,
+      );
+      console.log("");
     }
 
     // Step 4 — Install skill
@@ -209,7 +204,7 @@ export const onboardCmd = new Command("onboard")
 
     if (installSkills) {
       const syncMod = await import("@clawops/sync");
-      for (const agent of scan.agents) {
+      for (const agent of discoveredAgents) {
         const skillPath = path.join(
           agent.workspacePath,
           "skills",

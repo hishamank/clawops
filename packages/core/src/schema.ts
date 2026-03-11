@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import crypto from "node:crypto";
 
 // ── Agents ──────────────────────────────────────────────────────────────────
@@ -63,6 +63,40 @@ export const openclawConnections = sqliteTable("openclaw_connections", {
     .notNull()
     .default(sql`(unixepoch())`),
 });
+
+export const openclawAgents = sqliteTable(
+  "openclaw_agents",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    connectionId: text("connection_id")
+      .notNull()
+      .references(() => openclawConnections.id),
+    linkedAgentId: text("linked_agent_id")
+      .notNull()
+      .references(() => agents.id),
+    externalAgentId: text("external_agent_id").notNull(),
+    externalAgentName: text("external_agent_name").notNull(),
+    workspacePath: text("workspace_path"),
+    memoryPath: text("memory_path"),
+    defaultModel: text("default_model"),
+    role: text("role"),
+    avatar: text("avatar"),
+    lastSeenAt: integer("last_seen_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (table) => ({
+    connectionExternalIdentityUnique: uniqueIndex(
+      "openclaw_agents_connection_external_identity_unique",
+    ).on(table.connectionId, table.externalAgentId),
+  }),
+);
 
 // ── Projects ────────────────────────────────────────────────────────────────
 
@@ -432,6 +466,8 @@ export type NewAgent = typeof agents.$inferInsert;
 
 export type OpenClawConnection = typeof openclawConnections.$inferSelect;
 export type NewOpenClawConnection = typeof openclawConnections.$inferInsert;
+export type OpenClawAgent = typeof openclawAgents.$inferSelect;
+export type NewOpenClawAgent = typeof openclawAgents.$inferInsert;
 
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
