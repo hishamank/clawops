@@ -129,7 +129,13 @@ export function upsertOpenClawAgentIdentity(
     .returning()
     .all();
 
-  return rows[0]!;
+  const row = rows[0];
+  if (!row) {
+    throw new Error(
+      `Failed to upsert OpenClaw agent identity for connection=${input.connectionId}, externalAgent=${input.externalAgentId}`,
+    );
+  }
+  return row;
 }
 
 export function createAgent(
@@ -242,33 +248,37 @@ export function initAgent(
 
   if (existing) {
     const current = existing;
-    const rows = db
-      .update(agents)
-      .set({
-        name: input.name,
-        model: input.model,
-        role: input.role,
-        framework: input.framework,
-        memoryPath: input.memoryPath ?? current.memoryPath,
-        skills: input.skills ? toJsonArray(input.skills) : current.skills,
-        avatar: input.avatar ?? current.avatar,
-      })
-      .where(eq(agents.id, current.id))
-      .returning()
-      .all();
-    const agent = rows[0] ?? current;
+    const agent = db.transaction((tx) => {
+      const rows = tx
+        .update(agents)
+        .set({
+          name: input.name,
+          model: input.model,
+          role: input.role,
+          framework: input.framework,
+          memoryPath: input.memoryPath ?? current.memoryPath,
+          skills: input.skills ? toJsonArray(input.skills) : current.skills,
+          avatar: input.avatar ?? current.avatar,
+        })
+        .where(eq(agents.id, current.id))
+        .returning()
+        .all();
+      const updated = rows[0] ?? current;
 
-    if (input.openclaw) {
-      upsertOpenClawAgentIdentity(db, {
-        ...input.openclaw,
-        linkedAgentId: agent.id,
-        memoryPath:
-          input.openclaw.memoryPath ?? input.memoryPath ?? agent.memoryPath ?? undefined,
-        defaultModel: input.openclaw.defaultModel ?? input.model,
-        role: input.openclaw.role ?? input.role,
-        avatar: input.openclaw.avatar ?? input.avatar ?? agent.avatar ?? undefined,
-      });
-    }
+      if (input.openclaw) {
+        upsertOpenClawAgentIdentity(tx as unknown as DB, {
+          ...input.openclaw,
+          linkedAgentId: updated.id,
+          memoryPath:
+            input.openclaw.memoryPath ?? input.memoryPath ?? updated.memoryPath ?? undefined,
+          defaultModel: input.openclaw.defaultModel ?? input.model,
+          role: input.openclaw.role ?? input.role,
+          avatar: input.openclaw.avatar ?? input.avatar ?? updated.avatar ?? undefined,
+        });
+      }
+
+      return updated;
+    });
 
     return { agent, created: false };
   }

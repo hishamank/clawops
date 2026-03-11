@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
     "lint": "eslint src/",
-    "test": "pnpm build && node --import tsx/esm --test src/index.test.mts"
+    "test": "pnpm build && node --import tsx/esm --test src/index.test.mts",
+    "test:integration": "pnpm build && node --import tsx/esm --test src/index.integration.test.mts"
   },
   "dependencies": {
     "@clawops/core": "workspace:*",

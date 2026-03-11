@@ -7,7 +7,8 @@ import { getDb } from "@/lib/server/runtime";
 export const dynamic = "force-dynamic";
 
 async function getAgents(): Promise<Agent[]> {
-  return listAgents(getDb()) as unknown as Agent[];
+  const rows = listAgents(getDb());
+  return rows.map(({ apiKey: _apiKey, ...rest }) => rest) as unknown as Agent[];
 }
 
 export default async function ActivityPage(): Promise<React.JSX.Element> {

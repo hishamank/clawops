@@ -296,28 +296,30 @@ export async function onboardOpenClaw(
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    dependencies.finishSyncRun(db, run.id, {
-      status: "failed",
-      error: message,
-      meta: {
-        source: input.source,
-        openclawDir,
-      },
-    });
-    db.insert(events)
-      .values({
-        id: crypto.randomUUID(),
-        action: "sync.run.failed",
-        entityType: "sync_run",
-        entityId: run.id,
-        agentId: input.actorAgentId ?? null,
-        meta: JSON.stringify({
+    db.transaction((tx: TransactionDb) => {
+      dependencies.finishSyncRun(tx as unknown as DB, run.id, {
+        status: "failed",
+        error: message,
+        meta: {
           source: input.source,
-          error: message,
-        }),
-        createdAt: new Date(),
-      })
-      .run();
+          openclawDir,
+        },
+      });
+      tx.insert(events)
+        .values({
+          id: crypto.randomUUID(),
+          action: "sync.run.failed",
+          entityType: "sync_run",
+          entityId: run.id,
+          agentId: input.actorAgentId ?? null,
+          meta: JSON.stringify({
+            source: input.source,
+            error: message,
+          }),
+          createdAt: new Date(),
+        })
+        .run();
+    });
     throw error;
   }
 }

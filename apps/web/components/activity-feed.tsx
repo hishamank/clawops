@@ -159,6 +159,7 @@ export function ActivityFeed({
             <div className="flex flex-wrap gap-2">
               {/* Agent filter */}
               <select
+                aria-label="Filter by agent"
                 value={filters.agentId}
                 onChange={(e) =>
                   setFilters((f) => ({ ...f, agentId: e.target.value }))
@@ -175,6 +176,7 @@ export function ActivityFeed({
 
               {/* Severity filter */}
               <select
+                aria-label="Filter by severity"
                 value={filters.severity}
                 onChange={(e) =>
                   setFilters((f) => ({ ...f, severity: e.target.value }))
@@ -190,6 +192,7 @@ export function ActivityFeed({
 
               {/* Entity type filter */}
               <select
+                aria-label="Filter by entity type"
                 value={filters.entityType}
                 onChange={(e) =>
                   setFilters((f) => ({ ...f, entityType: e.target.value }))
@@ -205,6 +208,7 @@ export function ActivityFeed({
 
               {/* Type filter */}
               <select
+                aria-label="Filter by event type"
                 value={filters.type}
                 onChange={(e) =>
                   setFilters((f) => ({ ...f, type: e.target.value }))

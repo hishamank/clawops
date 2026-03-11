@@ -9,7 +9,7 @@ import {
   and,
   type ActivityEventFilters,
 } from "@clawops/core";
-import { getDb, jsonError, parseSearch } from "@/lib/server/runtime";
+import { getDb, jsonError, parseSearch, requireAgentId } from "@/lib/server/runtime";
 
 const activityFiltersSchema = z.object({
   type: z.string().optional(),
@@ -20,11 +20,30 @@ const activityFiltersSchema = z.object({
   taskId: z.string().optional(),
   severity: z.enum(["info", "warning", "error", "critical"]).optional(),
   source: z.enum(["system", "agent", "user", "sync", "workflow", "hook"]).optional(),
-  limit: z.string().transform((v) => (v ? Number.parseInt(v, 10) : undefined)).optional(),
-  offset: z.string().transform((v) => (v ? Number.parseInt(v, 10) : undefined)).optional(),
+  limit: z
+    .string()
+    .transform((v) => {
+      if (!v) return undefined;
+      const n = Number.parseInt(v, 10);
+      if (Number.isNaN(n) || n < 0 || n > 1000) throw new Error("limit must be 0-1000");
+      return n;
+    })
+    .optional(),
+  offset: z
+    .string()
+    .transform((v) => {
+      if (!v) return undefined;
+      const n = Number.parseInt(v, 10);
+      if (Number.isNaN(n) || n < 0 || n > 100000) throw new Error("offset must be 0-100000");
+      return n;
+    })
+    .optional(),
 });
 
 export async function GET(req: Request): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const filters = parseSearch(req, activityFiltersSchema);
     const db = getDb();
