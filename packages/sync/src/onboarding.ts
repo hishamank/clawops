@@ -6,7 +6,7 @@ import { initAgent } from "@clawops/agents";
 import { events, type DB } from "@clawops/core";
 import { upsertOpenClawConnection, type OpenClawConnectionSyncMode } from "./connections.js";
 import { fetchGatewayCronJobs, scanOpenClaw } from "./openclaw/index.js";
-import { finishSyncRun, finishSyncRunWithTx, startSyncRun } from "./runs.js";
+import { finishSyncRunWithTx, startSyncRun } from "./runs.js";
 import type { SyncAgent, SyncCronJob, SyncWorkspace } from "./types.js";
 
 type TransactionDb = Parameters<DB["transaction"]>[0] extends (tx: infer T) => unknown ? T : DB;
@@ -49,7 +49,7 @@ interface OnboardingDependencies {
   scanOpenClaw: typeof scanOpenClaw;
   fetchGatewayCronJobs: typeof fetchGatewayCronJobs;
   startSyncRun: typeof startSyncRun;
-  finishSyncRun: typeof finishSyncRun;
+  finishSyncRunWithTx: typeof finishSyncRunWithTx;
 }
 
 const defaultDependencies: OnboardingDependencies = {
@@ -60,7 +60,7 @@ const defaultDependencies: OnboardingDependencies = {
   scanOpenClaw,
   fetchGatewayCronJobs,
   startSyncRun,
-  finishSyncRun,
+  finishSyncRunWithTx,
 };
 
 function resolvePath(inputPath: string): string {
@@ -214,7 +214,7 @@ export async function onboardOpenClaw(
         };
       });
 
-      finishSyncRunWithTx(tx as unknown as DB, run.id, {
+      dependencies.finishSyncRunWithTx(tx as unknown as DB, run.id, {
         connectionId: connection.connection.id,
         status: "success",
         agentCount: scanResult.agents.length,
@@ -297,7 +297,7 @@ export async function onboardOpenClaw(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     db.transaction((tx: TransactionDb) => {
-      finishSyncRunWithTx(tx as unknown as DB, run.id, {
+      dependencies.finishSyncRunWithTx(tx as unknown as DB, run.id, {
         status: "failed",
         error: message,
         meta: {

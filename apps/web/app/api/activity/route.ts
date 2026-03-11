@@ -20,22 +20,21 @@ const activityFiltersSchema = z.object({
   taskId: z.string().optional(),
   severity: z.enum(["info", "warning", "error", "critical"]).optional(),
   source: z.enum(["system", "agent", "user", "sync", "workflow", "hook"]).optional(),
-  limit: z.coerce.number().int().min(0).max(1000).optional(),
-  offset: z.coerce.number().int().min(0).max(100000).optional(),
+  limit: z.coerce.number().int().nonnegative().max(200).optional(),
+  offset: z.coerce.number().int().nonnegative().optional(),
 });
 
 export async function GET(req: Request): Promise<NextResponse> {
-  const auth = requireAgentId(req);
-  if (auth instanceof NextResponse) return auth;
-
   try {
+    const agentId = requireAgentId(req);
+    if (agentId instanceof NextResponse) return agentId;
     const filters = parseSearch(req, activityFiltersSchema);
     const db = getDb();
 
     const conditions = buildActivityEventQueryConditions(filters as ActivityEventFilters);
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const queryLimit = filters.limit ?? 50;
+    const queryLimit = Math.min(filters.limit ?? 50, 200);
     const queryOffset = filters.offset ?? 0;
 
     const query = db

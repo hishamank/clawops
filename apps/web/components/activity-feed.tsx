@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   Bot,
   CheckCircle2,
@@ -67,6 +67,8 @@ function getEntityIcon(event: ActivityEvent) {
         return FolderKanban;
       case "agent":
         return Bot;
+      case "file":
+        return FileText;
       default:
         return FileText;
     }
@@ -169,10 +171,14 @@ export function ActivityFeed({
           <div className="mb-4 space-y-2">
             <div className="flex flex-wrap gap-2">
               {/* Agent filter */}
+              <label htmlFor="activity-filter-agent" className="sr-only">
+                Filter by agent
+              </label>
               <select
-                aria-label="Filter by agent"
+                id="activity-filter-agent"
                 value={filters.agentId}
                 onChange={(e) => updateFilters({ agentId: e.target.value })}
+                aria-label="Filter by agent"
                 className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">All Agents</option>
@@ -184,14 +190,18 @@ export function ActivityFeed({
               </select>
 
               {/* Severity filter */}
+              <label htmlFor="activity-filter-severity" className="sr-only">
+                Filter by severity
+              </label>
               <select
-                aria-label="Filter by severity"
+                id="activity-filter-severity"
                 value={filters.severity}
                 onChange={(e) =>
                   updateFilters({
                     severity: e.target.value as ActivityEvent["severity"] | "",
                   })
                 }
+                aria-label="Filter by severity"
                 className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">All Severities</option>
@@ -202,10 +212,14 @@ export function ActivityFeed({
               </select>
 
               {/* Entity type filter */}
+              <label htmlFor="activity-filter-entity" className="sr-only">
+                Filter by entity type
+              </label>
               <select
-                aria-label="Filter by entity type"
+                id="activity-filter-entity"
                 value={filters.entityType}
                 onChange={(e) => updateFilters({ entityType: e.target.value })}
+                aria-label="Filter by entity type"
                 className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">All Entities</option>
@@ -216,10 +230,14 @@ export function ActivityFeed({
               </select>
 
               {/* Type filter */}
+              <label htmlFor="activity-filter-type" className="sr-only">
+                Filter by activity type
+              </label>
               <select
-                aria-label="Filter by event type"
+                id="activity-filter-type"
                 value={filters.type}
                 onChange={(e) => updateFilters({ type: e.target.value })}
+                aria-label="Filter by activity type"
                 className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">All Types</option>
@@ -260,6 +278,7 @@ export function ActivityFeed({
                 return (
                   <button
                     key={event.id}
+                    type="button"
                     onClick={() => setSelectedEvent(event)}
                     className="w-full text-left"
                   >
@@ -331,6 +350,10 @@ function EventDetailPanel({
   event,
   onClose,
 }: EventDetailPanelProps): React.JSX.Element {
+  const titleId = useId();
+  const bodyId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const SeverityIcon = severityConfig[event.severity].icon;
   const SourceIcon = getSourceIcon(event.source);
   const EntityIcon = getEntityIcon(event);
@@ -344,17 +367,66 @@ function EventDetailPanel({
     }
   }
 
+  useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    closeButtonRef.current?.focus();
+    return () => {
+      previousFocus?.focus();
+    };
+  }, []);
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      onClose();
+      return;
+    }
+
+    if (event.key !== "Tab") return;
+
+    const panel = panelRef.current;
+    if (!panel) return;
+
+    const focusable = panel.querySelectorAll<HTMLElement>(
+      'a[href], button, textarea, input, select, [tabindex]:not([tabindex="-1"])',
+    );
+    if (focusable.length === 0) {
+      event.preventDefault();
+      return;
+    }
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement as HTMLElement | null;
+
+    if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus();
+      return;
+    }
+
+    if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="event-detail-title"
-      onKeyDown={(e) => {
-        if (e.key === "Escape") onClose();
-      }}
+      onClick={onClose}
+      onKeyDown={handleKeyDown}
+      role="presentation"
     >
-      <div className="w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-xl bg-card shadow-xl">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={event.body ? bodyId : undefined}
+        className="w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-xl bg-card shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="sticky top-0 flex items-start justify-between border-b border-border bg-card p-4">
           <div className="flex items-center gap-3">
@@ -362,7 +434,9 @@ function EventDetailPanel({
               <SeverityIcon className="h-5 w-5 text-muted-foreground" />
             </div>
             <div>
-              <h3 id="event-detail-title" className="text-lg font-semibold">{event.title}</h3>
+              <h3 id={titleId} className="text-lg font-semibold">
+                {event.title}
+              </h3>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <SourceIcon className="h-3 w-3" />
@@ -378,6 +452,8 @@ function EventDetailPanel({
             size="icon"
             onClick={onClose}
             className="h-8 w-8"
+            ref={closeButtonRef}
+            aria-label="Close activity detail"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -403,7 +479,9 @@ function EventDetailPanel({
           {event.body && (
             <div>
               <h4 className="text-sm font-medium mb-2">Description</h4>
-              <p className="text-sm text-muted-foreground">{event.body}</p>
+              <p id={bodyId} className="text-sm text-muted-foreground">
+                {event.body}
+              </p>
             </div>
           )}
 
