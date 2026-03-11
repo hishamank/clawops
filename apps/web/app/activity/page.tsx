@@ -3,7 +3,6 @@ import type { Agent } from "@/lib/types";
 import { ActivityFeed } from "@/components/activity-feed";
 import { listAgents } from "@clawops/agents";
 import { getDb } from "@/lib/server/runtime";
-import { listActivityEvents } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +25,6 @@ async function getAgents(): Promise<Agent[]> {
 
 export default async function ActivityPage(): Promise<React.JSX.Element> {
   const agents = await getAgents();
-  const initialEvents = await listActivityEvents();
 
   return (
     <div className="space-y-6">
@@ -45,7 +43,7 @@ export default async function ActivityPage(): Promise<React.JSX.Element> {
 
       {/* Full-page activity feed */}
       <div className="min-h-[600px]">
-        <ActivityFeed agents={agents} initialEvents={initialEvents} />
+        <ActivityFeed agents={agents} />
       </div>
     </div>
   );
