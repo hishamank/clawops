@@ -25,9 +25,10 @@ const activityFiltersSchema = z.object({
 });
 
 export async function GET(req: Request): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   try {
-    const agentId = requireAgentId(req);
-    if (agentId instanceof NextResponse) return agentId;
     const filters = parseSearch(req, activityFiltersSchema);
     const db = getDb();
 
