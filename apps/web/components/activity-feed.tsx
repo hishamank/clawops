@@ -67,8 +67,6 @@ function getEntityIcon(event: ActivityEvent) {
         return FolderKanban;
       case "agent":
         return Bot;
-      case "file":
-        return FileText;
       default:
         return FileText;
     }
@@ -171,14 +169,10 @@ export function ActivityFeed({
           <div className="mb-4 space-y-2">
             <div className="flex flex-wrap gap-2">
               {/* Agent filter */}
-              <label htmlFor="activity-filter-agent" className="sr-only">
-                Filter by agent
-              </label>
               <select
-                id="activity-filter-agent"
+                aria-label="Filter by agent"
                 value={filters.agentId}
                 onChange={(e) => updateFilters({ agentId: e.target.value })}
-                aria-label="Filter by agent"
                 className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">All Agents</option>
@@ -190,18 +184,14 @@ export function ActivityFeed({
               </select>
 
               {/* Severity filter */}
-              <label htmlFor="activity-filter-severity" className="sr-only">
-                Filter by severity
-              </label>
               <select
-                id="activity-filter-severity"
+                aria-label="Filter by severity"
                 value={filters.severity}
                 onChange={(e) =>
                   updateFilters({
                     severity: e.target.value as ActivityEvent["severity"] | "",
                   })
                 }
-                aria-label="Filter by severity"
                 className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">All Severities</option>
@@ -212,14 +202,10 @@ export function ActivityFeed({
               </select>
 
               {/* Entity type filter */}
-              <label htmlFor="activity-filter-entity" className="sr-only">
-                Filter by entity type
-              </label>
               <select
-                id="activity-filter-entity"
+                aria-label="Filter by entity type"
                 value={filters.entityType}
                 onChange={(e) => updateFilters({ entityType: e.target.value })}
-                aria-label="Filter by entity type"
                 className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">All Entities</option>
@@ -230,14 +216,10 @@ export function ActivityFeed({
               </select>
 
               {/* Type filter */}
-              <label htmlFor="activity-filter-type" className="sr-only">
-                Filter by activity type
-              </label>
               <select
-                id="activity-filter-type"
+                aria-label="Filter by event type"
                 value={filters.type}
                 onChange={(e) => updateFilters({ type: e.target.value })}
-                aria-label="Filter by activity type"
                 className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">All Types</option>
@@ -350,13 +332,13 @@ function EventDetailPanel({
   event,
   onClose,
 }: EventDetailPanelProps): React.JSX.Element {
-  const titleId = useId();
-  const bodyId = useId();
-  const panelRef = useRef<HTMLDivElement>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const SeverityIcon = severityConfig[event.severity].icon;
   const SourceIcon = getSourceIcon(event.source);
   const EntityIcon = getEntityIcon(event);
+  const titleId = useId();
+  const bodyId = useId();
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
   let metadata: Record<string, unknown> = {};
   if (event.metadata) {
@@ -425,7 +407,7 @@ function EventDetailPanel({
         aria-labelledby={titleId}
         aria-describedby={event.body ? bodyId : undefined}
         className="w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-xl bg-card shadow-xl"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
       >
         {/* Header */}
         <div className="sticky top-0 flex items-start justify-between border-b border-border bg-card p-4">
