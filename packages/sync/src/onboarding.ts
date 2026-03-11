@@ -6,7 +6,7 @@ import { initAgent } from "@clawops/agents";
 import { events, type DB } from "@clawops/core";
 import { upsertOpenClawConnection, type OpenClawConnectionSyncMode } from "./connections.js";
 import { fetchGatewayCronJobs, scanOpenClaw } from "./openclaw/index.js";
-import { finishSyncRunWithTx, startSyncRun } from "./runs.js";
+import { finishSyncRun, finishSyncRunWithTx, startSyncRun } from "./runs.js";
 import type { SyncAgent, SyncCronJob, SyncWorkspace } from "./types.js";
 
 type TransactionDb = Parameters<DB["transaction"]>[0] extends (tx: infer T) => unknown ? T : DB;
