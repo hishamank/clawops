@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   Bot,
   CheckCircle2,
@@ -24,10 +24,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { timeAgo } from "@/lib/time";
 import type { ActivityEvent, Agent } from "@/lib/types";
+import { listActivityEvents } from "@/app/activity/actions";
 
 interface ActivityFeedProps {
   agents?: Agent[];
   embedded?: boolean;
+  initialEvents: ActivityEvent[];
 }
 
 const severityConfig = {
@@ -89,49 +91,58 @@ function getSeverityBadgeVariant(severity: ActivityEvent["severity"]) {
 export function ActivityFeed({
   agents,
   embedded = false,
+  initialEvents,
 }: ActivityFeedProps): React.JSX.Element {
-  const [events, setEvents] = useState<ActivityEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  type ActivityFilterState = {
+    agentId: string;
+    type: string;
+    severity: "" | ActivityEvent["severity"];
+    entityType: string;
+  };
+
+  const [events, setEvents] = useState<ActivityEvent[]>(initialEvents);
+  const [loading, setLoading] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<ActivityEvent | null>(null);
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<ActivityFilterState>({
     agentId: "",
     type: "",
     severity: "",
     entityType: "",
   });
 
-  const fetchEvents = useCallback(async () => {
+  const fetchEvents = async (nextFilters: ActivityFilterState) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (filters.agentId) params.set("agentId", filters.agentId);
-      if (filters.type) params.set("type", filters.type);
-      if (filters.severity) params.set("severity", filters.severity);
-      if (filters.entityType) params.set("entityType", filters.entityType);
-      params.set("limit", "50");
-
-      const response = await fetch(`/api/activity?${params.toString()}`);
-      if (response.ok) {
-        const data = await response.json();
-        setEvents(data);
-      }
+      const data = await listActivityEvents({
+        agentId: nextFilters.agentId || undefined,
+        type: nextFilters.type || undefined,
+        severity: nextFilters.severity || undefined,
+        entityType: nextFilters.entityType || undefined,
+      });
+      setEvents(data);
     } catch {
-      // Silently handle errors - user will see empty state
+      setEvents([]);
     } finally {
       setLoading(false);
     }
-  }, [filters]);
-
-  useEffect(() => {
-    fetchEvents();
-  }, [fetchEvents]);
+  };
 
   const clearFilters = () => {
-    setFilters({
+    const nextFilters = {
       agentId: "",
       type: "",
       severity: "",
       entityType: "",
+    };
+    setFilters(nextFilters);
+    void fetchEvents(nextFilters);
+  };
+
+  const updateFilters = (partial: Partial<typeof filters>) => {
+    setFilters((current) => {
+      const nextFilters = { ...current, ...partial };
+      void fetchEvents(nextFilters);
+      return nextFilters;
     });
   };
 
@@ -160,11 +171,14 @@ export function ActivityFeed({
           <div className="mb-4 space-y-2">
             <div className="flex flex-wrap gap-2">
               {/* Agent filter */}
+              <label htmlFor="activity-filter-agent" className="sr-only">
+                Filter by agent
+              </label>
               <select
+                id="activity-filter-agent"
                 value={filters.agentId}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, agentId: e.target.value }))
-                }
+                onChange={(e) => updateFilters({ agentId: e.target.value })}
+                aria-label="Filter by agent"
                 className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">All Agents</option>
@@ -176,11 +190,18 @@ export function ActivityFeed({
               </select>
 
               {/* Severity filter */}
+              <label htmlFor="activity-filter-severity" className="sr-only">
+                Filter by severity
+              </label>
               <select
+                id="activity-filter-severity"
                 value={filters.severity}
                 onChange={(e) =>
-                  setFilters((f) => ({ ...f, severity: e.target.value }))
+                  updateFilters({
+                    severity: e.target.value as ActivityEvent["severity"] | "",
+                  })
                 }
+                aria-label="Filter by severity"
                 className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">All Severities</option>
@@ -191,11 +212,14 @@ export function ActivityFeed({
               </select>
 
               {/* Entity type filter */}
+              <label htmlFor="activity-filter-entity" className="sr-only">
+                Filter by entity type
+              </label>
               <select
+                id="activity-filter-entity"
                 value={filters.entityType}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, entityType: e.target.value }))
-                }
+                onChange={(e) => updateFilters({ entityType: e.target.value })}
+                aria-label="Filter by entity type"
                 className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">All Entities</option>
@@ -206,11 +230,14 @@ export function ActivityFeed({
               </select>
 
               {/* Type filter */}
+              <label htmlFor="activity-filter-type" className="sr-only">
+                Filter by activity type
+              </label>
               <select
+                id="activity-filter-type"
                 value={filters.type}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, type: e.target.value }))
-                }
+                onChange={(e) => updateFilters({ type: e.target.value })}
+                aria-label="Filter by activity type"
                 className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">All Types</option>
@@ -322,6 +349,10 @@ function EventDetailPanel({
   event,
   onClose,
 }: EventDetailPanelProps): React.JSX.Element {
+  const titleId = useId();
+  const bodyId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const SeverityIcon = severityConfig[event.severity].icon;
   const SourceIcon = getSourceIcon(event.source);
   const EntityIcon = getEntityIcon(event);
@@ -335,9 +366,66 @@ function EventDetailPanel({
     }
   }
 
+  useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    closeButtonRef.current?.focus();
+    return () => {
+      previousFocus?.focus();
+    };
+  }, []);
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      onClose();
+      return;
+    }
+
+    if (event.key !== "Tab") return;
+
+    const panel = panelRef.current;
+    if (!panel) return;
+
+    const focusable = panel.querySelectorAll<HTMLElement>(
+      'a[href], button, textarea, input, select, [tabindex]:not([tabindex="-1"])',
+    );
+    if (focusable.length === 0) {
+      event.preventDefault();
+      return;
+    }
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement as HTMLElement | null;
+
+    if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus();
+      return;
+    }
+
+    if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-xl bg-card shadow-xl">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+      onKeyDown={handleKeyDown}
+      role="presentation"
+    >
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={event.body ? bodyId : undefined}
+        className="w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-xl bg-card shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="sticky top-0 flex items-start justify-between border-b border-border bg-card p-4">
           <div className="flex items-center gap-3">
@@ -345,7 +433,9 @@ function EventDetailPanel({
               <SeverityIcon className="h-5 w-5 text-muted-foreground" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold">{event.title}</h3>
+              <h3 id={titleId} className="text-lg font-semibold">
+                {event.title}
+              </h3>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <SourceIcon className="h-3 w-3" />
@@ -361,6 +451,8 @@ function EventDetailPanel({
             size="icon"
             onClick={onClose}
             className="h-8 w-8"
+            ref={closeButtonRef}
+            aria-label="Close activity detail"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -386,7 +478,9 @@ function EventDetailPanel({
           {event.body && (
             <div>
               <h4 className="text-sm font-medium mb-2">Description</h4>
-              <p className="text-sm text-muted-foreground">{event.body}</p>
+              <p id={bodyId} className="text-sm text-muted-foreground">
+                {event.body}
+              </p>
             </div>
           )}
 

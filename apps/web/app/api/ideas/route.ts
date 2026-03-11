@@ -5,7 +5,7 @@ import { z } from "zod";
 import { events, createActivityEvent, type DB } from "@clawops/core";
 import { ConflictError, IdeaStatus, NotFoundError, Source } from "@clawops/domain";
 import { createIdea, listIdeas } from "@clawops/ideas";
-import { getDb, jsonError, parseSearch } from "@/lib/server/runtime";
+import { getAgentIdFromApiKey, getDb, jsonError, parseSearch } from "@/lib/server/runtime";
 
 const sectionSchema = z.object({
   brainstorming: z.string().optional(),
@@ -42,6 +42,7 @@ export async function POST(req: Request): Promise<NextResponse> {
   try {
     const body = createIdeaBody.parse(await req.json());
     const db = getDb();
+    const agentId = getAgentIdFromApiKey(req) ?? undefined;
     const idea = db.transaction((tx) => {
       const i = createIdea(tx as unknown as DB, body);
       tx.insert(events)
@@ -49,16 +50,19 @@ export async function POST(req: Request): Promise<NextResponse> {
           action: "idea.created",
           entityType: "idea",
           entityId: i.id,
+          agentId,
           meta: JSON.stringify({ title: i.title }),
         })
         .run();
+      const source = agentId ? "agent" : body.source === "agent" ? "agent" : "user";
       createActivityEvent(tx as unknown as DB, {
-        source: body.source === "agent" ? "agent" : "user",
+        source,
         type: "idea.created",
         title: `Idea created: ${i.title}`,
         entityType: "idea",
         entityId: i.id,
-        metadata: JSON.stringify({ title: i.title, source: body.source }),
+        agentId,
+        metadata: JSON.stringify({ title: i.title, source }),
       });
       return i;
     });

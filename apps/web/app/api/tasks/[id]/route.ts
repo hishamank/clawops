@@ -5,7 +5,7 @@ import { z } from "zod";
 import { TaskPriority, TaskStatus } from "@clawops/domain";
 import { events, createActivityEvent, type DB } from "@clawops/core";
 import { getTask, updateTask } from "@clawops/tasks";
-import { getDb, jsonError } from "@/lib/server/runtime";
+import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
 
 const taskStatusEnum = z.nativeEnum(TaskStatus);
 const taskPriorityEnum = z.nativeEnum(TaskPriority);
@@ -39,6 +39,7 @@ export async function PATCH(
     const { id } = idParams.parse(await params);
     const body = updateTaskBody.parse(await req.json());
     const db = getDb();
+    const agentId = getAgentIdFromApiKey(req) ?? undefined;
     const task = db.transaction((tx) => {
       const t = updateTask(tx as unknown as DB, id, {
         ...body,
@@ -50,17 +51,19 @@ export async function PATCH(
           action: "task.updated",
           entityType: "task",
           entityId: t.id,
+          agentId,
           meta: JSON.stringify({ fields: Object.keys(body) }),
         })
         .run();
       createActivityEvent(tx as unknown as DB, {
-        source: "user",
+        source: agentId ? "agent" : "user",
         type: "task.updated",
         title: `Task updated: ${t.title}`,
         entityType: "task",
         entityId: t.id,
         projectId: t.projectId ?? undefined,
         taskId: t.id,
+        agentId,
         metadata: JSON.stringify({ fields: Object.keys(body), status: body.status, priority: body.priority }),
       });
       return t;

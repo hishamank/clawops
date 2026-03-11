@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { eq, events, tasks, createActivityEvent, type DB } from "@clawops/core";
 import { getTaskSpec, setTaskSpec } from "@clawops/tasks";
-import { getDb, jsonError } from "@/lib/server/runtime";
+import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
 
 const idParams = z.object({ id: z.string().min(1) });
 
@@ -40,6 +40,7 @@ export async function PUT(
     const { id } = idParams.parse(await params);
     const body = setSpecBody.parse(await req.json());
     const db = getDb();
+    const agentId = getAgentIdFromApiKey(req) ?? undefined;
     const task = db.transaction((tx) => {
       const t = setTaskSpec(tx as unknown as DB, id, body.specContent);
       tx.insert(events)
@@ -47,17 +48,19 @@ export async function PUT(
           action: "task.spec_updated",
           entityType: "task",
           entityId: t.id,
+          agentId,
           meta: JSON.stringify({ specLength: body.specContent.length }),
         })
         .run();
       createActivityEvent(tx as unknown as DB, {
-        source: "user",
+        source: agentId ? "agent" : "user",
         type: "task.spec_updated",
         title: `Task spec updated: ${t.title}`,
         entityType: "task",
         entityId: t.id,
         projectId: t.projectId ?? undefined,
         taskId: t.id,
+        agentId,
         metadata: JSON.stringify({ specLength: body.specContent.length }),
       });
       return t;

@@ -30,6 +30,7 @@ Target users: developers running multi-agent AI systems who need observability a
 - **Next.js** — app router
 - **shadcn/ui** + **Tailwind CSS** — UI components
 - **Recharts** — charts only (no other chart libraries)
+- **No `useEffect` for data fetching** — use RSCs or a data fetching library
 
 ### Shared packages
 - `@clawops/domain` — shared types, constants, model pricing, utils
@@ -73,7 +74,7 @@ Target users: developers running multi-agent AI systems who need observability a
 - Every route: Zod input validation
 - Validate route params at runtime too, not just request bodies
 - Every mutation: writes an `events` row, wrapped in a transaction with the main write
-- Auth guard protects all routes — only `/api/health` and `/api/auth/login` are public
+- Auth guard protects all routes — only `/api/health` and `/api/auth/login` are public (explicitly check `x-api-key`)
 - Proper HTTP status codes: 404 for missing entities, 409 for conflicts, 400 for validation errors
 
 ### CLI (`apps/cli`)
@@ -135,6 +136,7 @@ clawops/
 - Schema changes in `packages/core/src/schema.ts` without a matching forward-only migration in `packages/core/migrations`
 - Runtime bootstrap/seed helpers that are never wired into a real initialization or migration path while the PR claims built-in data will exist
 - Unrelated schema changes bundled into a feature PR without being required for the issue being implemented
+- Missing auth guard on any `/api/*` route other than `/api/health` and `/api/auth/login`
 
 ### Warnings (recommend fix)
 - Non-null assertion (`!`) without an explanatory comment
@@ -144,6 +146,7 @@ clawops/
 - Missing 404/409 HTTP status codes on routes that can fail with known reasons
 - Tests that only mock or reimplement behavior without covering the real exported helper or route contract that changed
 - Tests that validate a reimplementation of production logic instead of the actual exported module
+- Activity event emissions that omit `agentId` or hardcode `source` when `x-api-key` is present
 
 ### Do NOT flag
 - Drizzle ORM's complex generic types in function signatures — expected

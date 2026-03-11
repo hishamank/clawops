@@ -5,7 +5,7 @@ import { z } from "zod";
 import { events, createActivityEvent, type DB } from "@clawops/core";
 import { TaskPriority, TaskStatus, Source } from "@clawops/domain";
 import { createTask, listTasks } from "@clawops/tasks";
-import { getDb, jsonError, parseSearch } from "@/lib/server/runtime";
+import { getAgentIdFromApiKey, getDb, jsonError, parseSearch } from "@/lib/server/runtime";
 
 const taskStatusEnum = z.nativeEnum(TaskStatus);
 const taskPriorityEnum = z.nativeEnum(TaskPriority);
@@ -45,6 +45,7 @@ export async function POST(req: Request): Promise<NextResponse> {
   try {
     const body = createTaskBody.parse(await req.json());
     const db = getDb();
+    const agentId = getAgentIdFromApiKey(req) ?? undefined;
     const task = db.transaction((tx) => {
       const t = createTask(tx as unknown as DB, {
         ...body,
@@ -57,17 +58,19 @@ export async function POST(req: Request): Promise<NextResponse> {
           action: "task.created",
           entityType: "task",
           entityId: t.id,
+          agentId,
           meta: JSON.stringify({ title: t.title }),
         })
         .run();
       createActivityEvent(tx as unknown as DB, {
-        source: "user",
+        source: agentId ? "agent" : "user",
         type: "task.created",
         title: `Task created: ${t.title}`,
         entityType: "task",
         entityId: t.id,
         projectId: t.projectId ?? undefined,
         taskId: t.id,
+        agentId,
         metadata: JSON.stringify({ title: t.title, status: t.status, priority: t.priority, source: body.source }),
       });
       return t;

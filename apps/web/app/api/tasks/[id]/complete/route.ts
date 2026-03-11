@@ -5,7 +5,7 @@ import { z } from "zod";
 import { events, createActivityEvent, type DB } from "@clawops/core";
 import { completeTask } from "@clawops/tasks";
 import { createNotification } from "@clawops/notifications";
-import { getDb, jsonError } from "@/lib/server/runtime";
+import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
 
 const idParams = z.object({ id: z.string().min(1) });
 
@@ -25,6 +25,7 @@ export async function POST(
     const { id } = idParams.parse(await params);
     const body = completeTaskBody.parse(await req.json());
     const db = getDb();
+    const agentId = getAgentIdFromApiKey(req) ?? undefined;
     const task = db.transaction((tx) => {
       const t = completeTask(tx as unknown as DB, id, body);
       if (!t) return null;
@@ -40,17 +41,19 @@ export async function POST(
           action: "task.completed",
           entityType: "task",
           entityId: t.id,
+          agentId,
           meta: JSON.stringify({ summary: body.summary }),
         })
         .run();
       createActivityEvent(tx as unknown as DB, {
-        source: "agent",
+        source: agentId ? "agent" : "user",
         type: "task.completed",
         title: `Task completed: ${t.title}`,
         entityType: "task",
         entityId: t.id,
         projectId: t.projectId ?? undefined,
         taskId: t.id,
+        agentId,
         metadata: JSON.stringify({ summary: body.summary, model: body.model }),
       });
       return t;
