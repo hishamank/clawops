@@ -8,6 +8,9 @@ import {
   desc,
   type ActivityEventFilters,
 } from "@clawops/core";
+import { getAgentByApiKey } from "@clawops/agents";
+import { hashApiKey } from "@clawops/domain";
+import { headers } from "next/headers";
 import { getDb } from "@/lib/server/runtime";
 import type { ActivityEvent } from "@/lib/types";
 
@@ -43,6 +46,16 @@ function serializeActivityEvent(
 export async function listActivityEvents(
   input: ActivityFiltersInput = {},
 ): Promise<ActivityEvent[]> {
+  const apiKey = headers().get("x-api-key");
+  if (!apiKey) {
+    return [];
+  }
+
+  const agent = getAgentByApiKey(getDb(), hashApiKey(apiKey));
+  if (!agent) {
+    return [];
+  }
+
   const filters = activityFiltersSchema.parse(input);
   const conditions = buildActivityEventQueryConditions(filters as ActivityEventFilters);
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;

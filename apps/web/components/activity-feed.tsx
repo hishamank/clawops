@@ -278,6 +278,7 @@ export function ActivityFeed({
                 return (
                   <button
                     key={event.id}
+                    type="button"
                     onClick={() => setSelectedEvent(event)}
                     className="w-full text-left"
                   >

@@ -102,18 +102,23 @@ export async function POST(req: Request): Promise<NextResponse> {
       return result;
     });
 
-    createActivityEvent(db, {
-      source: "sync",
-      type: "sync.completed",
-      title: `Sync completed: ${agents.length} agents, ${cronJobs.length} cron jobs`,
-      entityType: "sync_run",
-      metadata: JSON.stringify({
-        agentCount: agents.length,
-        cronJobCount: cronJobs.length,
-        workspaceCount: workspaces.length,
-        agentNames: agents.map((a) => a.name),
-      }),
-    });
+    try {
+      createActivityEvent(db, {
+        source: "sync",
+        type: "sync.completed",
+        title: `Sync completed: ${agents.length} agents, ${cronJobs.length} cron jobs`,
+        entityType: "sync_run",
+        entityId: completed.id,
+        metadata: JSON.stringify({
+          agentCount: agents.length,
+          cronJobCount: cronJobs.length,
+          workspaceCount: workspaces.length,
+          agentNames: agents.map((a) => a.name),
+        }),
+      });
+    } catch {
+      // Non-critical
+    }
 
     return NextResponse.json({
       success: true,
