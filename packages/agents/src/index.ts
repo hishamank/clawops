@@ -77,24 +77,6 @@ export function getAgentByOpenClawIdentity(
   return rows[0]?.agent ?? null;
 }
 
-export function getOpenClawAgentMapping(
-  db: DB,
-  connectionId: string,
-  externalAgentId: string,
-): OpenClawAgent | null {
-  return db
-    .select()
-    .from(openclawAgents)
-    .where(
-      and(
-        eq(openclawAgents.connectionId, connectionId),
-        eq(openclawAgents.externalAgentId, externalAgentId),
-      ),
-    )
-    .limit(1)
-    .get() ?? null;
-}
-
 function findSingleAgentByNameAndFramework(
   db: DB,
   input: InitAgentInput,
