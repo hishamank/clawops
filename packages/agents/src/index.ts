@@ -245,10 +245,9 @@ export function getAgentByApiKey(db: DB, hashedKey: string): Agent | null {
  *
  * **OpenClaw identity coverage:**
  * The durable identity lookup only activates when `input.openclaw` is provided.
- * Currently the CLI `onboard` and `sync` commands do NOT pass OpenClaw fields
- * because they run before a connection record exists.  Duplicate-on-rename
- * prevention therefore only works for callers that supply OpenClaw identity
- * (e.g. the web connect-wizard flow).
+ * CLI and web flows that route through `onboardOpenClaw` do pass OpenClaw
+ * identity, so repeated syncs and renames resolve through the durable mapping.
+ * Callers that omit `input.openclaw` still fall back to name/framework matching.
  */
 export function initAgent(
   db: DB,
@@ -279,7 +278,10 @@ export function initAgent(
         .where(eq(agents.id, current.id))
         .returning()
         .all();
-      const updated = rows[0] ?? current;
+      const updated = rows[0];
+      if (!updated) {
+        throw new Error(`Failed to update agent during init: ${current.id}`);
+      }
 
       if (input.openclaw) {
         upsertOpenClawAgentIdentity(tx as unknown as DB, {

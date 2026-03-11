@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { listSyncRuns, onboardOpenClaw, summarizeOpenClawOnboarding } from "@clawops/sync";
+import { listSyncRuns, onboardOpenClaw } from "@clawops/sync";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
@@ -33,11 +33,21 @@ export async function POST(req: Request): Promise<NextResponse> {
       includeFiles: true,
       actorAgentId: getAgentIdFromApiKey(req) ?? undefined,
     });
-    const summary = summarizeOpenClawOnboarding(result);
 
     return NextResponse.json({
       success: true,
-      ...summary,
+      connectionId: result.connectionId,
+      syncRunId: result.syncRunId,
+      syncedAt: result.syncedAt,
+      gatewayUrl: result.gatewayUrl,
+      openclawDir: result.openclawDir,
+      agents: result.agents,
+      cronJobs: result.cronJobs,
+      workspaces: result.workspaces.map((workspace) => ({
+        agentId: workspace.agentId,
+        path: workspace.path,
+        hasFiles: Object.values(workspace.files).some(Boolean),
+      })),
     });
   } catch (err) {
     return jsonError(

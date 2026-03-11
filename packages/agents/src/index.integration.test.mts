@@ -1,6 +1,5 @@
 import { beforeEach, describe, it } from "node:test";
 import assert from "node:assert";
-import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import path from "node:path";
@@ -16,6 +15,22 @@ const {
   initAgent,
   listAgents,
 } = await import("../dist/index.js");
+
+const Database = await import("better-sqlite3")
+  .then((module) => module.default)
+  .catch(() => null);
+const supportsBetterSqlite = (() => {
+  if (!Database) return false;
+
+  try {
+    const sqlite = new Database(":memory:");
+    sqlite.close();
+    return true;
+  } catch {
+    return false;
+  }
+})();
+const integrationTest = supportsBetterSqlite ? it : it.skip;
 
 let db: DB;
 
@@ -44,7 +59,7 @@ function createConnection(rootPath: string) {
 }
 
 describe("OpenClaw durable identity mapping", () => {
-  it("reuses the same ClawOps agent when the OpenClaw name changes", () => {
+  integrationTest("reuses the same ClawOps agent when the OpenClaw name changes", () => {
     const connection = createConnection("/tmp/openclaw-rename");
 
     const initial = initAgent(db, {
@@ -97,7 +112,7 @@ describe("OpenClaw durable identity mapping", () => {
     assert.equal(listAgents(db).length, 1);
   });
 
-  it("links a legacy agent by name once, then uses the durable mapping after rename", () => {
+  integrationTest("links a legacy agent by name once, then uses the durable mapping after rename", () => {
     const connection = createConnection("/tmp/openclaw-legacy");
 
     const legacy = initAgent(db, {

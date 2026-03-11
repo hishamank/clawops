@@ -155,10 +155,10 @@ export const syncCmd = new Command("sync")
         createActivityEvent(activityDb, {
           source: "sync",
           type: "sync.completed",
-          title: `CLI sync completed: ${scan?.agents.length ?? 0} agents, ${cronJobCount} cron jobs`,
+          title: `CLI sync completed: ${discoveredAgents.length} agents, ${cronJobCount} cron jobs`,
           entityType: "sync_run",
           metadata: JSON.stringify({
-            agentCount: scan?.agents.length ?? 0,
+            agentCount: discoveredAgents.length,
             cronJobCount,
             addedAgents,
             removedAgents,
