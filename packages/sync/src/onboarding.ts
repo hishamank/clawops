@@ -214,7 +214,7 @@ export async function onboardOpenClaw(
         };
       });
 
-      dependencies.finishSyncRun(tx as unknown as DB, run.id, {
+      finishSyncRunWithTx(tx as unknown as DB, run.id, {
         connectionId: connection.connection.id,
         status: "success",
         agentCount: scanResult.agents.length,
@@ -297,7 +297,7 @@ export async function onboardOpenClaw(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     db.transaction((tx: TransactionDb) => {
-      dependencies.finishSyncRun(tx as unknown as DB, run.id, {
+      finishSyncRunWithTx(tx as unknown as DB, run.id, {
         status: "failed",
         error: message,
         meta: {
