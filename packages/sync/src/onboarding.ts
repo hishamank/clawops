@@ -49,7 +49,7 @@ interface OnboardingDependencies {
   scanOpenClaw: typeof scanOpenClaw;
   fetchGatewayCronJobs: typeof fetchGatewayCronJobs;
   startSyncRun: typeof startSyncRun;
-  finishSyncRunWithTx: typeof finishSyncRunWithTx;
+  finishSyncRun: typeof finishSyncRunWithTx;
 }
 
 const defaultDependencies: OnboardingDependencies = {
@@ -60,7 +60,7 @@ const defaultDependencies: OnboardingDependencies = {
   scanOpenClaw,
   fetchGatewayCronJobs,
   startSyncRun,
-  finishSyncRunWithTx,
+  finishSyncRun: finishSyncRunWithTx,
 };
 
 function resolvePath(inputPath: string): string {
@@ -214,7 +214,7 @@ export async function onboardOpenClaw(
         };
       });
 
-      dependencies.finishSyncRunWithTx(tx as unknown as DB, run.id, {
+      dependencies.finishSyncRun(tx as unknown as DB, run.id, {
         connectionId: connection.connection.id,
         status: "success",
         agentCount: scanResult.agents.length,
@@ -297,7 +297,7 @@ export async function onboardOpenClaw(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     db.transaction((tx: TransactionDb) => {
-      dependencies.finishSyncRunWithTx(tx as unknown as DB, run.id, {
+      dependencies.finishSyncRun(tx as unknown as DB, run.id, {
         status: "failed",
         error: message,
         meta: {

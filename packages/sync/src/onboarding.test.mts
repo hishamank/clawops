@@ -3,7 +3,7 @@ import { beforeEach, describe, it } from "node:test";
 
 const eventsInserted: Array<Record<string, unknown>> = [];
 const initAgentCalls: Array<Record<string, unknown>> = [];
-const finishSyncRunWithTxCalls: Array<Record<string, unknown>> = [];
+const finishSyncRunCalls: Array<Record<string, unknown>> = [];
 const upsertConnectionCalls: Array<Record<string, unknown>> = [];
 const fetchGatewayCronJobsCalls: Array<Record<string, unknown>> = [];
 const startSyncRunCalls: Array<Record<string, unknown>> = [];
@@ -30,7 +30,7 @@ const { onboardOpenClaw } = await import("./onboarding.js");
 beforeEach(() => {
   eventsInserted.length = 0;
   initAgentCalls.length = 0;
-  finishSyncRunWithTxCalls.length = 0;
+  finishSyncRunCalls.length = 0;
   upsertConnectionCalls.length = 0;
   fetchGatewayCronJobsCalls.length = 0;
   startSyncRunCalls.length = 0;
@@ -100,8 +100,8 @@ describe("onboardOpenClaw", () => {
           startSyncRunCalls.push(input);
           return { id: "run-1" };
         },
-        finishSyncRunWithTx: (_db: unknown, id: string, input: Record<string, unknown>) => {
-          finishSyncRunWithTxCalls.push({ id, input });
+        finishSyncRun: (_db: unknown, id: string, input: Record<string, unknown>) => {
+          finishSyncRunCalls.push({ id, input });
           return { id, status: input["status"] };
         },
       },
@@ -114,9 +114,9 @@ describe("onboardOpenClaw", () => {
     assert.equal(startSyncRunCalls.length, 1);
     assert.equal(upsertConnectionCalls.length, 1);
     assert.equal(initAgentCalls.length, 1);
-    assert.equal(finishSyncRunWithTxCalls.length, 1);
+    assert.equal(finishSyncRunCalls.length, 1);
     assert.equal(fetchGatewayCronJobsCalls.length, 1);
-    const finishSyncRunInput = finishSyncRunWithTxCalls[0]?.["input"] as Record<string, unknown>;
+    const finishSyncRunInput = finishSyncRunCalls[0]?.["input"] as Record<string, unknown>;
     assert.equal(finishSyncRunInput["connectionId"], "conn-1");
 
     const openclawIdentity = initAgentCalls[0]?.["openclaw"] as Record<string, unknown>;

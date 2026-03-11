@@ -163,7 +163,7 @@ export function createAgent(
 
   const agent = rows[0];
   if (!agent) {
-    throw new Error(`Failed to create agent: ${input.name}`);
+    throw new Error("Failed to create agent");
   }
   return { ...agent, apiKey: rawKey };
 }
@@ -289,29 +289,29 @@ export function initAgent(
   const rawKey = generateId();
   const hashed = hashApiKey(rawKey);
 
-  const agent = db.transaction((tx) => {
-    const rows = tx
-      .insert(agents)
-      .values({
-        name: input.name,
-        model: input.model,
-        role: input.role,
-        framework: input.framework,
-        memoryPath: input.memoryPath ?? null,
-        skills: input.skills ? toJsonArray(input.skills) : null,
-        avatar: input.avatar ?? null,
-        apiKey: hashed,
-        status: "offline",
-      })
-      .returning()
-      .all();
+  if (input.openclaw) {
+    const agent = db.transaction((tx) => {
+      const rows = tx
+        .insert(agents)
+        .values({
+          name: input.name,
+          model: input.model,
+          role: input.role,
+          framework: input.framework,
+          memoryPath: input.memoryPath ?? null,
+          skills: input.skills ? toJsonArray(input.skills) : null,
+          avatar: input.avatar ?? null,
+          apiKey: hashed,
+          status: "offline",
+        })
+        .returning()
+        .all();
 
-    const created = rows[0];
-    if (!created) {
-      throw new Error(`Failed to create agent during init: ${input.name}`);
-    }
+      const created = rows[0];
+      if (!created) {
+        throw new Error("Failed to create agent");
+      }
 
-    if (input.openclaw) {
       upsertOpenClawAgentIdentity(tx as unknown as DB, {
         ...input.openclaw,
         linkedAgentId: created.id,
@@ -321,10 +321,33 @@ export function initAgent(
         role: input.openclaw.role ?? input.role,
         avatar: input.openclaw.avatar ?? input.avatar ?? created.avatar ?? undefined,
       });
-    }
 
-    return created;
-  });
+      return created;
+    });
+
+    return { agent, apiKey: rawKey, created: true };
+  }
+
+  const rows = db
+    .insert(agents)
+    .values({
+      name: input.name,
+      model: input.model,
+      role: input.role,
+      framework: input.framework,
+      memoryPath: input.memoryPath ?? null,
+      skills: input.skills ? toJsonArray(input.skills) : null,
+      avatar: input.avatar ?? null,
+      apiKey: hashed,
+      status: "offline",
+    })
+    .returning()
+    .all();
+
+  const agent = rows[0];
+  if (!agent) {
+    throw new Error("Failed to create agent");
+  }
 
   return { agent, apiKey: rawKey, created: true };
 }
