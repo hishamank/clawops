@@ -128,3 +128,19 @@ export interface AgentDetail extends Agent {
   habits?: Habit[];
   streaks?: Record<string, HabitStreak[]>;
 }
+
+export interface ActivityEvent {
+  id: string;
+  source: "system" | "agent" | "user" | "sync" | "workflow" | "hook";
+  severity: "info" | "warning" | "error" | "critical";
+  type: string;
+  title: string;
+  body: string | null;
+  agentId: string | null;
+  entityType: string | null;
+  entityId: string | null;
+  projectId: string | null;
+  taskId: string | null;
+  metadata: string | null;
+  createdAt: string;
+}
