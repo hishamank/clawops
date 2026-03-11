@@ -166,7 +166,7 @@ export const onboardCmd = new Command("onboard")
     debug("scan summary", { agentCount: discoveredAgents.length, gatewayUrl });
 
     result.openclawDir = onboarding?.openclawDir ?? openclawDir;
-    result.agents = discoveredAgents.map((agent) => ({
+    result.agents = discoveredAgents.map((agent: { id: string; name: string; workspacePath: string }) => ({
       id: agent.id,
       name: agent.name,
       workspacePath: agent.workspacePath,
@@ -176,10 +176,10 @@ export const onboardCmd = new Command("onboard")
       : discoveredAgents.length;
 
     if (!isJson) {
-      const names = discoveredAgents.map((agent) => agent.id).join(", ");
+      const names = discoveredAgents.map((agent: { id: string }) => agent.id).join(", ");
       console.log(`✓ Found ${discoveredAgents.length} agents: ${names}`);
       const wsPaths = discoveredAgents
-        .map((agent) => `  ${agent.workspacePath}`)
+        .map((agent: { workspacePath: string }) => `  ${agent.workspacePath}`)
         .join("\n");
       console.log(`  Workspaces:\n${wsPaths}`);
       console.log(`  Gateway: ${gatewayUrl}`);
@@ -203,7 +203,6 @@ export const onboardCmd = new Command("onboard")
     }
 
     if (installSkills) {
-      const syncMod = await import("@clawops/sync");
       for (const agent of discoveredAgents) {
         const skillPath = path.join(
           agent.workspacePath,

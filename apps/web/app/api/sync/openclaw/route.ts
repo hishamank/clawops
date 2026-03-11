@@ -25,14 +25,13 @@ export async function POST(req: Request): Promise<NextResponse> {
   }
 
   try {
-    const actorAgentId = getAgentIdFromApiKey(req);
     const result = await onboardOpenClaw(getDb(), {
       source: "api.sync.openclaw",
       openclawDir: body.openclawDir,
       gatewayUrl: body.gatewayUrl,
       gatewayToken: body.gatewayToken,
       includeFiles: true,
-      actorAgentId: actorAgentId ?? undefined,
+      actorAgentId: getAgentIdFromApiKey(req) ?? undefined,
     });
 
     return NextResponse.json({

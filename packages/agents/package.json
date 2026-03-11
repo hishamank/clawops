@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
     "lint": "eslint src/",
-    "test": "node --import tsx/esm --test src/index.test.mts",
+    "test": "node --import tsx/esm --test src/index.test.mts src/index.integration.test.mts",
     "test:integration": "node --import tsx/esm --test src/index.integration.test.mts"
   },
   "dependencies": {

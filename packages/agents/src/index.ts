@@ -3,6 +3,9 @@ import type { Agent, DB, OpenClawAgent } from "@clawops/core";
 import { agents, openclawAgents, toJsonArray } from "@clawops/core";
 import { generateId, hashApiKey, type AgentStatus } from "@clawops/domain";
 
+/** Subset of DB that both the root connection and a transaction satisfy. */
+type Queryable = Pick<DB, "insert" | "update" | "select" | "delete">;
+
 interface CreateAgentInput {
   name: string;
   model: string;
@@ -92,12 +95,12 @@ function findSingleAgentByNameAndFramework(
 }
 
 export function upsertOpenClawAgentIdentity(
-  db: DB,
+  db: Queryable,
   input: NonNullable<InitAgentInput["openclaw"]> & { linkedAgentId: string },
 ): OpenClawAgent {
   const now = new Date();
   const lastSeenAt = input.lastSeenAt ?? now;
-  const rows = db
+  const row = db
     .insert(openclawAgents)
     .values({
       connectionId: input.connectionId,
@@ -127,9 +130,8 @@ export function upsertOpenClawAgentIdentity(
       },
     })
     .returning()
-    .all();
+    .get();
 
-  const row = rows[0];
   if (!row) {
     throw new Error(
       `Failed to upsert OpenClaw agent identity for connection=${input.connectionId}, externalAgent=${input.externalAgentId}`,
@@ -237,6 +239,16 @@ export function getAgentByApiKey(db: DB, hashedKey: string): Agent | null {
   return rows[0] ?? null;
 }
 
+/**
+ * Initialise (find-or-create) an agent, optionally linking it to an OpenClaw
+ * identity.
+ *
+ * **OpenClaw identity coverage:**
+ * The durable identity lookup only activates when `input.openclaw` is provided.
+ * CLI and web flows that route through `onboardOpenClaw` do pass OpenClaw
+ * identity, so repeated syncs and renames resolve through the durable mapping.
+ * Callers that omit `input.openclaw` still fall back to name/framework matching.
+ */
 export function initAgent(
   db: DB,
   input: InitAgentInput,
@@ -266,7 +278,10 @@ export function initAgent(
         .where(eq(agents.id, current.id))
         .returning()
         .all();
-      const updated = rows[0] ?? current;
+      const updated = rows[0];
+      if (!updated) {
+        throw new Error(`Failed to update agent during init: ${current.id}`);
+      }
 
       if (input.openclaw) {
         upsertOpenClawAgentIdentity(tx as unknown as DB, {

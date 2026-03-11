@@ -53,8 +53,8 @@
     },
     {
       "idx": 7,
-      "version": "6",
-      "when": 1773215400000,
+      "version": "7",
+      "when": 1773212403000,
       "tag": "0007_durable_openclaw_identity",
       "breakpoints": true
     }

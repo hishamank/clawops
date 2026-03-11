@@ -323,3 +323,27 @@ export async function onboardOpenClaw(
     throw error;
   }
 }
+
+export interface OpenClawOnboardingSummary {
+  openclawDir: string;
+  gatewayUrl: string;
+  agents: SyncAgent[];
+  agentsRegistered: number;
+  agentRegistrations: OpenClawOnboardingAgentRegistration[];
+}
+
+/**
+ * Summarize the result of onboardOpenClaw into a flat structure
+ * for CLI display and result reporting.
+ */
+export function summarizeOpenClawOnboarding(
+  result: OpenClawOnboardingResult,
+): OpenClawOnboardingSummary {
+  return {
+    openclawDir: result.openclawDir,
+    gatewayUrl: result.gatewayUrl,
+    agents: result.agents,
+    agentsRegistered: result.agentRegistrations.filter((r) => r.created).length,
+    agentRegistrations: result.agentRegistrations,
+  };
+}
