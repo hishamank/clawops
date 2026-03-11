@@ -20,24 +20,8 @@ const activityFiltersSchema = z.object({
   taskId: z.string().optional(),
   severity: z.enum(["info", "warning", "error", "critical"]).optional(),
   source: z.enum(["system", "agent", "user", "sync", "workflow", "hook"]).optional(),
-  limit: z
-    .string()
-    .transform((v) => {
-      if (!v) return undefined;
-      const n = Number.parseInt(v, 10);
-      if (Number.isNaN(n) || n < 0 || n > 1000) throw new Error("limit must be 0-1000");
-      return n;
-    })
-    .optional(),
-  offset: z
-    .string()
-    .transform((v) => {
-      if (!v) return undefined;
-      const n = Number.parseInt(v, 10);
-      if (Number.isNaN(n) || n < 0 || n > 100000) throw new Error("offset must be 0-100000");
-      return n;
-    })
-    .optional(),
+  limit: z.coerce.number().int().min(0).max(1000).optional(),
+  offset: z.coerce.number().int().min(0).max(100000).optional(),
 });
 
 export async function GET(req: Request): Promise<NextResponse> {

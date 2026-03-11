@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import {
   Bot,
   CheckCircle2,
@@ -24,10 +24,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { timeAgo } from "@/lib/time";
 import type { ActivityEvent, Agent } from "@/lib/types";
+import { listActivityEvents } from "@/app/activity/actions";
 
 interface ActivityFeedProps {
   agents?: Agent[];
   embedded?: boolean;
+  initialEvents: ActivityEvent[];
 }
 
 const severityConfig = {
@@ -87,49 +89,58 @@ function getSeverityBadgeVariant(severity: ActivityEvent["severity"]) {
 export function ActivityFeed({
   agents,
   embedded = false,
+  initialEvents,
 }: ActivityFeedProps): React.JSX.Element {
-  const [events, setEvents] = useState<ActivityEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  type ActivityFilterState = {
+    agentId: string;
+    type: string;
+    severity: "" | ActivityEvent["severity"];
+    entityType: string;
+  };
+
+  const [events, setEvents] = useState<ActivityEvent[]>(initialEvents);
+  const [loading, setLoading] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<ActivityEvent | null>(null);
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<ActivityFilterState>({
     agentId: "",
     type: "",
     severity: "",
     entityType: "",
   });
 
-  const fetchEvents = useCallback(async () => {
+  const fetchEvents = async (nextFilters: ActivityFilterState) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (filters.agentId) params.set("agentId", filters.agentId);
-      if (filters.type) params.set("type", filters.type);
-      if (filters.severity) params.set("severity", filters.severity);
-      if (filters.entityType) params.set("entityType", filters.entityType);
-      params.set("limit", "50");
-
-      const response = await fetch(`/api/activity?${params.toString()}`);
-      if (response.ok) {
-        const data = await response.json();
-        setEvents(data);
-      }
+      const data = await listActivityEvents({
+        agentId: nextFilters.agentId || undefined,
+        type: nextFilters.type || undefined,
+        severity: nextFilters.severity || undefined,
+        entityType: nextFilters.entityType || undefined,
+      });
+      setEvents(data);
     } catch {
-      // Silently handle errors - user will see empty state
+      setEvents([]);
     } finally {
       setLoading(false);
     }
-  }, [filters]);
-
-  useEffect(() => {
-    fetchEvents();
-  }, [fetchEvents]);
+  };
 
   const clearFilters = () => {
-    setFilters({
+    const nextFilters: ActivityFilterState = {
       agentId: "",
       type: "",
       severity: "",
       entityType: "",
+    };
+    setFilters(nextFilters);
+    void fetchEvents(nextFilters);
+  };
+
+  const updateFilters = (partial: Partial<typeof filters>) => {
+    setFilters((current) => {
+      const nextFilters = { ...current, ...partial };
+      void fetchEvents(nextFilters);
+      return nextFilters;
     });
   };
 
@@ -161,9 +172,7 @@ export function ActivityFeed({
               <select
                 aria-label="Filter by agent"
                 value={filters.agentId}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, agentId: e.target.value }))
-                }
+                onChange={(e) => updateFilters({ agentId: e.target.value })}
                 className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">All Agents</option>
@@ -179,7 +188,9 @@ export function ActivityFeed({
                 aria-label="Filter by severity"
                 value={filters.severity}
                 onChange={(e) =>
-                  setFilters((f) => ({ ...f, severity: e.target.value }))
+                  updateFilters({
+                    severity: e.target.value as ActivityEvent["severity"] | "",
+                  })
                 }
                 className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               >
@@ -194,9 +205,7 @@ export function ActivityFeed({
               <select
                 aria-label="Filter by entity type"
                 value={filters.entityType}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, entityType: e.target.value }))
-                }
+                onChange={(e) => updateFilters({ entityType: e.target.value })}
                 className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">All Entities</option>
@@ -210,9 +219,7 @@ export function ActivityFeed({
               <select
                 aria-label="Filter by event type"
                 value={filters.type}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, type: e.target.value }))
-                }
+                onChange={(e) => updateFilters({ type: e.target.value })}
                 className="h-8 rounded-md border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">All Types</option>

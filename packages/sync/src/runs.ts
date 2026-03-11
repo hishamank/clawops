@@ -99,50 +99,64 @@ export function startSyncRun(db: DB, input: StartSyncRunInput = {}): SyncRun {
   return run;
 }
 
+function finishSyncRunTx(
+  db: DB,
+  id: string,
+  input: FinishSyncRunInput,
+): SyncRunSummary {
+  const rows = db
+    .update(syncRuns)
+    .set({
+      connectionId: input.connectionId === undefined ? undefined : input.connectionId,
+      status: input.status,
+      completedAt: new Date(),
+      agentCount: input.agentCount ?? 0,
+      cronJobCount: input.cronJobCount ?? 0,
+      workspaceCount: input.workspaceCount ?? 0,
+      addedCount: input.addedCount ?? 0,
+      updatedCount: input.updatedCount ?? 0,
+      removedCount: input.removedCount ?? 0,
+      error: input.error ?? null,
+      meta: input.meta ? toJsonObject(input.meta) : null,
+    })
+    .where(eq(syncRuns.id, id))
+    .returning()
+    .all();
+
+  const run = rows[0];
+  if (!run) {
+    throw new Error(`Sync run not found: ${id}`);
+  }
+
+  if (input.items && input.items.length > 0) {
+    db.insert(syncRunItems)
+      .values(
+        input.items.map((item) => ({
+          syncRunId: run.id,
+          itemType: item.itemType,
+          itemExternalId: item.itemExternalId,
+          changeType: item.changeType,
+          summary: item.summary ?? null,
+          meta: item.meta ? toJsonObject(item.meta) : null,
+        })),
+      )
+      .run();
+  }
+
+  const items = listSyncRunItemsByRunIds(db, [run.id]);
+  return buildSyncRunSummary(run, items);
+}
+
 export function finishSyncRun(db: DB, id: string, input: FinishSyncRunInput): SyncRunSummary {
-  return db.transaction((tx: TransactionDb) => {
-    const rows = tx
-      .update(syncRuns)
-      .set({
-        connectionId: input.connectionId === undefined ? undefined : input.connectionId,
-        status: input.status,
-        completedAt: new Date(),
-        agentCount: input.agentCount ?? 0,
-        cronJobCount: input.cronJobCount ?? 0,
-        workspaceCount: input.workspaceCount ?? 0,
-        addedCount: input.addedCount ?? 0,
-        updatedCount: input.updatedCount ?? 0,
-        removedCount: input.removedCount ?? 0,
-        error: input.error ?? null,
-        meta: input.meta ? toJsonObject(input.meta) : null,
-      })
-      .where(eq(syncRuns.id, id))
-      .returning()
-      .all();
+  return db.transaction((tx: TransactionDb) => finishSyncRunTx(tx as unknown as DB, id, input));
+}
 
-    const run = rows[0];
-    if (!run) {
-      throw new Error(`Sync run not found: ${id}`);
-    }
-
-    if (input.items && input.items.length > 0) {
-      tx.insert(syncRunItems)
-        .values(
-          input.items.map((item) => ({
-            syncRunId: run.id,
-            itemType: item.itemType,
-            itemExternalId: item.itemExternalId,
-            changeType: item.changeType,
-            summary: item.summary ?? null,
-            meta: item.meta ? toJsonObject(item.meta) : null,
-          })),
-        )
-        .run();
-    }
-
-    const items = listSyncRunItemsByRunIds(tx as unknown as DB, [run.id]);
-    return buildSyncRunSummary(run, items);
-  });
+export function finishSyncRunWithTx(
+  db: DB,
+  id: string,
+  input: FinishSyncRunInput,
+): SyncRunSummary {
+  return finishSyncRunTx(db, id, input);
 }
 
 export function getSyncRun(db: DB, id: string): SyncRunSummary | null {
