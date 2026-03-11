@@ -47,6 +47,11 @@ export default function ApiDocsPage(): React.JSX.Element {
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">API Docs</h1>
         <p className="mt-1 text-muted-foreground">Static route reference for the Next.js transport layer.</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          <code>POST /api/sync/openclaw</code> persists the OpenClaw connection, records the
+          sync run, and registers or updates discovered agents through the shared sync
+          onboarding service.
+        </p>
       </div>
       <Card>
         <CardHeader>

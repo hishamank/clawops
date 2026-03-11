@@ -58,6 +58,7 @@ clawops onboard --all --openclaw-dir /opt/openclaw --json
   "platform": "openclaw",
   "openclawDir": "/home/user/.openclaw",
   "agents": [{"id": "rick", "name": "Rick", "workspacePath": "..."}],
+  "agentsRegistered": 1,
   "skillsInstalled": 4,
   "dashboardStarted": false,
   "dashboardMode": "prod",
@@ -69,6 +70,10 @@ Dashboard start behavior:
 - If production build artifacts exist, onboard starts Web in production mode.
 - If artifacts are missing, onboard runs `pnpm build` first, then starts Web in production mode.
 - On start, onboard writes dashboard process metadata to `.clawops-web.pid` in the project root.
+
+Onboarding side effects:
+- CLI onboarding uses the shared OpenClaw onboarding service from `@clawops/sync`.
+- The command persists the OpenClaw connection, upserts discovered agents, and records a durable sync run before optional skill installation.
 
 ---
 
