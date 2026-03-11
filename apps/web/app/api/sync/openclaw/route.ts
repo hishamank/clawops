@@ -156,6 +156,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         type: "sync.failed",
         title: "Sync failed",
         entityType: "sync_run",
+        entityId: run.id,
         metadata: JSON.stringify({ error: message, syncRunId: run.id }),
       });
     } catch {
