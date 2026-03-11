@@ -345,7 +345,15 @@ function EventDetailPanel({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="event-detail-title"
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
+    >
       <div className="w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-xl bg-card shadow-xl">
         {/* Header */}
         <div className="sticky top-0 flex items-start justify-between border-b border-border bg-card p-4">
@@ -354,7 +362,7 @@ function EventDetailPanel({
               <SeverityIcon className="h-5 w-5 text-muted-foreground" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold">{event.title}</h3>
+              <h3 id="event-detail-title" className="text-lg font-semibold">{event.title}</h3>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <SourceIcon className="h-3 w-3" />

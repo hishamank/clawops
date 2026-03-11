@@ -161,7 +161,10 @@ export function createAgent(
     .returning()
     .all();
 
-  const agent = rows[0]!;
+  const agent = rows[0];
+  if (!agent) {
+    throw new Error(`Failed to create agent: ${input.name}`);
+  }
   return { ...agent, apiKey: rawKey };
 }
 
@@ -286,35 +289,42 @@ export function initAgent(
   const rawKey = generateId();
   const hashed = hashApiKey(rawKey);
 
-  const rows = db
-    .insert(agents)
-    .values({
-      name: input.name,
-      model: input.model,
-      role: input.role,
-      framework: input.framework,
-      memoryPath: input.memoryPath ?? null,
-      skills: input.skills ? toJsonArray(input.skills) : null,
-      avatar: input.avatar ?? null,
-      apiKey: hashed,
-      status: "offline",
-    })
-    .returning()
-    .all();
+  const agent = db.transaction((tx) => {
+    const rows = tx
+      .insert(agents)
+      .values({
+        name: input.name,
+        model: input.model,
+        role: input.role,
+        framework: input.framework,
+        memoryPath: input.memoryPath ?? null,
+        skills: input.skills ? toJsonArray(input.skills) : null,
+        avatar: input.avatar ?? null,
+        apiKey: hashed,
+        status: "offline",
+      })
+      .returning()
+      .all();
 
-  const agent = rows[0]!;
+    const created = rows[0];
+    if (!created) {
+      throw new Error(`Failed to create agent during init: ${input.name}`);
+    }
 
-  if (input.openclaw) {
-    upsertOpenClawAgentIdentity(db, {
-      ...input.openclaw,
-      linkedAgentId: agent.id,
-      memoryPath:
-        input.openclaw.memoryPath ?? input.memoryPath ?? agent.memoryPath ?? undefined,
-      defaultModel: input.openclaw.defaultModel ?? input.model,
-      role: input.openclaw.role ?? input.role,
-      avatar: input.openclaw.avatar ?? input.avatar ?? agent.avatar ?? undefined,
-    });
-  }
+    if (input.openclaw) {
+      upsertOpenClawAgentIdentity(tx as unknown as DB, {
+        ...input.openclaw,
+        linkedAgentId: created.id,
+        memoryPath:
+          input.openclaw.memoryPath ?? input.memoryPath ?? created.memoryPath ?? undefined,
+        defaultModel: input.openclaw.defaultModel ?? input.model,
+        role: input.openclaw.role ?? input.role,
+        avatar: input.openclaw.avatar ?? input.avatar ?? created.avatar ?? undefined,
+      });
+    }
+
+    return created;
+  });
 
   return { agent, apiKey: rawKey, created: true };
 }

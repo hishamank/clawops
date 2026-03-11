@@ -61,7 +61,10 @@ export async function POST(req: Request): Promise<NextResponse> {
   }
 }
 
-export async function GET(): Promise<NextResponse> {
+export async function GET(req: Request): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   const runs = listSyncRuns(getDb(), 10);
   const latest = runs[0];
 
