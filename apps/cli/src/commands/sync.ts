@@ -51,13 +51,25 @@ export const syncCmd = new Command("sync")
       console.log(`→ Syncing OpenClaw at ${openclawDir}...`);
     }
 
-    // Scan
-    const { openclaw } = await import("@clawops/sync");
-    const scan = openclaw.scanOpenClaw({
-      openclawDir,
-      gatewayUrl,
-      includeFiles: false,
-    });
+    const syncMod = await import("@clawops/sync");
+    const scan = isDryRun
+      ? syncMod.openclaw.scanOpenClaw({
+          openclawDir,
+          gatewayUrl,
+          includeFiles: false,
+        })
+      : null;
+    const onboarding = isDryRun
+      ? null
+      : await syncMod.onboardOpenClaw((await import("@clawops/core/db")).db, {
+          source: "cli.sync",
+          openclawDir,
+          gatewayUrl,
+          gatewayToken,
+          includeFiles: false,
+        });
+    const discoveredAgents = onboarding?.agents ?? scan?.agents ?? [];
+    const gatewayEndpoint = onboarding?.gatewayUrl ?? scan?.gatewayUrl ?? gatewayUrl ?? "";
 
     // Load previous sync state for diff
     const stateFile = path.join(openclawDir, ".clawops-sync-state.json");
@@ -70,7 +82,7 @@ export const syncCmd = new Command("sync")
       // No previous state
     }
 
-    const currentAgentIds = scan.agents.map((a: { id: string }) => a.id);
+    const currentAgentIds = discoveredAgents.map((a: { id: string }) => a.id);
     const addedAgents = currentAgentIds.filter(
       (id: string) => !previousAgentIds.includes(id),
     );
@@ -78,36 +90,15 @@ export const syncCmd = new Command("sync")
       (id: string) => !currentAgentIds.includes(id),
     );
 
-    // Upsert discovered agents into ClawOps DB registry
-    let registryCreated = 0;
-    {
-      const { initAgent } = await import("@clawops/agents");
-      const { db } = await import("@clawops/core/db");
-      for (const discovered of scan.agents) {
-        if (isDryRun) {
-          registryCreated++;
-          continue;
-        }
-        const registered = initAgent(db, {
-          name: discovered.name,
-          model: discovered.model ?? "unknown",
-          role: discovered.role ?? "agent",
-          framework: discovered.framework ?? "openclaw",
-          memoryPath: discovered.memoryPath ?? discovered.workspacePath,
-          skills: discovered.skills,
-          avatar: discovered.avatar,
-        });
-        if (registered.created) {
-          registryCreated++;
-        }
-      }
-    }
+    const registryCreated = onboarding
+      ? onboarding.agentRegistrations.filter((registration) => registration.created).length
+      : discoveredAgents.length;
 
     // Install skills
     let installed = 0;
     let skipped = 0;
 
-    for (const agent of scan.agents) {
+    for (const agent of discoveredAgents) {
       const skillPath = path.join(
         agent.workspacePath,
         "skills",
@@ -126,7 +117,7 @@ export const syncCmd = new Command("sync")
         continue;
       }
 
-      const result = openclaw.installClawOpsSkill(agent.workspacePath);
+      const result = syncMod.openclaw.installClawOpsSkill(agent.workspacePath);
       if (result.installed) {
         installed++;
       } else {
@@ -139,10 +130,10 @@ export const syncCmd = new Command("sync")
 
     // Fetch gateway data if token provided
     let cronJobCount = 0;
-    if (gatewayToken && scan.gatewayUrl) {
+    if (gatewayToken && gatewayEndpoint) {
       const [, cronJobs] = await Promise.all([
-        openclaw.fetchGatewayAgents(scan.gatewayUrl, gatewayToken),
-        openclaw.fetchGatewayCronJobs(scan.gatewayUrl, gatewayToken),
+        syncMod.openclaw.fetchGatewayAgents(gatewayEndpoint, gatewayToken),
+        syncMod.openclaw.fetchGatewayCronJobs(gatewayEndpoint, gatewayToken),
       ]);
       cronJobCount = cronJobs.length;
     }
@@ -183,7 +174,7 @@ export const syncCmd = new Command("sync")
     const jsonResult: SyncJsonResult = {
       syncedAt: new Date().toISOString(),
       agents: {
-        total: scan.agents.length,
+        total: discoveredAgents.length,
         added: addedAgents,
         removed: removedAgents,
       },
@@ -211,13 +202,13 @@ export const syncCmd = new Command("sync")
           ? ` (${removedAgents.length} removed: ${removedAgents.join(", ")})`
           : "";
       console.log(
-        `✓ Agents: ${scan.agents.length} found${addedLabel}${removedLabel}`,
+        `✓ Agents: ${discoveredAgents.length} found${addedLabel}${removedLabel}`,
       );
       console.log(`✓ Registry: ${registryCreated} new agent records created`);
 
       const skillLabel =
         installed > 0
-          ? ` (${scan.agents
+          ? ` (${discoveredAgents
               .filter((a: { id: string; workspacePath: string }) => {
                 const sp = path.join(a.workspacePath, "skills", "clawops", "SKILL.md");
                 return reinstallSkills || !fs.existsSync(sp) || addedAgents.includes(a.id);

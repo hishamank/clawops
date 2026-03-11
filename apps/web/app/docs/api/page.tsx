@@ -50,7 +50,7 @@ export default function ApiDocsPage(): React.JSX.Element {
         <p className="mt-1 text-sm text-muted-foreground">
           <code>POST /api/sync/openclaw</code> persists the OpenClaw connection, records the
           sync run, and registers or updates discovered agents through the shared sync
-          onboarding service.
+          onboarding service using durable OpenClaw agent identities.
         </p>
       </div>
       <Card>

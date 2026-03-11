@@ -116,10 +116,15 @@ clawops sync --json
 {
   "syncedAt": "2026-03-06T09:54:00Z",
   "agents": {"total": 5, "added": ["anghaminator"], "removed": []},
+  "registry": {"created": 1},
   "skills": {"installed": 1, "skipped": 4},
   "cronJobs": {"total": 12}
 }
 ```
+
+Sync side effects:
+- CLI sync persists or updates the OpenClaw connection and records a sync run through `@clawops/sync`.
+- Discovered agents are linked by durable OpenClaw identity so renames do not create duplicate ClawOps agents.
 
 ---
 

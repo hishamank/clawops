@@ -161,26 +161,25 @@ export const onboardCmd = new Command("onboard")
           includeFiles: false,
           source: "cli.onboard",
         });
-    const discoveredAgents = onboarding?.agents ?? scan?.agents ?? [];
-    const gatewayUrl = onboarding?.gatewayUrl ?? scan?.gatewayUrl ?? "";
+    const onboardingSummary = onboarding
+      ? syncMod.summarizeOpenClawOnboarding(onboarding)
+      : null;
+    const discoveredAgents = onboardingSummary?.agents ?? scan?.agents ?? [];
+    const gatewayUrl = onboardingSummary?.gatewayUrl ?? scan?.gatewayUrl ?? "";
     debug("scan summary", { agentCount: discoveredAgents.length, gatewayUrl });
 
-    result.openclawDir = onboarding?.openclawDir ?? openclawDir;
+    result.openclawDir = onboardingSummary?.openclawDir ?? openclawDir;
     result.agents = discoveredAgents.map((agent) => ({
       id: agent.id,
       name: agent.name,
       workspacePath: agent.workspacePath,
     }));
-    result.agentsRegistered = onboarding
-      ? onboarding.agentRegistrations.filter((registration) => registration.created).length
-      : discoveredAgents.length;
+    result.agentsRegistered = onboardingSummary?.agentsRegistered ?? discoveredAgents.length;
 
     if (!isJson) {
       const names = discoveredAgents.map((agent) => agent.id).join(", ");
       console.log(`✓ Found ${discoveredAgents.length} agents: ${names}`);
-      const wsPaths = discoveredAgents
-        .map((agent) => `  ${agent.workspacePath}`)
-        .join("\n");
+      const wsPaths = discoveredAgents.map((agent) => `  ${agent.workspacePath}`).join("\n");
       console.log(`  Workspaces:\n${wsPaths}`);
       console.log(`  Gateway: ${gatewayUrl}`);
       console.log("");
@@ -203,7 +202,6 @@ export const onboardCmd = new Command("onboard")
     }
 
     if (installSkills) {
-      const syncMod = await import("@clawops/sync");
       for (const agent of discoveredAgents) {
         const skillPath = path.join(
           agent.workspacePath,
