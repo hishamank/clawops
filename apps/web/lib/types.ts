@@ -9,6 +9,10 @@ import type {
   IdeaStatus,
   Source,
 } from "@clawops/domain";
+import type {
+  ActivityEventSource,
+  ActivityEventSeverity,
+} from "@clawops/core";
 
 export interface Agent {
   id: string;
@@ -131,8 +135,8 @@ export interface AgentDetail extends Agent {
 
 export interface ActivityEvent {
   id: string;
-  source: "system" | "agent" | "user" | "sync" | "workflow" | "hook";
-  severity: "info" | "warning" | "error" | "critical";
+  source: ActivityEventSource;
+  severity: ActivityEventSeverity;
   type: string;
   title: string;
   body: string | null;

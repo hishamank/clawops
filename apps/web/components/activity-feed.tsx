@@ -98,8 +98,12 @@ export function ActivityFeed({
     entityType: "",
   });
 
+  const [error, setError] = useState<string | null>(null);
+
   const fetchEvents = useCallback(async () => {
     setLoading(true);
+    setEvents([]);
+    setError(null);
     try {
       const params = new URLSearchParams();
       if (filters.agentId) params.set("agentId", filters.agentId);
@@ -109,12 +113,14 @@ export function ActivityFeed({
       params.set("limit", "50");
 
       const response = await fetch(`/api/activity?${params.toString()}`);
-      if (response.ok) {
-        const data = await response.json();
-        setEvents(data);
+      if (!response.ok) {
+        setError("Failed to load activity events");
+        return;
       }
+      const data = await response.json();
+      setEvents(data);
     } catch {
-      // Silently handle errors - user will see empty state
+      setError("Failed to load activity events");
     } finally {
       setLoading(false);
     }
@@ -230,6 +236,19 @@ export function ActivityFeed({
             <div className="flex items-center justify-center py-8">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <AlertCircle className="h-8 w-8 text-destructive mb-2" />
+              <p className="text-sm text-destructive">{error}</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={fetchEvents}
+                className="mt-2"
+              >
+                Retry
+              </Button>
+            </div>
           ) : events.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <Info className="h-8 w-8 text-muted-foreground mb-2" />
@@ -335,7 +354,7 @@ function EventDetailPanel({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-xl bg-card shadow-xl">
+      <div role="dialog" aria-modal="true" aria-labelledby="event-detail-title" className="w-full max-w-2xl max-h-[80vh] overflow-y-auto rounded-xl bg-card shadow-xl">
         {/* Header */}
         <div className="sticky top-0 flex items-start justify-between border-b border-border bg-card p-4">
           <div className="flex items-center gap-3">
@@ -343,7 +362,7 @@ function EventDetailPanel({
               <SeverityIcon className="h-5 w-5 text-muted-foreground" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold">{event.title}</h3>
+              <h3 id="event-detail-title" className="text-lg font-semibold">{event.title}</h3>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <SourceIcon className="h-3 w-3" />
@@ -359,6 +378,7 @@ function EventDetailPanel({
             size="icon"
             onClick={onClose}
             className="h-8 w-8"
+            aria-label="Close event details"
           >
             <X className="h-4 w-4" />
           </Button>

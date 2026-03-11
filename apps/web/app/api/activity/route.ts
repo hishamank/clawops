@@ -20,8 +20,8 @@ const activityFiltersSchema = z.object({
   taskId: z.string().optional(),
   severity: z.enum(["info", "warning", "error", "critical"]).optional(),
   source: z.enum(["system", "agent", "user", "sync", "workflow", "hook"]).optional(),
-  limit: z.string().transform((v) => (v ? Number.parseInt(v, 10) : undefined)).optional(),
-  offset: z.string().transform((v) => (v ? Number.parseInt(v, 10) : undefined)).optional(),
+  limit: z.coerce.number().int().min(0).max(1000).default(50).optional(),
+  offset: z.coerce.number().int().min(0).default(0).optional(),
 });
 
 export async function GET(req: Request): Promise<NextResponse> {

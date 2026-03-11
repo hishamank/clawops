@@ -7,7 +7,20 @@ import { getDb } from "@/lib/server/runtime";
 export const dynamic = "force-dynamic";
 
 async function getAgents(): Promise<Agent[]> {
-  return listAgents(getDb()) as unknown as Agent[];
+  const rows = listAgents(getDb());
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    model: row.model,
+    role: row.role,
+    status: row.status,
+    lastActive: row.lastActive ? row.lastActive.toISOString() : null,
+    avatar: row.avatar,
+    framework: row.framework,
+    memoryPath: row.memoryPath,
+    skills: row.skills,
+    createdAt: row.createdAt.toISOString(),
+  }));
 }
 
 export default async function ActivityPage(): Promise<React.JSX.Element> {
