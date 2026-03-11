@@ -7,6 +7,8 @@ import {
   type OpenClawConnection,
 } from "@clawops/core";
 
+type TransactionDb = Parameters<DB["transaction"]>[0] extends (tx: infer T) => unknown ? T : DB;
+
 export type OpenClawConnectionStatus = "active" | "disconnected" | "error";
 export type OpenClawConnectionSyncMode = "manual" | "hybrid";
 
@@ -90,7 +92,7 @@ export function upsertOpenClawConnection(
 ): { connection: OpenClawConnection; created: boolean } {
   // Use a transaction + INSERT with ON CONFLICT to avoid the read-then-insert race condition.
   // SQLite's unique constraint on rootPath ensures atomicity.
-  return db.transaction((tx) => {
+  return db.transaction((tx: TransactionDb) => {
     const now = new Date();
 
     // Attempt insert; conflict means the row already exists.

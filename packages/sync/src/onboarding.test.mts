@@ -1,5 +1,5 @@
 import assert from "node:assert";
-import { beforeEach, describe, it, mock } from "node:test";
+import { beforeEach, describe, it } from "node:test";
 
 const eventsInserted: Array<Record<string, unknown>> = [];
 const initAgentCalls: Array<Record<string, unknown>> = [];
@@ -25,6 +25,8 @@ const mockDb = {
   },
 } as const;
 
+const { onboardOpenClaw } = await import("./onboarding.js");
+
 beforeEach(() => {
   eventsInserted.length = 0;
   initAgentCalls.length = 0;
@@ -33,86 +35,6 @@ beforeEach(() => {
   fetchGatewayCronJobsCalls.length = 0;
   startSyncRunCalls.length = 0;
 });
-
-mock.module("@clawops/agents", {
-  namedExports: {
-    initAgent: (_db: unknown, input: Record<string, unknown>) => {
-      initAgentCalls.push(input);
-      return {
-        agent: { id: "agent-1" },
-        created: true,
-      };
-    },
-  },
-});
-
-mock.module("@clawops/core", {
-  namedExports: {
-    events: Symbol("events"),
-  },
-});
-
-mock.module("./connections.js", {
-  namedExports: {
-    upsertOpenClawConnection: (_db: unknown, input: Record<string, unknown>) => {
-      upsertConnectionCalls.push(input);
-      return {
-        connection: {
-          id: "conn-1",
-          rootPath: input["rootPath"],
-          gatewayUrl: input["gatewayUrl"],
-        },
-        created: true,
-      };
-    },
-  },
-});
-
-mock.module("./openclaw/index.js", {
-  namedExports: {
-    scanOpenClaw: () => ({
-      agents: [
-        {
-          id: "main",
-          name: "Scout",
-          workspacePath: "/tmp/openclaw/workspace-main",
-          framework: "openclaw",
-          model: "gpt-5",
-          role: "researcher",
-          skills: ["docs"],
-          memoryPath: "/tmp/openclaw/workspace-main",
-        },
-      ],
-      workspaces: [
-        {
-          agentId: "main",
-          path: "/tmp/openclaw/workspace-main",
-          files: { identity: "Scout" },
-        },
-      ],
-      gatewayUrl: "http://localhost:4312",
-    }),
-    fetchGatewayCronJobs: async (gatewayUrl: string, gatewayToken: string) => {
-      fetchGatewayCronJobsCalls.push({ gatewayUrl, gatewayToken });
-      return [{ id: "cron-1", name: "Daily sync", schedule: "0 0 * * *", enabled: true }];
-    },
-  },
-});
-
-mock.module("./runs.js", {
-  namedExports: {
-    startSyncRun: (_db: unknown, input: Record<string, unknown>) => {
-      startSyncRunCalls.push(input);
-      return { id: "run-1" };
-    },
-    finishSyncRun: (_db: unknown, id: string, input: Record<string, unknown>) => {
-      finishSyncRunCalls.push({ id, input });
-      return { id, status: input["status"] };
-    },
-  },
-});
-
-const { onboardOpenClaw } = await import("./onboarding.js");
 
 describe("onboardOpenClaw", () => {
   it("persists the shared onboarding side effects through package services", async () => {
@@ -194,6 +116,8 @@ describe("onboardOpenClaw", () => {
     assert.equal(initAgentCalls.length, 1);
     assert.equal(finishSyncRunCalls.length, 1);
     assert.equal(fetchGatewayCronJobsCalls.length, 1);
+    const finishSyncRunInput = finishSyncRunCalls[0]?.["input"] as Record<string, unknown>;
+    assert.equal(finishSyncRunInput["connectionId"], "conn-1");
 
     const openclawIdentity = initAgentCalls[0]?.["openclaw"] as Record<string, unknown>;
     assert.equal(openclawIdentity["connectionId"], "conn-1");

@@ -31,14 +31,13 @@ const routes = [
   "PATCH /api/notifications/:id",
   "PATCH /api/notifications/:id/read",
   "PATCH /api/notifications/read-all",
-  "GET /api/activity",
   "GET /api/integrations/openclaw",
   "POST /api/integrations/openclaw",
   "GET /api/integrations/openclaw/:id",
   "PATCH /api/integrations/openclaw/:id",
   "GET /api/activity",
   "POST /api/sync/openclaw",
-  "GET /api/sync/openclaw  (latest status + recent sync runs)",
+  "GET /api/sync/openclaw",
   "POST /api/sync/openclaw/install-skill",
 ];
 
