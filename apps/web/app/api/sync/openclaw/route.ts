@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { listSyncRuns, onboardOpenClaw } from "@clawops/sync";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getAgentIdFromApiKey, getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
+import { getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
 
 const syncRequestSchema = z.object({
   openclawDir: z.string().optional(),
