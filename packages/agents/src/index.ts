@@ -3,6 +3,9 @@ import type { Agent, DB, OpenClawAgent } from "@clawops/core";
 import { agents, openclawAgents, toJsonArray } from "@clawops/core";
 import { generateId, hashApiKey, type AgentStatus } from "@clawops/domain";
 
+/** Subset of DB that both the root connection and a transaction satisfy. */
+type Queryable = Pick<DB, "insert" | "update" | "select" | "delete">;
+
 interface CreateAgentInput {
   name: string;
   model: string;
@@ -92,12 +95,12 @@ function findSingleAgentByNameAndFramework(
 }
 
 export function upsertOpenClawAgentIdentity(
-  db: DB,
+  db: Queryable,
   input: NonNullable<InitAgentInput["openclaw"]> & { linkedAgentId: string },
 ): OpenClawAgent {
   const now = new Date();
   const lastSeenAt = input.lastSeenAt ?? now;
-  const rows = db
+  const row = db
     .insert(openclawAgents)
     .values({
       connectionId: input.connectionId,
@@ -127,7 +130,7 @@ export function upsertOpenClawAgentIdentity(
       },
     })
     .returning()
-    .all();
+    .get();
 
   const row = rows[0];
   if (!row) {
@@ -237,6 +240,17 @@ export function getAgentByApiKey(db: DB, hashedKey: string): Agent | null {
   return rows[0] ?? null;
 }
 
+/**
+ * Initialise (find-or-create) an agent, optionally linking it to an OpenClaw
+ * identity.
+ *
+ * **OpenClaw identity coverage:**
+ * The durable identity lookup only activates when `input.openclaw` is provided.
+ * Currently the CLI `onboard` and `sync` commands do NOT pass OpenClaw fields
+ * because they run before a connection record exists.  Duplicate-on-rename
+ * prevention therefore only works for callers that supply OpenClaw identity
+ * (e.g. the web connect-wizard flow).
+ */
 export function initAgent(
   db: DB,
   input: InitAgentInput,
