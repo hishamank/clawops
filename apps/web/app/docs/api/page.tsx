@@ -31,6 +31,7 @@ const routes = [
   "PATCH /api/notifications/:id",
   "PATCH /api/notifications/:id/read",
   "PATCH /api/notifications/read-all",
+  "GET /api/activity",
   "GET /api/integrations/openclaw",
   "POST /api/integrations/openclaw",
   "GET /api/integrations/openclaw/:id",
