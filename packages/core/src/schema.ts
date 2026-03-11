@@ -255,27 +255,40 @@ export const habits = sqliteTable("habits", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
+  connectionId: text("connection_id").references(() => openclawConnections.id),
   agentId: text("agent_id")
     .notNull()
     .references(() => agents.id),
+  externalId: text("external_id"),
   name: text("name").notNull(),
   type: text("type", {
     enum: ["heartbeat", "scheduled", "cron", "hook", "watchdog", "polling"],
   }).notNull(),
   schedule: text("schedule"),
   cronExpr: text("cron_expr"),
+  scheduleKind: text("schedule_kind"),
+  scheduleExpr: text("schedule_expr"),
   trigger: text("trigger"),
+  sessionTarget: text("session_target"),
   status: text("status", {
     enum: ["active", "paused"],
   })
     .notNull()
     .default("active"),
+  enabled: integer("enabled", { mode: "boolean" })
+    .notNull()
+    .default(true),
   lastRun: integer("last_run", { mode: "timestamp" }),
   nextRun: integer("next_run", { mode: "timestamp" }),
+  lastSyncedAt: integer("last_synced_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
-});
+}, (table) => ({
+  connectionExternalIdentityUnique: uniqueIndex(
+    "habits_connection_external_id_unique",
+  ).on(table.connectionId, table.externalId),
+}));
 
 // ── Habit Runs ──────────────────────────────────────────────────────────────
 

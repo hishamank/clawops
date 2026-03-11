@@ -338,6 +338,9 @@ importers:
       '@clawops/core':
         specifier: workspace:*
         version: link:../core
+      '@clawops/habits':
+        specifier: workspace:*
+        version: link:../habits
     devDependencies:
       '@types/node':
         specifier: ^22.0.0

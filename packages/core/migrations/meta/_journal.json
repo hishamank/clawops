@@ -64,6 +64,13 @@
       "when": 1773225600000,
       "tag": "0008_tracked_workspace_files",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1773222000000,
+      "tag": "0009_openclaw_cron_foundation",
+      "breakpoints": true
     }
   ]
 }

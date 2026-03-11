@@ -2,6 +2,7 @@
 
 import { Command } from "commander";
 import { agentCmd } from "./commands/agent.js";
+import { cronCmd } from "./commands/cron.js";
 import { habitCmd } from "./commands/habit.js";
 import { taskCmd } from "./commands/task.js";
 import { ideaCmd } from "./commands/idea.js";
@@ -20,6 +21,7 @@ program
   .option("--json", "Output raw JSON");
 
 program.addCommand(agentCmd);
+program.addCommand(cronCmd);
 program.addCommand(habitCmd);
 program.addCommand(taskCmd);
 program.addCommand(ideaCmd);
