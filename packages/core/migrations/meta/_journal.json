@@ -71,6 +71,13 @@
       "when": 1773222000000,
       "tag": "0009_openclaw_cron_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1773226000000,
+      "tag": "0010_openclaw_sessions",
+      "breakpoints": true
     }
   ]
 }

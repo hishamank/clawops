@@ -114,6 +114,7 @@ export const workspaceFiles = sqliteTable(
     lastSeenAt: integer("last_seen_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
+
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
@@ -513,6 +514,8 @@ export type OpenClawAgent = typeof openclawAgents.$inferSelect;
 export type NewOpenClawAgent = typeof openclawAgents.$inferInsert;
 export type WorkspaceFile = typeof workspaceFiles.$inferSelect;
 export type NewWorkspaceFile = typeof workspaceFiles.$inferInsert;
+export type OpenClawSession = typeof openclawSessions.$inferSelect;
+export type NewOpenClawSession = typeof openclawSessions.$inferInsert;
 
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
