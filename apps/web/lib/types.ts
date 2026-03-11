@@ -9,6 +9,7 @@ import type {
   IdeaStatus,
   Source,
 } from "@clawops/domain";
+import type { ActivityEventSeverity, ActivityEventSource } from "@clawops/core";
 
 export interface Agent {
   id: string;
@@ -127,4 +128,20 @@ export interface AgentDetail extends Agent {
   recentTasks?: Task[];
   habits?: Habit[];
   streaks?: Record<string, HabitStreak[]>;
+}
+
+export interface ActivityEvent {
+  id: string;
+  source: ActivityEventSource;
+  severity: ActivityEventSeverity;
+  type: string;
+  title: string;
+  body: string | null;
+  agentId: string | null;
+  entityType: string | null;
+  entityId: string | null;
+  projectId: string | null;
+  taskId: string | null;
+  metadata: string | null;
+  createdAt: string;
 }

@@ -35,6 +35,7 @@ const routes = [
   "POST /api/integrations/openclaw",
   "GET /api/integrations/openclaw/:id",
   "PATCH /api/integrations/openclaw/:id",
+  "GET /api/activity",
   "POST /api/sync/openclaw",
   "GET /api/sync/openclaw  (latest status + recent sync runs)",
   "POST /api/sync/openclaw/install-skill",

@@ -147,13 +147,34 @@ export const syncCmd = new Command("sync")
       cronJobCount = cronJobs.length;
     }
 
-    // Save sync state
+    // Save sync state and emit activity event
     if (!isDryRun) {
       try {
         fs.writeFileSync(
           stateFile,
           JSON.stringify({ agentIds: currentAgentIds, syncedAt: new Date().toISOString() }),
         );
+      } catch {
+        // Non-critical
+      }
+
+      const { createActivityEvent } = await import("@clawops/core");
+      const { db: activityDb } = await import("@clawops/core/db");
+      try {
+        createActivityEvent(activityDb, {
+          source: "sync",
+          type: "sync.completed",
+          title: `CLI sync completed: ${scan.agents.length} agents, ${cronJobCount} cron jobs`,
+          entityType: "sync_run",
+          metadata: JSON.stringify({
+            agentCount: scan.agents.length,
+            cronJobCount,
+            addedAgents,
+            removedAgents,
+            registryCreated,
+            skillsInstalled: installed,
+          }),
+        });
       } catch {
         // Non-critical
       }

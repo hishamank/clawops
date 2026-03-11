@@ -2,17 +2,18 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { events, type DB } from "@clawops/core";
+import { events, createActivityEvent, type DB } from "@clawops/core";
 import { promoteIdeaToProject } from "@clawops/ideas";
 import { ConflictError, NotFoundError } from "@clawops/domain";
-import { getDb, jsonError } from "@/lib/server/runtime";
+import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
 
 export async function POST(
-  _request: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   const { id } = await params;
   const db = getDb();
+  const agentId = getAgentIdFromApiKey(req) ?? undefined;
   try {
     const result = db.transaction((tx) => {
       const r = promoteIdeaToProject(tx as unknown as DB, id);
@@ -21,6 +22,7 @@ export async function POST(
           action: "idea.promoted",
           entityType: "idea",
           entityId: r.idea.id,
+          agentId,
           meta: JSON.stringify({ projectId: r.project.id }),
         })
         .run();
@@ -29,9 +31,30 @@ export async function POST(
           action: "project.created",
           entityType: "project",
           entityId: r.project.id,
+          agentId,
           meta: JSON.stringify({ name: r.project.name, ideaId: r.idea.id }),
         })
         .run();
+      createActivityEvent(tx as unknown as DB, {
+        source: agentId ? "agent" : "user",
+        type: "idea.promoted",
+        title: `Idea promoted to project: ${r.idea.title}`,
+        entityType: "idea",
+        entityId: r.idea.id,
+        projectId: r.project.id,
+        agentId,
+        metadata: JSON.stringify({ ideaTitle: r.idea.title, projectId: r.project.id, projectName: r.project.name }),
+      });
+      createActivityEvent(tx as unknown as DB, {
+        source: agentId ? "agent" : "user",
+        type: "project.created",
+        title: `Project created from idea: ${r.project.name}`,
+        entityType: "project",
+        entityId: r.project.id,
+        projectId: r.project.id,
+        agentId,
+        metadata: JSON.stringify({ name: r.project.name, ideaId: r.idea.id, ideaTitle: r.idea.title }),
+      });
       return r;
     });
 

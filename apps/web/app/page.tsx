@@ -9,6 +9,7 @@ import { OnboardingBanner } from "@/components/onboarding/onboarding-banner";
 import { listAgents } from "@clawops/agents";
 import { getTokenSummary as getAnalyticsTokenSummary } from "@clawops/analytics";
 import { getDb } from "@/lib/server/runtime";
+import { listActivityEvents } from "./activity/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -35,9 +36,10 @@ function getTokenSummaryInternal(): { totalIn: number; totalOut: number; totalCo
 }
 
 export default async function FleetOverview(): Promise<React.JSX.Element> {
-  const [agents, tokenSummary] = await Promise.all([
+  const [agents, tokenSummary, initialEvents] = await Promise.all([
     getAgents(),
     getTokenSummary(),
+    listActivityEvents({ limit: 20 }),
   ]);
 
   const activeAgents = agents.filter((a) => a.status === "online" || a.status === "busy");
@@ -124,7 +126,7 @@ export default async function FleetOverview(): Promise<React.JSX.Element> {
 
         {/* Activity Feed */}
         <div className="space-y-4">
-          <ActivityFeed agents={agents} />
+          <ActivityFeed agents={agents} embedded initialEvents={initialEvents} />
         </div>
       </div>
 

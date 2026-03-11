@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import crypto from "node:crypto";
-import { events, type DB } from "@clawops/core";
+import { createActivityEvent, events, type DB } from "@clawops/core";
 import { finishSyncRun, listSyncRuns, openclaw, startSyncRun } from "@clawops/sync";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -102,6 +102,24 @@ export async function POST(req: Request): Promise<NextResponse> {
       return result;
     });
 
+    try {
+      createActivityEvent(db, {
+        source: "sync",
+        type: "sync.completed",
+        title: `Sync completed: ${agents.length} agents, ${cronJobs.length} cron jobs`,
+        entityType: "sync_run",
+        entityId: completed.id,
+        metadata: JSON.stringify({
+          agentCount: agents.length,
+          cronJobCount: cronJobs.length,
+          workspaceCount: workspaces.length,
+          agentNames: agents.map((a) => a.name),
+        }),
+      });
+    } catch {
+      // Non-critical
+    }
+
     return NextResponse.json({
       success: true,
       syncRunId: completed.id,
@@ -131,6 +149,19 @@ export async function POST(req: Request): Promise<NextResponse> {
         createdAt: new Date(),
       })
       .run();
+    try {
+      createActivityEvent(db, {
+        source: "sync",
+        severity: "error",
+        type: "sync.failed",
+        title: "Sync failed",
+        entityType: "sync_run",
+        entityId: run.id,
+        metadata: JSON.stringify({ error: message, syncRunId: run.id }),
+      });
+    } catch {
+      // Non-critical
+    }
     return jsonError(500, message, "INTERNAL_ERROR");
   }
 }

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events, type DB } from "@clawops/core";
+import { events, createActivityEvent, type DB } from "@clawops/core";
 import { ProjectStatus } from "@clawops/domain";
 import { createProject, listProjects } from "@clawops/projects";
 import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
@@ -35,6 +35,16 @@ export async function POST(req: Request): Promise<NextResponse> {
           meta: JSON.stringify({ name: p.name }),
         })
         .run();
+      createActivityEvent(tx as unknown as DB, {
+        source: agentId ? "agent" : "user",
+        type: "project.created",
+        title: `Project created: ${p.name}`,
+        entityType: "project",
+        entityId: p.id,
+        projectId: p.id,
+        agentId,
+        metadata: JSON.stringify({ name: p.name, status: p.status }),
+      });
       return p;
     });
     return NextResponse.json(project, { status: 201 });
