@@ -98,6 +98,36 @@ export const openclawAgents = sqliteTable(
   }),
 );
 
+export const workspaceFiles = sqliteTable(
+  "workspace_files",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    connectionId: text("connection_id")
+      .notNull()
+      .references(() => openclawConnections.id),
+    workspacePath: text("workspace_path").notNull(),
+    relativePath: text("relative_path").notNull(),
+    fileHash: text("file_hash"),
+    sizeBytes: integer("size_bytes"),
+    lastSeenAt: integer("last_seen_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (table) => ({
+    connectionRelativePathUnique: uniqueIndex(
+      "workspace_files_connection_relative_path_unique",
+    ).on(table.connectionId, table.relativePath),
+  }),
+);
+
 // ── Projects ────────────────────────────────────────────────────────────────
 
 export const projects = sqliteTable("projects", {
@@ -468,6 +498,8 @@ export type OpenClawConnection = typeof openclawConnections.$inferSelect;
 export type NewOpenClawConnection = typeof openclawConnections.$inferInsert;
 export type OpenClawAgent = typeof openclawAgents.$inferSelect;
 export type NewOpenClawAgent = typeof openclawAgents.$inferInsert;
+export type WorkspaceFile = typeof workspaceFiles.$inferSelect;
+export type NewWorkspaceFile = typeof workspaceFiles.$inferInsert;
 
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
