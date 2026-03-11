@@ -9,6 +9,8 @@ import { fetchGatewayCronJobs, scanOpenClaw } from "./openclaw/index.js";
 import { finishSyncRun, startSyncRun } from "./runs.js";
 import type { SyncAgent, SyncCronJob, SyncWorkspace } from "./types.js";
 
+type TransactionDb = Parameters<DB["transaction"]>[0] extends (tx: infer T) => unknown ? T : DB;
+
 export interface OpenClawOnboardingInput {
   source: string;
   openclawDir?: string;
@@ -129,7 +131,7 @@ export async function onboardOpenClaw(
       : [];
     const syncedAt = new Date();
 
-    return db.transaction((tx) => {
+    return db.transaction((tx: TransactionDb) => {
       const connection = dependencies.upsertOpenClawConnection(tx as unknown as DB, {
         name: input.connectionName ?? defaultConnectionName(openclawDir),
         rootPath: openclawDir,
@@ -213,6 +215,7 @@ export async function onboardOpenClaw(
       });
 
       dependencies.finishSyncRun(tx as unknown as DB, run.id, {
+        connectionId: connection.connection.id,
         status: "success",
         agentCount: scanResult.agents.length,
         cronJobCount: cronJobs.length,

@@ -89,6 +89,12 @@ Suggested fields:
 - `createdAt`
 - `updatedAt`
 
+Implementation note:
+
+- use `(connectionId, externalAgentId)` as the canonical durable identity
+- onboarding and sync should upsert this mapping on every discovery pass
+- only fall back to a single `name + framework` match when linking legacy pre-mapping agents
+
 ### Changes to `agents`
 
 Add optional fields:

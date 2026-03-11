@@ -39,7 +39,7 @@ interface SelectChain<T> {
 }
 
 interface UpdateChain {
-  set: () => UpdateChain;
+  set: (value: Record<string, unknown>) => UpdateChain;
   where: () => UpdateChain;
   returning: () => UpdateChain;
   all: () => SyncRun[];
@@ -70,6 +70,7 @@ function makeDb(options?: {
   insertedRuns?: SyncRun[];
   onTransaction?: () => void;
   onInsertItems?: () => void;
+  onUpdateRun?: (value: Record<string, unknown>) => void;
 }): DB {
   const runs = options?.runs ?? [BASE_RUN];
   const items = options?.items ?? [BASE_ITEM];
@@ -87,7 +88,10 @@ function makeDb(options?: {
 
   let selectCall = 0;
   const updateChain: UpdateChain = {
-    set: () => updateChain,
+    set: (value) => {
+      options?.onUpdateRun?.(value);
+      return updateChain;
+    },
     where: () => updateChain,
     returning: () => updateChain,
     all: () => updatedRuns,
@@ -148,6 +152,7 @@ describe("finishSyncRun", () => {
   it("wraps updates in a transaction and returns the completed summary", () => {
     let transactionCount = 0;
     let insertItemCount = 0;
+    let updatedConnectionId: string | null | undefined;
     const result = finishSyncRun(
       makeDb({
         onTransaction: () => {
@@ -156,9 +161,13 @@ describe("finishSyncRun", () => {
         onInsertItems: () => {
           insertItemCount += 1;
         },
+        onUpdateRun: (value) => {
+          updatedConnectionId = (value["connectionId"] as string | null | undefined) ?? undefined;
+        },
       }),
       "run-1",
       {
+        connectionId: "conn-1",
         status: "success",
         items: [
           {
@@ -172,6 +181,7 @@ describe("finishSyncRun", () => {
 
     assert.equal(transactionCount, 1);
     assert.equal(insertItemCount, 1);
+    assert.equal(updatedConnectionId, "conn-1");
     assert.equal(result.status, "success");
     assert.equal(result.items.length, 1);
     assert.equal(result.metaObject["gatewayUrl"], "http://localhost:3000");

@@ -1,9 +1,7 @@
-import { eq, and } from "drizzle-orm";
-import type { DB, Agent, OpenClawAgent } from "@clawops/core";
+import { and, eq } from "drizzle-orm";
+import type { Agent, DB, OpenClawAgent } from "@clawops/core";
 import { agents, openclawAgents, toJsonArray } from "@clawops/core";
 import { generateId, hashApiKey, type AgentStatus } from "@clawops/domain";
-
-// ── Input types ────────────────────────────────────────────────────────────
 
 interface CreateAgentInput {
   name: string;
@@ -41,6 +39,24 @@ interface OpenClawIdentityLookupInput {
   externalAgentId: string;
 }
 
+export function getOpenClawAgentMapping(
+  db: DB,
+  connectionId: string,
+  externalAgentId: string,
+): OpenClawAgent | null {
+  return db
+    .select()
+    .from(openclawAgents)
+    .where(
+      and(
+        eq(openclawAgents.connectionId, connectionId),
+        eq(openclawAgents.externalAgentId, externalAgentId),
+      ),
+    )
+    .limit(1)
+    .get() ?? null;
+}
+
 export function getAgentByOpenClawIdentity(
   db: DB,
   input: OpenClawIdentityLookupInput,
@@ -59,24 +75,6 @@ export function getAgentByOpenClawIdentity(
     .all();
 
   return rows[0]?.agent ?? null;
-}
-
-export function getOpenClawAgentMapping(
-  db: DB,
-  connectionId: string,
-  externalAgentId: string,
-): OpenClawAgent | null {
-  return db
-    .select()
-    .from(openclawAgents)
-    .where(
-      and(
-        eq(openclawAgents.connectionId, connectionId),
-        eq(openclawAgents.externalAgentId, externalAgentId),
-      ),
-    )
-    .limit(1)
-    .get() ?? null;
 }
 
 function findSingleAgentByNameAndFramework(
@@ -134,8 +132,6 @@ export function upsertOpenClawAgentIdentity(
   return rows[0]!;
 }
 
-// ── createAgent ────────────────────────────────────────────────────────────
-
 export function createAgent(
   db: DB,
   input: CreateAgentInput,
@@ -163,8 +159,6 @@ export function createAgent(
   return { ...agent, apiKey: rawKey };
 }
 
-// ── getAgent ───────────────────────────────────────────────────────────────
-
 export function getAgent(db: DB, id: string): Agent | null {
   const rows = db
     .select()
@@ -175,13 +169,9 @@ export function getAgent(db: DB, id: string): Agent | null {
   return rows[0] ?? null;
 }
 
-// ── listAgents ─────────────────────────────────────────────────────────────
-
 export function listAgents(db: DB): Agent[] {
   return db.select().from(agents).all();
 }
-
-// ── updateAgentStatus ──────────────────────────────────────────────────────
 
 export function updateAgentStatus(
   db: DB,
@@ -208,8 +198,6 @@ export function updateAgentStatus(
   return agent;
 }
 
-// ── updateAgentSkills ──────────────────────────────────────────────────────
-
 export function updateAgentSkills(
   db: DB,
   id: string,
@@ -230,8 +218,6 @@ export function updateAgentSkills(
   return agent;
 }
 
-// ── getAgentByApiKey ───────────────────────────────────────────────────────
-
 export function getAgentByApiKey(db: DB, hashedKey: string): Agent | null {
   const rows = db
     .select()
@@ -241,8 +227,6 @@ export function getAgentByApiKey(db: DB, hashedKey: string): Agent | null {
     .all();
   return rows[0] ?? null;
 }
-
-// ── initAgent ──────────────────────────────────────────────────────────────
 
 export function initAgent(
   db: DB,

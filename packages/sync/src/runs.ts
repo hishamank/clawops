@@ -11,6 +11,8 @@ import {
   type SyncRunItem,
 } from "@clawops/core";
 
+type TransactionDb = Parameters<DB["transaction"]>[0] extends (tx: infer T) => unknown ? T : DB;
+
 export interface StartSyncRunInput {
   connectionId?: string;
   syncType?: "manual" | "scheduled" | "reconcile";
@@ -26,6 +28,7 @@ export interface FinishSyncRunItemInput {
 }
 
 export interface FinishSyncRunInput {
+  connectionId?: string | null;
   status: "success" | "failed";
   agentCount?: number;
   cronJobCount?: number;
@@ -97,10 +100,11 @@ export function startSyncRun(db: DB, input: StartSyncRunInput = {}): SyncRun {
 }
 
 export function finishSyncRun(db: DB, id: string, input: FinishSyncRunInput): SyncRunSummary {
-  return db.transaction((tx) => {
+  return db.transaction((tx: TransactionDb) => {
     const rows = tx
       .update(syncRuns)
       .set({
+        connectionId: input.connectionId === undefined ? undefined : input.connectionId,
         status: input.status,
         completedAt: new Date(),
         agentCount: input.agentCount ?? 0,
@@ -152,10 +156,15 @@ export function getSyncRun(db: DB, id: string): SyncRunSummary | null {
 }
 
 export function listSyncRuns(db: DB, limit = 10): SyncRunSummary[] {
-  const runs = db.select().from(syncRuns).orderBy(desc(syncRuns.startedAt)).limit(limit).all();
+  const runs: SyncRun[] = db
+    .select()
+    .from(syncRuns)
+    .orderBy(desc(syncRuns.startedAt))
+    .limit(limit)
+    .all();
   const items = listSyncRunItemsByRunIds(
     db,
-    runs.map((run) => run.id),
+    runs.map((run: SyncRun) => run.id),
   );
   const itemsByRunId = new Map<string, SyncRunItem[]>();
 
@@ -165,5 +174,5 @@ export function listSyncRuns(db: DB, limit = 10): SyncRunSummary[] {
     itemsByRunId.set(item.syncRunId, existing);
   }
 
-  return runs.map((run) => buildSyncRunSummary(run, itemsByRunId.get(run.id) ?? []));
+  return runs.map((run: SyncRun) => buildSyncRunSummary(run, itemsByRunId.get(run.id) ?? []));
 }
