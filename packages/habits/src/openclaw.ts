@@ -258,7 +258,9 @@ export function listCronJobs(
     .orderBy(desc(habits.createdAt));
 
   if (filters.connectionId) {
-    return query.where(eq(habits.connectionId, filters.connectionId)).all();
+    return query
+      .where(and(eq(habits.connectionId, filters.connectionId), eq(habits.type, "cron")))
+      .all();
   }
 
   return query.where(eq(habits.type, "cron")).all();
