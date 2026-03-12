@@ -1,7 +1,10 @@
 import {
+  and,
   eq,
+  lt,
   openclawConnections,
   parseJsonObject,
+  sql,
   workspaceFiles,
   type DB,
   type OpenClawConnection,
@@ -29,6 +32,8 @@ export interface WorkspaceFileSyncResult {
   updated: WorkspaceFileChange[];
   unchangedCount: number;
 }
+
+const WORKSPACE_FILES_FETCH_TIMEOUT_MS = 30_000;
 
 function toNullableString(value: unknown): string | null {
   if (typeof value !== "string") {
@@ -106,7 +111,7 @@ export async function fetchWorkspaceFiles(
   const url = new URL("/api/workspace/files", gatewayUrl).toString();
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
-    signal: AbortSignal.timeout(5000),
+    signal: AbortSignal.timeout(WORKSPACE_FILES_FETCH_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -123,7 +128,7 @@ export function upsertWorkspaceFiles(
   files: OpenClawWorkspaceFile[],
 ): WorkspaceFileSyncResult {
   return db.transaction((tx: TransactionDb) => {
-    const now = new Date();
+    const syncStartedAt = new Date();
     const existingRows = tx
       .select()
       .from(workspaceFiles)
@@ -138,65 +143,100 @@ export function upsertWorkspaceFiles(
 
     const inserted: WorkspaceFile[] = [];
     const updated: WorkspaceFileChange[] = [];
-    let unchangedCount = 0;
+    const rowsToUpsert = [];
+    const changedRelativePaths = new Set<string>();
 
     for (const file of uniqueFiles.values()) {
       const current = existingByRelativePath.get(file.relativePath);
       const nextHash = file.fileHash ?? null;
       const nextSize = file.sizeBytes ?? null;
 
-      if (!current) {
-        const created = tx
-          .insert(workspaceFiles)
-          .values({
-            connectionId,
-            workspacePath: file.workspacePath,
-            relativePath: file.relativePath,
-            fileHash: nextHash,
-            sizeBytes: nextSize,
-            lastSeenAt: now,
-            createdAt: now,
-            updatedAt: now,
-          })
-          .returning()
-          .get();
-
-        inserted.push(created);
-        continue;
-      }
-
       const changed =
+        !current ||
         current.workspacePath !== file.workspacePath ||
         (current.fileHash ?? null) !== nextHash ||
         (current.sizeBytes ?? null) !== nextSize;
 
       if (changed) {
-        const updatedRow = tx
-          .update(workspaceFiles)
-          .set({
-            workspacePath: file.workspacePath,
-            fileHash: nextHash,
-            sizeBytes: nextSize,
-            lastSeenAt: now,
-            updatedAt: now,
-          })
-          .where(eq(workspaceFiles.id, current.id))
-          .returning()
-          .get();
+        changedRelativePaths.add(file.relativePath);
+      }
 
-        updated.push({
-          file: updatedRow,
-          previousHash: current.fileHash ?? null,
-          changed: (current.fileHash ?? null) !== nextHash,
-        });
+      rowsToUpsert.push({
+        connectionId,
+        workspacePath: file.workspacePath,
+        relativePath: file.relativePath,
+        fileHash: nextHash,
+        sizeBytes: nextSize,
+        lastSeenAt: syncStartedAt,
+        createdAt: current?.createdAt ?? syncStartedAt,
+        updatedAt: syncStartedAt,
+      });
+    }
+
+    const upsertedRows =
+      rowsToUpsert.length === 0
+        ? []
+        : tx
+            .insert(workspaceFiles)
+            .values(rowsToUpsert)
+            .onConflictDoUpdate({
+              target: [workspaceFiles.connectionId, workspaceFiles.relativePath],
+              set: {
+                workspacePath: sql.raw(`excluded.${workspaceFiles.workspacePath.name}`),
+                fileHash: sql.raw(`excluded.${workspaceFiles.fileHash.name}`),
+                sizeBytes: sql.raw(`excluded.${workspaceFiles.sizeBytes.name}`),
+                lastSeenAt: sql.raw(`excluded.${workspaceFiles.lastSeenAt.name}`),
+                updatedAt: sql`
+                  case
+                    when ${workspaceFiles.workspacePath} is not excluded.${sql.raw(workspaceFiles.workspacePath.name)}
+                      or ${workspaceFiles.fileHash} is not excluded.${sql.raw(workspaceFiles.fileHash.name)}
+                      or ${workspaceFiles.sizeBytes} is not excluded.${sql.raw(workspaceFiles.sizeBytes.name)}
+                    then excluded.${sql.raw(workspaceFiles.updatedAt.name)}
+                    else ${workspaceFiles.updatedAt}
+                  end
+                `,
+              },
+            })
+            .returning()
+            .all();
+    const upsertedByRelativePath = new Map(upsertedRows.map((row) => [row.relativePath, row]));
+
+    for (const file of uniqueFiles.values()) {
+      const row = upsertedByRelativePath.get(file.relativePath);
+      if (!row) {
         continue;
       }
 
-      tx.update(workspaceFiles)
-        .set({ lastSeenAt: now })
-        .where(eq(workspaceFiles.id, current.id))
-        .run();
-      unchangedCount += 1;
+      const previous = existingByRelativePath.get(file.relativePath);
+      if (!previous) {
+        inserted.push(row);
+        continue;
+      }
+
+      if (!changedRelativePaths.has(file.relativePath)) {
+        continue;
+      }
+
+      updated.push({
+        file: row,
+        previousHash: previous.fileHash ?? null,
+        changed: (previous.fileHash ?? null) !== (file.fileHash ?? null),
+      });
+    }
+
+    tx.delete(workspaceFiles)
+      .where(
+        and(
+          eq(workspaceFiles.connectionId, connectionId),
+          lt(workspaceFiles.lastSeenAt, syncStartedAt),
+        ),
+      )
+      .run();
+
+    const unchangedCount = uniqueFiles.size - inserted.length - updated.length;
+
+    if (unchangedCount < 0) {
+      throw new Error(`Workspace file sync produced an invalid unchanged count for ${connectionId}`);
     }
 
     return {
