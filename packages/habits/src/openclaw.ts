@@ -277,56 +277,58 @@ export function upsertCronJobs(
 ): Habit[] {
   const syncedAt = new Date();
 
-  return jobs.map((job) => {
-    const existing = db
-      .select()
-      .from(habits)
-      .where(
-        and(
-          eq(habits.connectionId, connectionId),
-          eq(habits.externalId, job.id),
-        ),
-      )
-      .get();
+  return db.transaction((tx) =>
+    jobs.map((job) => {
+      const existing = tx
+        .select()
+        .from(habits)
+        .where(
+          and(
+            eq(habits.connectionId, connectionId),
+            eq(habits.externalId, job.id),
+          ),
+        )
+        .get();
 
-    const agentId = resolveAgentId(db, connectionId, job.sessionTarget, existing?.agentId ?? null);
-    const values = {
-      connectionId,
-      agentId,
-      externalId: job.id,
-      name: job.name,
-      type: "cron" as const,
-      schedule: job.scheduleRaw,
-      cronExpr: job.scheduleKind === "cron" ? job.scheduleExpr : null,
-      scheduleKind: job.scheduleKind,
-      scheduleExpr: job.scheduleExpr,
-      sessionTarget: job.sessionTarget,
-      trigger: job.sessionTarget,
-      status: job.enabled ? ("active" as const) : ("paused" as const),
-      enabled: job.enabled,
-      lastRun: job.lastRunAt ?? null,
-      nextRun: job.nextRunAt ?? null,
-      lastSyncedAt: syncedAt,
-    };
+      const agentId = resolveAgentId(tx as unknown as DB, connectionId, job.sessionTarget, existing?.agentId ?? null);
+      const values = {
+        connectionId,
+        agentId,
+        externalId: job.id,
+        name: job.name,
+        type: "cron" as const,
+        schedule: job.scheduleRaw,
+        cronExpr: job.scheduleKind === "cron" ? job.scheduleExpr : null,
+        scheduleKind: job.scheduleKind,
+        scheduleExpr: job.scheduleExpr,
+        sessionTarget: job.sessionTarget,
+        trigger: job.sessionTarget,
+        status: job.enabled ? ("active" as const) : ("paused" as const),
+        enabled: job.enabled,
+        lastRun: job.lastRunAt ?? null,
+        nextRun: job.nextRunAt ?? null,
+        lastSyncedAt: syncedAt,
+      };
 
-    const row = existing
-      ? db
-          .update(habits)
-          .set(values)
-          .where(eq(habits.id, existing.id))
-          .returning()
-          .get()
-      : db
-          .insert(habits)
-          .values({
-            id: crypto.randomUUID(),
-            ...values,
-          })
-          .returning()
-          .get();
+      const row = existing
+        ? tx
+            .update(habits)
+            .set(values)
+            .where(eq(habits.id, existing.id))
+            .returning()
+            .get()
+        : tx
+            .insert(habits)
+            .values({
+              id: crypto.randomUUID(),
+              ...values,
+            })
+            .returning()
+            .get();
 
-    return row;
-  });
+      return row;
+    }),
+  );
 }
 
 export async function updateCronJob(
