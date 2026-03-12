@@ -3,9 +3,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { initAgent } from "@clawops/agents";
-import { events, type DB } from "@clawops/core";
+import { events, type DB, type OpenClawConnection } from "@clawops/core";
 import { upsertOpenClawConnection, type OpenClawConnectionSyncMode } from "./connections.js";
 import { fetchGatewayCronJobs, scanOpenClaw } from "./openclaw/index.js";
+import { syncWorkspaceFiles } from "./openclaw/files.js";
 import { finishSyncRunWithTx, startSyncRun } from "./runs.js";
 import type { SyncAgent, SyncCronJob, SyncWorkspace } from "./types.js";
 
@@ -48,6 +49,7 @@ interface OnboardingDependencies {
   upsertOpenClawConnection: typeof upsertOpenClawConnection;
   scanOpenClaw: typeof scanOpenClaw;
   fetchGatewayCronJobs: typeof fetchGatewayCronJobs;
+  syncWorkspaceFiles: typeof syncWorkspaceFiles;
   startSyncRun: typeof startSyncRun;
   finishSyncRunWithTx: typeof finishSyncRunWithTx;
 }
@@ -59,6 +61,7 @@ const defaultDependencies: OnboardingDependencies = {
   upsertOpenClawConnection,
   scanOpenClaw,
   fetchGatewayCronJobs,
+  syncWorkspaceFiles,
   startSyncRun,
   finishSyncRunWithTx,
 };
@@ -130,8 +133,9 @@ export async function onboardOpenClaw(
         ).catch(() => [])
       : [];
     const syncedAt = new Date();
+    let connectionForFileSync: OpenClawConnection | null = null;
 
-    return db.transaction((tx: TransactionDb) => {
+    const result = db.transaction((tx: TransactionDb) => {
       const connection = dependencies.upsertOpenClawConnection(tx as unknown as DB, {
         name: input.connectionName ?? defaultConnectionName(openclawDir),
         rootPath: openclawDir,
@@ -147,6 +151,7 @@ export async function onboardOpenClaw(
           cronJobCount: cronJobs.length,
         },
       });
+      connectionForFileSync = connection.connection;
 
       tx.insert(events)
         .values({
@@ -294,6 +299,12 @@ export async function onboardOpenClaw(
         agentRegistrations,
       };
     });
+
+    if (input.includeFiles && connectionForFileSync) {
+      await dependencies.syncWorkspaceFiles(db, connectionForFileSync);
+    }
+
+    return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     db.transaction((tx: TransactionDb) => {

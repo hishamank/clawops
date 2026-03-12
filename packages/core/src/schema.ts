@@ -106,7 +106,7 @@ export const workspaceFiles = sqliteTable(
       .$defaultFn(() => crypto.randomUUID()),
     connectionId: text("connection_id")
       .notNull()
-      .references(() => openclawConnections.id),
+      .references(() => openclawConnections.id, { onDelete: "cascade" }),
     workspacePath: text("workspace_path").notNull(),
     relativePath: text("relative_path").notNull(),
     fileHash: text("file_hash"),
