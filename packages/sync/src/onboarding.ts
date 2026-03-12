@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { initAgent } from "@clawops/agents";
 import { events, type DB, type OpenClawConnection } from "@clawops/core";
+import { upsertCronJobs } from "@clawops/habits";
 import { upsertOpenClawConnection, type OpenClawConnectionSyncMode } from "./connections.js";
 import { fetchGatewayCronJobs, scanOpenClaw } from "./openclaw/index.js";
 import { syncWorkspaceFiles } from "./openclaw/files.js";
@@ -50,6 +51,7 @@ interface OnboardingDependencies {
   scanOpenClaw: typeof scanOpenClaw;
   fetchGatewayCronJobs: typeof fetchGatewayCronJobs;
   syncWorkspaceFiles: typeof syncWorkspaceFiles;
+  upsertCronJobs: typeof upsertCronJobs;
   startSyncRun: typeof startSyncRun;
   finishSyncRunWithTx: typeof finishSyncRunWithTx;
 }
@@ -62,6 +64,7 @@ const defaultDependencies: OnboardingDependencies = {
   scanOpenClaw,
   fetchGatewayCronJobs,
   syncWorkspaceFiles,
+  upsertCronJobs,
   startSyncRun,
   finishSyncRunWithTx,
 };
@@ -218,6 +221,22 @@ export async function onboardOpenClaw(
           created: registration.created,
         };
       });
+
+      dependencies.upsertCronJobs(
+        tx as unknown as DB,
+        connection.connection.id,
+        cronJobs.map((job) => ({
+          id: job.id,
+          name: job.name,
+          enabled: job.enabled,
+          scheduleKind: "cron",
+          scheduleExpr: job.schedule,
+          sessionTarget: "main",
+          scheduleRaw: JSON.stringify(job.schedule),
+          lastRunAt: job.lastRunAt ? new Date(job.lastRunAt) : null,
+          nextRunAt: null,
+        })),
+      );
 
       dependencies.finishSyncRunWithTx(tx as unknown as DB, run.id, {
         connectionId: connection.connection.id,

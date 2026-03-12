@@ -102,7 +102,13 @@ function createFakeDb() {
                     ),
                   )
                   .map((mapping) => ({
-                    agent: state.agents.find((agent) => agent.id === mapping.linkedAgentId)!,
+                    agent:
+                      state.agents.find((agent) => agent.id === mapping.linkedAgentId) ??
+                      (() => {
+                        throw new Error(
+                          `Missing linked agent for mapping ${mapping.linkedAgentId}`,
+                        );
+                      })(),
                   }));
               }
 
@@ -157,10 +163,12 @@ function createFakeDb() {
                     mapping.connectionId === insertedValues["connectionId"] &&
                     mapping.externalAgentId === insertedValues["externalAgentId"],
                 );
+                const existingMapping =
+                  existingIndex >= 0 ? state.mappings[existingIndex] : null;
                 const mapping = {
                   id:
                     existingIndex >= 0
-                      ? state.mappings[existingIndex]!.id
+                      ? existingMapping?.id ?? `mapping-${state.nextMappingId++}`
                       : `mapping-${state.nextMappingId++}`,
                   connectionId: String(insertedValues["connectionId"]),
                   linkedAgentId: String(insertedValues["linkedAgentId"]),
@@ -174,7 +182,7 @@ function createFakeDb() {
                   lastSeenAt: (insertedValues["lastSeenAt"] as Date | null) ?? null,
                   createdAt:
                     existingIndex >= 0
-                      ? state.mappings[existingIndex]!.createdAt
+                      ? existingMapping?.createdAt ?? new Date()
                       : new Date(),
                   updatedAt: (insertedValues["updatedAt"] as Date | null) ?? new Date(),
                 } satisfies OpenClawAgent;

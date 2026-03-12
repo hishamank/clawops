@@ -20,7 +20,8 @@
   },
   "dependencies": {
     "@clawops/agents": "workspace:*",
-    "@clawops/core": "workspace:*"
+    "@clawops/core": "workspace:*",
+    "@clawops/habits": "workspace:*"
   },
   "exports": {
     ".": {

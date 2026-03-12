@@ -1,3 +1,5 @@
+/* eslint-disable no-console -- CLI tool uses console for output */
+
 import { Command } from "commander";
 import { taskCreate, taskList, taskUpdate, taskDone, taskSpec, taskSpecSet, taskSpecSetFile, taskSpecAppend } from "../lib/client.js";
 import * as fs from "node:fs";

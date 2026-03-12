@@ -246,3 +246,5 @@ export function logHeartbeat(db: DB, agentId: string): HabitRun {
     return run;
   });
 }
+
+export * from "./openclaw.js";

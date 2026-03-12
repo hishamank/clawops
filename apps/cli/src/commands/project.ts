@@ -1,3 +1,5 @@
+/* eslint-disable no-console -- CLI tool uses console for output */
+
 import { Command } from "commander";
 import {
   projectCreate,
