@@ -424,18 +424,21 @@ export async function updateConnectionCronJob(
     patch,
   );
 
-  const remoteSchedule = remote?.scheduleRaw ?? localJob.schedule;
+  const patchSchedule = patch.schedule !== undefined ? normalizeSchedule(patch.schedule) : null;
+  const resolvedScheduleRaw = remote?.scheduleRaw ?? patchSchedule?.raw ?? localJob.schedule;
+  const resolvedScheduleKind =
+    remote?.scheduleKind ?? patch.scheduleKind ?? patchSchedule?.kind ?? localJob.scheduleKind;
+  const resolvedScheduleExpr =
+    remote?.scheduleExpr ?? patch.scheduleExpr ?? patchSchedule?.expr ?? localJob.scheduleExpr;
+  const resolvedCronExpr =
+    resolvedScheduleKind === "cron" ? resolvedScheduleExpr ?? localJob.cronExpr : null;
+
   const updatedLocal = updateLocalCronJob(db, localCronJobId, {
     name: remote?.name ?? patch.name ?? localJob.name,
-    schedule: remoteSchedule,
-    cronExpr:
-      remote?.scheduleKind === "cron"
-        ? remote.scheduleExpr
-        : patch.scheduleKind === "cron"
-          ? patch.scheduleExpr ?? localJob.cronExpr
-          : localJob.cronExpr,
-    scheduleKind: remote?.scheduleKind ?? patch.scheduleKind ?? localJob.scheduleKind,
-    scheduleExpr: remote?.scheduleExpr ?? patch.scheduleExpr ?? localJob.scheduleExpr,
+    schedule: resolvedScheduleRaw,
+    cronExpr: resolvedCronExpr,
+    scheduleKind: resolvedScheduleKind,
+    scheduleExpr: resolvedScheduleExpr,
     sessionTarget: remote?.sessionTarget ?? patch.sessionTarget ?? localJob.sessionTarget,
     enabled: remote?.enabled ?? patch.enabled ?? localJob.enabled,
     status:

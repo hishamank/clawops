@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { listSyncRuns, onboardOpenClaw } from "@clawops/sync";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
+import { getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
 
 const syncRequestSchema = z.object({
   openclawDir: z.string().optional(),
@@ -12,6 +12,11 @@ const syncRequestSchema = z.object({
 });
 
 export async function POST(req: Request): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) {
+    return auth;
+  }
+
   let body: z.infer<typeof syncRequestSchema>;
 
   try {
@@ -31,7 +36,7 @@ export async function POST(req: Request): Promise<NextResponse> {
       gatewayUrl: body.gatewayUrl,
       gatewayToken: body.gatewayToken,
       includeFiles: true,
-      actorAgentId: getAgentIdFromApiKey(req) ?? undefined,
+      actorAgentId: auth,
     });
 
     return NextResponse.json({
@@ -58,7 +63,12 @@ export async function POST(req: Request): Promise<NextResponse> {
   }
 }
 
-export async function GET(): Promise<NextResponse> {
+export async function GET(req: Request): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) {
+    return auth;
+  }
+
   const runs = listSyncRuns(getDb(), 10);
   const latest = runs[0];
 

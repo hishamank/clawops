@@ -7,6 +7,7 @@ import { events } from "@clawops/core";
 import { updateConnectionCronJob } from "@clawops/habits";
 import {
   getDb,
+  isNotFoundError,
   jsonError,
   requireAgentId,
 } from "@/lib/server/runtime";
@@ -82,7 +83,7 @@ export async function PATCH(
       return jsonError(400, err.message, "VALIDATION_ERROR");
     }
 
-    if (err instanceof Error && /not found/i.test(err.message)) {
+    if (isNotFoundError(err)) {
       return jsonError(404, err.message, "NOT_FOUND");
     }
 

@@ -137,12 +137,14 @@ clawops/
 - Runtime bootstrap/seed helpers that are never wired into a real initialization or migration path while the PR claims built-in data will exist
 - Unrelated schema changes bundled into a feature PR without being required for the issue being implemented
 - Missing auth guard on any `/api/*` route other than `/api/health` and `/api/auth/login`
+- Using `getAgentIdFromApiKey` as an auth guard instead of `requireAgentId` on `/api/*` routes
 
 ### Warnings (recommend fix)
 - Non-null assertion (`!`) without an explanatory comment
 - `console.log` in production code (use structured logging)
 - Async function in a `packages/*` file (should be sync)
 - Error handling via `err.message` string matching — prefer typed errors or error codes
+- OpenClaw cron job updates that accept a schedule patch but fail to persist a normalized local schedule/scheduleKind/scheduleExpr (e.g., when the gateway returns `204 No Content`)
 - Missing 404/409 HTTP status codes on routes that can fail with known reasons
 - Tests that only mock or reimplement behavior without covering the real exported helper or route contract that changed
 - Tests that validate a reimplementation of production logic instead of the actual exported module
