@@ -421,7 +421,7 @@ export function updateLocalCronJob(
   const updated = db
     .update(habits)
     .set(updates)
-    .where(eq(habits.id, id))
+    .where(and(eq(habits.id, id), eq(habits.type, "cron")))
     .returning()
     .get();
 

@@ -232,7 +232,7 @@ export async function onboardOpenClaw(
           scheduleKind: "cron",
           scheduleExpr: job.schedule,
           sessionTarget: "main",
-          scheduleRaw: job.schedule,
+          scheduleRaw: JSON.stringify(job.schedule),
           lastRunAt: job.lastRunAt ? new Date(job.lastRunAt) : null,
           nextRunAt: null,
         })),
