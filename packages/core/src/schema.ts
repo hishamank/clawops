@@ -129,6 +129,40 @@ export const workspaceFiles = sqliteTable(
   }),
 );
 
+export const openclawSessions = sqliteTable(
+  "openclaw_sessions",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    connectionId: text("connection_id")
+      .notNull()
+      .references(() => openclawConnections.id),
+    sessionKey: text("session_key").notNull(),
+    agentId: text("agent_id"),
+    model: text("model"),
+    status: text("status", {
+      enum: ["active", "ended"],
+    })
+      .notNull()
+      .default("active"),
+    startedAt: integer("started_at", { mode: "timestamp" }).notNull(),
+    endedAt: integer("ended_at", { mode: "timestamp" }),
+    metadata: text("metadata"),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (table) => ({
+    connectionSessionKeyUnique: uniqueIndex(
+      "openclaw_sessions_connection_session_key_unique",
+    ).on(table.connectionId, table.sessionKey),
+  }),
+);
+
 // ── Projects ────────────────────────────────────────────────────────────────
 
 export const projects = sqliteTable("projects", {
