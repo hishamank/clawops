@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events } from "@clawops/core";
+import { events, createActivityEvent, type DB } from "@clawops/core";
 import { updateConnectionCronJob } from "@clawops/habits";
 import {
   getDb,
@@ -76,6 +76,24 @@ export async function PATCH(
         createdAt: new Date(),
       })
       .run();
+
+    try {
+      createActivityEvent(db as DB, {
+        source: "user",
+        type: "cron.updated",
+        title: `Cron job updated: ${updated.local.name}`,
+        entityType: "cron_job",
+        entityId: updated.local.id,
+        agentId: auth,
+        metadata: JSON.stringify({
+          name: updated.local.name,
+          enabled: updated.local.enabled,
+          fields: Object.keys(body).filter((key) => key !== "gatewayToken"),
+        }),
+      });
+    } catch {
+      // best-effort
+    }
 
     return NextResponse.json(updated.local);
   } catch (err) {

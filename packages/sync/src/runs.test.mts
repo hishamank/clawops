@@ -131,6 +131,7 @@ mock.module("@clawops/core", {
     desc: () => ({}),
     parseJsonObject: (value: string | null) => (value ? JSON.parse(value) : {}),
     toJsonObject: (value: Record<string, unknown>) => JSON.stringify(value),
+    createActivityEvent: () => ({}),
   },
 });
 

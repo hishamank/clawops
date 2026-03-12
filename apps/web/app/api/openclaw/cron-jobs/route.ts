@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events, type DB } from "@clawops/core";
+import { events, createActivityEvent, type DB } from "@clawops/core";
 import {
   listCronJobs,
   syncCronJobs,
@@ -59,6 +59,20 @@ export async function GET(req: Request): Promise<NextResponse> {
             createdAt: new Date(),
           })
           .run();
+
+        try {
+          createActivityEvent(tx as unknown as DB, {
+            source: "sync",
+            type: "cron.synced",
+            title: `Cron jobs synced for connection: ${connection.name}`,
+            entityType: "cron_job",
+            entityId: connection.id,
+            agentId: auth,
+            metadata: JSON.stringify({ connectionId: connection.id, connectionName: connection.name }),
+          });
+        } catch {
+          // best-effort
+        }
       });
     }
 
