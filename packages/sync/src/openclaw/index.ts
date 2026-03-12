@@ -2,6 +2,7 @@ export { scanOpenClaw } from "./scanner.js";
 export { fetchGatewayAgents, fetchGatewayCronJobs } from "./gateway.js";
 export {
   fetchWorkspaceFiles,
+  listWorkspaceFileRevisions,
   upsertWorkspaceFiles,
   syncWorkspaceFiles,
 } from "./files.js";
@@ -18,3 +19,4 @@ export type {
   WorkspaceFileChange,
   WorkspaceFileSyncResult,
 } from "./files.js";
+export type { WorkspaceFileRevision, NewWorkspaceFileRevision } from "@clawops/core";

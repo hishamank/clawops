@@ -13,6 +13,16 @@ interface WorkspaceFileRow {
   updatedAt: Date;
 }
 
+interface RevisionRow {
+  workspaceFileId: string;
+  hash: string | null;
+  sizeBytes: number | null;
+  gitCommitSha: string | null;
+  gitBranch: string | null;
+  source: string;
+  capturedAt: Date;
+}
+
 const workspaceFileTable = {
   connectionId: { name: "connection_id" },
   workspacePath: { name: "workspace_path" },
@@ -23,11 +33,17 @@ const workspaceFileTable = {
   updatedAt: { name: "updated_at" },
 };
 
+const workspaceFileRevisionsTable = {
+  workspaceFileId: { name: "workspace_file_id" },
+  capturedAt: { name: "captured_at" },
+};
+
 mock.module("@clawops/core", {
   namedExports: {
     and: (...conditions: unknown[]) => ({ type: "and", conditions }),
     eq: (left: unknown, right: unknown) => ({ type: "eq", left, right }),
     lt: (left: unknown, right: unknown) => ({ type: "lt", left, right }),
+    desc: (col: unknown) => ({ type: "desc", col }),
     sql: Object.assign(
       (strings: TemplateStringsArray, ...values: unknown[]) => ({
         type: "sql",
@@ -43,24 +59,60 @@ mock.module("@clawops/core", {
     },
     parseJsonObject: (value: string | null) => (value ? JSON.parse(value) : {}),
     workspaceFiles: workspaceFileTable,
+    workspaceFileRevisions: workspaceFileRevisionsTable,
   },
 });
 
-const { upsertWorkspaceFiles } = await import("./files.js");
+const { upsertWorkspaceFiles, listWorkspaceFileRevisions } = await import("./files.js");
 
 function createDb(initialRows: WorkspaceFileRow[] = []) {
   const rows = [...initialRows];
+  const revisions: RevisionRow[] = [];
+  let currentInsertTarget: "files" | "revisions" = "files";
 
-  return {
-    transaction<T>(callback: (tx: ReturnType<typeof createDb>) => T): T {
+  const dbObj = {
+    transaction<T>(callback: (tx: typeof dbObj) => T): T {
       return callback(this);
     },
     select() {
       return {
-        from() {
+        from(table: unknown) {
+          const isRevisions = table === workspaceFileRevisionsTable;
           return {
-            where() {
+            where(condition: { type: string; left: unknown; right: unknown }) {
               return {
+                orderBy() {
+                  return {
+                    limit(_n: number) {
+                      return {
+                        all() {
+                          if (isRevisions) {
+                            const fileId = condition.right;
+                            return [...revisions]
+                              .filter((r) => r.workspaceFileId === fileId)
+                              .sort(
+                                (a, b) =>
+                                  b.capturedAt.getTime() - a.capturedAt.getTime(),
+                              );
+                          }
+                          return rows.map((row) => ({ ...row }));
+                        },
+                      };
+                    },
+                    all() {
+                      if (isRevisions) {
+                        const fileId = condition.right;
+                        return [...revisions]
+                          .filter((r) => r.workspaceFileId === fileId)
+                          .sort(
+                            (a, b) =>
+                              b.capturedAt.getTime() - a.capturedAt.getTime(),
+                          );
+                      }
+                      return rows.map((row) => ({ ...row }));
+                    },
+                  };
+                },
                 all() {
                   return rows.map((row) => ({ ...row }));
                 },
@@ -70,34 +122,35 @@ function createDb(initialRows: WorkspaceFileRow[] = []) {
         },
       };
     },
-    insert() {
-      let valuesToInsert: Array<
-        Omit<WorkspaceFileRow, "id"> & {
-          connectionId: string;
-          workspacePath: string;
-          relativePath: string;
-          fileHash: string | null;
-          sizeBytes: number | null;
-          lastSeenAt: Date;
-          createdAt: Date;
-          updatedAt: Date;
-        }
-      > = [];
+    insert(table?: unknown) {
+      currentInsertTarget =
+        table === workspaceFileRevisionsTable ? "revisions" : "files";
+
+      let valuesToInsert: unknown[] = [];
 
       return {
-        values(values: typeof valuesToInsert) {
+        values(values: unknown[]) {
           valuesToInsert = values;
           return this;
         },
         onConflictDoUpdate() {
           return this;
         },
+        run() {
+          if (currentInsertTarget === "revisions") {
+            for (const value of valuesToInsert) {
+              revisions.push(value as RevisionRow);
+            }
+          }
+        },
         returning() {
           return {
             all() {
               const upserted: WorkspaceFileRow[] = [];
 
-              for (const value of valuesToInsert) {
+              for (const value of valuesToInsert as Array<
+                Omit<WorkspaceFileRow, "id">
+              >) {
                 const existing = rows.find(
                   (row) =>
                     row.connectionId === value.connectionId &&
@@ -144,7 +197,9 @@ function createDb(initialRows: WorkspaceFileRow[] = []) {
 
               for (const row of rows) {
                 const seenAt = row.lastSeenAt.getTime();
-                const current = latestSeenAtByConnection.get(row.connectionId) ?? Number.NEGATIVE_INFINITY;
+                const current =
+                  latestSeenAtByConnection.get(row.connectionId) ??
+                  Number.NEGATIVE_INFINITY;
                 if (seenAt > current) {
                   latestSeenAtByConnection.set(row.connectionId, seenAt);
                 }
@@ -155,7 +210,9 @@ function createDb(initialRows: WorkspaceFileRow[] = []) {
                 if (!row) {
                   continue;
                 }
-                const latestSeenAt = latestSeenAtByConnection.get(row.connectionId);
+                const latestSeenAt = latestSeenAtByConnection.get(
+                  row.connectionId,
+                );
                 if (latestSeenAt && row.lastSeenAt.getTime() < latestSeenAt) {
                   rows.splice(index, 1);
                 }
@@ -166,7 +223,10 @@ function createDb(initialRows: WorkspaceFileRow[] = []) {
       };
     },
     rows,
+    revisions,
   };
+
+  return dbObj;
 }
 
 describe("upsertWorkspaceFiles", () => {
@@ -275,5 +335,125 @@ describe("upsertWorkspaceFiles", () => {
       db.rows.map((row) => row.relativePath),
       ["src/keep.ts"],
     );
+  });
+});
+
+describe("workspace file revisions", () => {
+  it("creates revision records when files are inserted", () => {
+    const db = createDb();
+
+    upsertWorkspaceFiles(db as never, "conn-1", [
+      {
+        workspacePath: "/tmp/openclaw/workspace-main",
+        relativePath: "src/index.ts",
+        fileHash: "hash-1",
+        sizeBytes: 128,
+        gitCommitSha: "abc123",
+        gitBranch: "main",
+      },
+    ]);
+
+    assert.equal(db.revisions.length, 1);
+    assert.equal(db.revisions[0]?.workspaceFileId, "row-src/index.ts");
+    assert.equal(db.revisions[0]?.hash, "hash-1");
+    assert.equal(db.revisions[0]?.sizeBytes, 128);
+    assert.equal(db.revisions[0]?.gitCommitSha, "abc123");
+    assert.equal(db.revisions[0]?.gitBranch, "main");
+    assert.equal(db.revisions[0]?.source, "sync");
+  });
+
+  it("creates revision records when files are updated (hash changed)", () => {
+    const originalSeenAt = new Date("2026-03-10T10:00:00.000Z");
+    const db = createDb([
+      {
+        id: "row-src/index.ts",
+        connectionId: "conn-1",
+        workspacePath: "/tmp/openclaw/workspace-main",
+        relativePath: "src/index.ts",
+        fileHash: "hash-old",
+        sizeBytes: 128,
+        lastSeenAt: originalSeenAt,
+        createdAt: originalSeenAt,
+        updatedAt: originalSeenAt,
+      },
+    ]);
+
+    upsertWorkspaceFiles(db as never, "conn-1", [
+      {
+        workspacePath: "/tmp/openclaw/workspace-main",
+        relativePath: "src/index.ts",
+        fileHash: "hash-new",
+        sizeBytes: 256,
+        gitCommitSha: "def456",
+        gitBranch: "feature-x",
+      },
+    ]);
+
+    assert.equal(db.revisions.length, 1);
+    assert.equal(db.revisions[0]?.hash, "hash-new");
+    assert.equal(db.revisions[0]?.sizeBytes, 256);
+    assert.equal(db.revisions[0]?.gitCommitSha, "def456");
+    assert.equal(db.revisions[0]?.gitBranch, "feature-x");
+  });
+
+  it("does NOT create revision records for unchanged files", () => {
+    const originalSeenAt = new Date("2026-03-10T10:00:00.000Z");
+    const db = createDb([
+      {
+        id: "row-src/index.ts",
+        connectionId: "conn-1",
+        workspacePath: "/tmp/openclaw/workspace-main",
+        relativePath: "src/index.ts",
+        fileHash: "hash-1",
+        sizeBytes: 128,
+        lastSeenAt: originalSeenAt,
+        createdAt: originalSeenAt,
+        updatedAt: originalSeenAt,
+      },
+    ]);
+
+    upsertWorkspaceFiles(db as never, "conn-1", [
+      {
+        workspacePath: "/tmp/openclaw/workspace-main",
+        relativePath: "src/index.ts",
+        fileHash: "hash-1",
+        sizeBytes: 128,
+      },
+    ]);
+
+    assert.equal(db.revisions.length, 0);
+  });
+
+  it("listWorkspaceFileRevisions returns revisions in descending capturedAt order", () => {
+    const db = createDb();
+    const earlier = new Date("2026-03-10T10:00:00.000Z");
+    const later = new Date("2026-03-11T10:00:00.000Z");
+
+    db.revisions.push(
+      {
+        workspaceFileId: "file-1",
+        hash: "hash-old",
+        sizeBytes: 100,
+        gitCommitSha: null,
+        gitBranch: null,
+        source: "sync",
+        capturedAt: earlier,
+      },
+      {
+        workspaceFileId: "file-1",
+        hash: "hash-new",
+        sizeBytes: 200,
+        gitCommitSha: "abc123",
+        gitBranch: "main",
+        source: "sync",
+        capturedAt: later,
+      },
+    );
+
+    const result = listWorkspaceFileRevisions(db as never, "file-1");
+
+    assert.equal(result.length, 2);
+    assert.equal(result[0]?.hash, "hash-new");
+    assert.equal(result[1]?.hash, "hash-old");
   });
 });

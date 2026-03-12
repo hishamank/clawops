@@ -78,6 +78,13 @@
       "when": 1773226000000,
       "tag": "0010_openclaw_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1773228000000,
+      "tag": "0011_workspace_file_revisions",
+      "breakpoints": true
     }
   ]
 }
