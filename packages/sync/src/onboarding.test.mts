@@ -8,6 +8,7 @@ const upsertConnectionCalls: Array<Record<string, unknown>> = [];
 const upsertCronJobsCalls: Array<Record<string, unknown>> = [];
 const fetchGatewayCronJobsCalls: Array<Record<string, unknown>> = [];
 const syncWorkspaceFilesCalls: Array<Record<string, unknown>> = [];
+const syncSessionsCalls: Array<Record<string, unknown>> = [];
 const startSyncRunCalls: Array<Record<string, unknown>> = [];
 
 const mockDb = {
@@ -37,6 +38,7 @@ beforeEach(() => {
   upsertCronJobsCalls.length = 0;
   fetchGatewayCronJobsCalls.length = 0;
   syncWorkspaceFilesCalls.length = 0;
+  syncSessionsCalls.length = 0;
   startSyncRunCalls.length = 0;
 });
 
@@ -113,6 +115,10 @@ describe("onboardOpenClaw", () => {
             unchangedCount: 0,
           };
         },
+        syncSessions: async (_db: unknown, syncedConnection: Record<string, unknown>) => {
+          syncSessionsCalls.push(syncedConnection);
+          return [];
+        },
         startSyncRun: (_db: unknown, input: Record<string, unknown>) => {
           startSyncRunCalls.push(input);
           return { id: "run-1" };
@@ -135,6 +141,7 @@ describe("onboardOpenClaw", () => {
     assert.equal(upsertCronJobsCalls.length, 1);
     assert.equal(fetchGatewayCronJobsCalls.length, 1);
     assert.equal(syncWorkspaceFilesCalls.length, 1);
+    assert.equal(syncSessionsCalls.length, 1);
     const finishSyncRunInput = finishSyncRunWithTxCalls[0]?.["input"] as Record<string, unknown>;
     assert.equal(finishSyncRunInput["connectionId"], "conn-1");
     assert.equal(syncWorkspaceFilesCalls[0]?.["id"], "conn-1");

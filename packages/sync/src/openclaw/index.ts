@@ -5,6 +5,12 @@ export {
   upsertWorkspaceFiles,
   syncWorkspaceFiles,
 } from "./files.js";
+export {
+  fetchActiveSessions,
+  listSessions,
+  syncSessions,
+  upsertSessions,
+} from "./sessions.js";
 export { installClawOpsSkill } from "./skill-installer.js";
 export type { OpenClawConfig, OpenClawScanOptions } from "./types.js";
 export type {

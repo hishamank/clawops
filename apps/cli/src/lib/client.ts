@@ -1,5 +1,12 @@
 /* eslint-disable no-console -- CLI tool uses console for output */
-import type { DB, Task, Idea, Project, Milestone, AgentSession } from "@clawops/core";
+import type {
+  DB,
+  Task,
+  Idea,
+  Project,
+  Milestone,
+  AgentSession,
+} from "@clawops/core";
 import { events } from "@clawops/core";
 import { db as coreDb } from "@clawops/core/db";
 import { runMigrations } from "@clawops/core/migrate";
@@ -18,6 +25,8 @@ import {
   appendProjectSpec,
   type ProjectContext,
 } from "@clawops/projects";
+import type { OpenClawSessionRecord, OpenClawSessionStatus } from "@clawops/sync";
+import { listOpenClawSessions } from "@clawops/sync";
 import type { IdeaStatus } from "@clawops/domain";
 import * as fs from "node:fs";
 
@@ -261,6 +270,15 @@ export async function projectSpecAppend(projectId: string, content: string): Pro
   ensureMigrated();
   const db = getDb();
   return appendProjectSpec(db, projectId, content);
+}
+
+export async function openClawSessionList(filters?: {
+  connectionId?: string;
+  status?: OpenClawSessionStatus;
+  limit?: number;
+}): Promise<OpenClawSessionRecord[]> {
+  ensureMigrated();
+  return listOpenClawSessions(getDb(), filters);
 }
 
 // ── Task Spec Functions ─────────────────────────────────────────────────────

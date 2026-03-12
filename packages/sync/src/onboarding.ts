@@ -8,6 +8,7 @@ import { upsertCronJobs } from "@clawops/habits";
 import { upsertOpenClawConnection, type OpenClawConnectionSyncMode } from "./connections.js";
 import { fetchGatewayCronJobs, scanOpenClaw } from "./openclaw/index.js";
 import { syncWorkspaceFiles } from "./openclaw/files.js";
+import { syncSessions } from "./openclaw/sessions.js";
 import { finishSyncRunWithTx, startSyncRun } from "./runs.js";
 import type { SyncAgent, SyncCronJob, SyncWorkspace } from "./types.js";
 
@@ -52,6 +53,7 @@ interface OnboardingDependencies {
   fetchGatewayCronJobs: typeof fetchGatewayCronJobs;
   syncWorkspaceFiles: typeof syncWorkspaceFiles;
   upsertCronJobs: typeof upsertCronJobs;
+  syncSessions: typeof syncSessions;
   startSyncRun: typeof startSyncRun;
   finishSyncRunWithTx: typeof finishSyncRunWithTx;
 }
@@ -65,6 +67,7 @@ const defaultDependencies: OnboardingDependencies = {
   fetchGatewayCronJobs,
   syncWorkspaceFiles,
   upsertCronJobs,
+  syncSessions,
   startSyncRun,
   finishSyncRunWithTx,
 };
@@ -306,6 +309,7 @@ export async function onboardOpenClaw(
         .run();
 
       return {
+        connection: connection.connection,
         connectionId: connection.connection.id,
         connectionCreated: connection.created,
         syncRunId: run.id,
@@ -321,6 +325,9 @@ export async function onboardOpenClaw(
 
     if (input.includeFiles && connectionForFileSync) {
       await dependencies.syncWorkspaceFiles(db, connectionForFileSync);
+    }
+    if (input.gatewayToken) {
+      await dependencies.syncSessions(db, result.connection);
     }
 
     return result;

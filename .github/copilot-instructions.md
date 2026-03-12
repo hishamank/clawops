@@ -138,6 +138,7 @@ clawops/
 - Unrelated schema changes bundled into a feature PR without being required for the issue being implemented
 - Missing auth guard on any `/api/*` route other than `/api/health` and `/api/auth/login`
 - Using `getAgentIdFromApiKey` as an auth guard instead of `requireAgentId` on `/api/*` routes
+- Foreign key references without `{ onDelete: "cascade" }` when the child entity should be deleted with its parent (e.g., sessions should cascade when connection is deleted)
 
 ### Warnings (recommend fix)
 - Non-null assertion (`!`) without an explanatory comment
@@ -149,9 +150,13 @@ clawops/
 - Tests that only mock or reimplement behavior without covering the real exported helper or route contract that changed
 - Tests that validate a reimplementation of production logic instead of the actual exported module
 - Activity event emissions that omit `agentId` or hardcode `source` when `x-api-key` is present
+- New exported functions (especially sync, upsert, or list operations) without corresponding test coverage
+- Complex parsing/normalization functions without test coverage for edge cases and various input formats
+- Promise.resolve() wrapper around synchronous database calls (better-sqlite3 is sync)
 
 ### Do NOT flag
 - Drizzle ORM's complex generic types in function signatures — expected
 - `pnpm-lock.yaml` changes — auto-generated
 - `dist/` output files
 - `node:test` `describe`/`it`/`beforeEach` boilerplate
+- Schema tables or types imported from `@clawops/core` — verify the import exists rather than claiming the definition is missing

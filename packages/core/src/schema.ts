@@ -114,6 +114,7 @@ export const workspaceFiles = sqliteTable(
     lastSeenAt: integer("last_seen_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
+
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
@@ -125,6 +126,40 @@ export const workspaceFiles = sqliteTable(
     connectionRelativePathUnique: uniqueIndex(
       "workspace_files_connection_relative_path_unique",
     ).on(table.connectionId, table.relativePath),
+  }),
+);
+
+export const openclawSessions = sqliteTable(
+  "openclaw_sessions",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    connectionId: text("connection_id")
+      .notNull()
+      .references(() => openclawConnections.id, { onDelete: "cascade" }),
+    sessionKey: text("session_key").notNull(),
+    agentId: text("agent_id"),
+    model: text("model"),
+    status: text("status", {
+      enum: ["active", "ended"],
+    })
+      .notNull()
+      .default("active"),
+    startedAt: integer("started_at", { mode: "timestamp" }).notNull(),
+    endedAt: integer("ended_at", { mode: "timestamp" }),
+    metadata: text("metadata"),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (table) => ({
+    connectionSessionKeyUnique: uniqueIndex(
+      "openclaw_sessions_connection_session_key_unique",
+    ).on(table.connectionId, table.sessionKey),
   }),
 );
 
@@ -513,6 +548,8 @@ export type OpenClawAgent = typeof openclawAgents.$inferSelect;
 export type NewOpenClawAgent = typeof openclawAgents.$inferInsert;
 export type WorkspaceFile = typeof workspaceFiles.$inferSelect;
 export type NewWorkspaceFile = typeof workspaceFiles.$inferInsert;
+export type OpenClawSession = typeof openclawSessions.$inferSelect;
+export type NewOpenClawSession = typeof openclawSessions.$inferInsert;
 
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;

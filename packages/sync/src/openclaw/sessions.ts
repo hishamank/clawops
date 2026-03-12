@@ -1,0 +1,337 @@
+import {
+  type SQL,
+  and,
+  desc,
+  eq,
+  inArray,
+  openclawSessions,
+  toJsonObject,
+  parseJsonObject,
+  type DB,
+  type OpenClawConnection,
+  type OpenClawSession,
+} from "@clawops/core";
+
+export type OpenClawSessionStatus = "active" | "ended";
+
+export interface FetchedOpenClawSession {
+  sessionKey: string;
+  agentId: string | null;
+  model: string | null;
+  status: "active";
+  startedAt: Date;
+  endedAt: null;
+  metadata: Record<string, unknown> | null;
+}
+
+export interface OpenClawSessionFilters {
+  connectionId?: string;
+  status?: OpenClawSessionStatus;
+  limit?: number;
+}
+
+export type OpenClawSessionRecord = Omit<OpenClawSession, "metadata"> & {
+  metadata: Record<string, unknown> | null;
+};
+
+export class OpenClawSessionFetchError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "OpenClawSessionFetchError";
+  }
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function pickString(...values: unknown[]): string | null {
+  for (const value of values) {
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed) {
+        return trimmed;
+      }
+    }
+  }
+
+  return null;
+}
+
+function pickDate(...values: unknown[]): Date | null {
+  for (const value of values) {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+      return value;
+    }
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+      const date = new Date(value > 1_000_000_000_000 ? value : value * 1000);
+      if (!Number.isNaN(date.getTime())) {
+        return date;
+      }
+    }
+
+    if (typeof value === "string" && value.trim()) {
+      const trimmed = value.trim();
+      const numeric = Number(trimmed);
+      if (!Number.isNaN(numeric)) {
+        const date = new Date(numeric > 1_000_000_000_000 ? numeric : numeric * 1000);
+        if (!Number.isNaN(date.getTime())) {
+          return date;
+        }
+      }
+
+      const date = new Date(trimmed);
+      if (!Number.isNaN(date.getTime())) {
+        return date;
+      }
+    }
+  }
+
+  return null;
+}
+
+export function normalizeSession(input: unknown): FetchedOpenClawSession | null {
+  const session = asRecord(input);
+  const payload = asRecord(session["payload"]);
+  const state = asRecord(session["state"]);
+
+  const sessionKey = pickString(
+    session["sessionKey"],
+    session["session_key"],
+    session["key"],
+    session["id"],
+  );
+
+  if (!sessionKey) {
+    return null;
+  }
+
+  return {
+    sessionKey,
+    agentId: pickString(
+      session["agentId"],
+      session["agent_id"],
+      payload["agentId"],
+      payload["agent_id"],
+    ),
+    model: pickString(
+      session["model"],
+      payload["model"],
+      state["model"],
+    ),
+    status: "active",
+    startedAt:
+      pickDate(
+        session["startedAt"],
+        session["started_at"],
+        session["createdAt"],
+        session["created_at"],
+        session["connectedAt"],
+        session["connected_at"],
+        state["startedAt"],
+        state["started_at"],
+      ) ?? new Date(),
+    endedAt: null,
+    metadata: Object.keys(session).length > 0 ? session : null,
+  };
+}
+
+function parseGatewaySessions(data: unknown): FetchedOpenClawSession[] {
+  const root = asRecord(data);
+  const sessions = Array.isArray(data)
+    ? data
+    : Array.isArray(root["sessions"])
+      ? root["sessions"]
+      : [];
+
+  return sessions
+    .map((session) => normalizeSession(session))
+    .filter((session): session is FetchedOpenClawSession => session !== null);
+}
+
+function resolveGatewayToken(connection: OpenClawConnection): string {
+  const token = process.env["OPENCLAW_GATEWAY_TOKEN"]?.trim();
+
+  if (connection.hasGatewayToken && !token) {
+    throw new Error(
+      `OPENCLAW_GATEWAY_TOKEN is required to sync sessions for connection ${connection.id}`,
+    );
+  }
+
+  return token ?? "";
+}
+
+function deserializeSession(session: OpenClawSession): OpenClawSessionRecord {
+  return {
+    ...session,
+    metadata: session.metadata ? parseJsonObject(session.metadata) : null,
+  };
+}
+
+export async function fetchActiveSessions(
+  gatewayUrl: string,
+  token: string,
+): Promise<FetchedOpenClawSession[]> {
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  try {
+    const res = await fetch(`${gatewayUrl}/api/sessions`, {
+      headers,
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!res.ok) {
+      throw new OpenClawSessionFetchError(
+        `Failed to fetch OpenClaw sessions from ${gatewayUrl}: ${res.status} ${res.statusText}`,
+      );
+    }
+
+    const data = (await res.json()) as unknown;
+    return parseGatewaySessions(data);
+  } catch (error) {
+    if (error instanceof OpenClawSessionFetchError) {
+      throw error;
+    }
+
+    throw new OpenClawSessionFetchError(
+      `Failed to fetch OpenClaw sessions from ${gatewayUrl}`,
+      { cause: error },
+    );
+  }
+}
+
+export function upsertSessions(
+  db: DB,
+  connectionId: string,
+  sessions: FetchedOpenClawSession[],
+): OpenClawSession[] {
+  if (sessions.length === 0) {
+    return [];
+  }
+
+  const now = new Date();
+  return sessions.map((session) =>
+    db
+      .insert(openclawSessions)
+      .values({
+        connectionId,
+        sessionKey: session.sessionKey,
+        agentId: session.agentId,
+        model: session.model,
+        status: session.status,
+        startedAt: session.startedAt,
+        endedAt: session.endedAt,
+        metadata: session.metadata ? toJsonObject(session.metadata) : null,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [openclawSessions.connectionId, openclawSessions.sessionKey],
+        set: {
+          agentId: session.agentId,
+          model: session.model,
+          status: "active",
+          startedAt: session.startedAt,
+          endedAt: null,
+          metadata: session.metadata ? toJsonObject(session.metadata) : null,
+          updatedAt: now,
+        },
+      })
+      .returning()
+      .get(),
+  );
+}
+
+export async function syncSessions(
+  db: DB,
+  connection: OpenClawConnection,
+): Promise<OpenClawSessionRecord[]> {
+  if (!connection.gatewayUrl) {
+    throw new Error(`OpenClaw connection ${connection.id} does not have a gateway URL`);
+  }
+
+  const token = resolveGatewayToken(connection);
+  let activeSessions: FetchedOpenClawSession[];
+
+  try {
+    activeSessions = await fetchActiveSessions(connection.gatewayUrl, token);
+  } catch (error) {
+    throw new OpenClawSessionFetchError(
+      `Aborted OpenClaw session sync for connection ${connection.id}`,
+      { cause: error },
+    );
+  }
+
+  return db.transaction((tx) => {
+    const upserted = upsertSessions(tx as unknown as DB, connection.id, activeSessions);
+    const activeSessionKeys = activeSessions.map((session) => session.sessionKey);
+    const previouslyActive = tx
+      .select()
+      .from(openclawSessions)
+      .where(
+        and(
+          eq(openclawSessions.connectionId, connection.id),
+          eq(openclawSessions.status, "active"),
+        ),
+      )
+      .all();
+
+    const endedCandidates = previouslyActive.filter(
+      (session) => !activeSessionKeys.includes(session.sessionKey),
+    );
+
+    const endedNow = endedCandidates.length > 0
+      ? tx
+          .update(openclawSessions)
+          .set({
+            status: "ended",
+            endedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(inArray(openclawSessions.id, endedCandidates.map((session) => session.id)))
+          .returning()
+          .all()
+      : [];
+
+    const byId = new Map<string, OpenClawSession>();
+    for (const session of [...upserted, ...endedNow]) {
+      byId.set(session.id, session);
+    }
+
+    return Array.from(byId.values())
+      .sort((left, right) => right.startedAt.getTime() - left.startedAt.getTime())
+      .map(deserializeSession);
+  });
+}
+
+export function listSessions(
+  db: DB,
+  filters: OpenClawSessionFilters = {},
+): OpenClawSessionRecord[] {
+  const conditions: SQL[] = [];
+
+  if (filters.connectionId) {
+    conditions.push(eq(openclawSessions.connectionId, filters.connectionId));
+  }
+
+  if (filters.status) {
+    conditions.push(eq(openclawSessions.status, filters.status));
+  }
+
+  const query = db
+    .select()
+    .from(openclawSessions)
+    .orderBy(desc(openclawSessions.updatedAt))
+    .$dynamic();
+
+  const rows = conditions.length > 0
+    ? query.where(and(...conditions)).limit(filters.limit ?? 20).all()
+    : query.limit(filters.limit ?? 20).all();
+
+  return rows.map(deserializeSession);
+}
