@@ -16,6 +16,8 @@ import {
 import { listCronJobs } from "@clawops/habits";
 import { desc, eq, workspaceFiles, type WorkspaceFile } from "@clawops/core";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "OpenClaw",
   description: "Operator dashboard for OpenClaw connections, sync runs, and telemetry",
@@ -122,38 +124,47 @@ export default async function OpenClawPage(): Promise<React.JSX.Element> {
               </div>
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
-                {connections.map((connection) => (
-                  <div
-                    key={connection.id}
-                    className="rounded-xl border border-border p-4 shadow-sm"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-sm font-semibold text-sidebar-foreground">
-                        {connection.name}
-                      </h3>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          connectionStatusStyles[connection.status] ?? "text-muted-foreground",
-                          "text-xs capitalize"
-                        )}
-                      >
-                        {connection.status}
-                      </Badge>
+                {connections.map((connection) => {
+                  let gatewayDisplay: string | null = null;
+                  if (connection.gatewayUrl) {
+                    try {
+                      gatewayDisplay = new URL(connection.gatewayUrl).host;
+                    } catch {
+                      gatewayDisplay = connection.gatewayUrl;
+                    }
+                  }
+
+                  return (
+                    <div
+                      key={connection.id}
+                      className="rounded-xl border border-border p-4 shadow-sm"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-sm font-semibold text-sidebar-foreground">
+                          {connection.name}
+                        </h3>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            connectionStatusStyles[connection.status] ?? "text-muted-foreground",
+                            "text-xs capitalize"
+                          )}
+                        >
+                          {connection.status}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{connection.rootPath}</p>
+                      {gatewayDisplay && (
+                        <p className="text-xs text-muted-foreground">{gatewayDisplay}</p>
+                      )}
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        {connection.lastSyncedAt
+                          ? `Last synced ${renderTimeAgo(connection.lastSyncedAt)}`
+                          : "Never synced yet"}
+                      </div>
                     </div>
-                    <p className="text-xs text-muted-foreground">{connection.rootPath}</p>
-                    {connection.gatewayUrl && (
-                      <p className="text-xs text-muted-foreground">
-                        {new URL(connection.gatewayUrl).host}
-                      </p>
-                    )}
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      {connection.lastSyncedAt
-                        ? `Last synced ${renderTimeAgo(connection.lastSyncedAt)}`
-                        : "Never synced yet"}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -327,7 +338,7 @@ export default async function OpenClawPage(): Promise<React.JSX.Element> {
                       </p>
                     </div>
                     <span className="text-xs text-muted-foreground">
-                      {file.sizeBytes ?? 0} bytes
+                      {file.sizeBytes != null ? `${file.sizeBytes} bytes` : "—"}
                     </span>
                   </div>
                 ))}
