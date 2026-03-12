@@ -19,13 +19,15 @@ export async function GET(req: Request): Promise<NextResponse> {
 
   try {
     const query = parseSearch(req, listSessionsQuery);
-    return NextResponse.json(
+    const sessions = await Promise.resolve(
       listOpenClawSessions(getDb(), {
         connectionId: query.connectionId,
         status: query.status,
         limit: query.limit,
       }),
     );
+
+    return NextResponse.json(sessions);
   } catch (err) {
     if (err instanceof z.ZodError) {
       return jsonError(400, err.message, "VALIDATION_ERROR");

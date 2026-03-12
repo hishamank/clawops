@@ -34,6 +34,13 @@ export type OpenClawSessionRecord = Omit<OpenClawSession, "metadata"> & {
   metadata: Record<string, unknown> | null;
 };
 
+export class OpenClawSessionFetchError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "OpenClawSessionFetchError";
+  }
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -86,7 +93,7 @@ function pickDate(...values: unknown[]): Date | null {
   return null;
 }
 
-function normalizeSession(input: unknown): FetchedOpenClawSession | null {
+export function normalizeSession(input: unknown): FetchedOpenClawSession | null {
   const session = asRecord(input);
   const payload = asRecord(session["payload"]);
   const state = asRecord(session["state"]);
@@ -168,25 +175,34 @@ export async function fetchActiveSessions(
   gatewayUrl: string,
   token: string,
 ): Promise<FetchedOpenClawSession[]> {
-  try {
-    const headers: Record<string, string> = {};
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
 
+  try {
     const res = await fetch(`${gatewayUrl}/api/sessions`, {
       headers,
       signal: AbortSignal.timeout(5000),
     });
 
     if (!res.ok) {
-      return [];
+      throw new OpenClawSessionFetchError(
+        `Failed to fetch OpenClaw sessions from ${gatewayUrl}: ${res.status} ${res.statusText}`,
+      );
     }
 
     const data = (await res.json()) as unknown;
     return parseGatewaySessions(data);
-  } catch {
-    return [];
+  } catch (error) {
+    if (error instanceof OpenClawSessionFetchError) {
+      throw error;
+    }
+
+    throw new OpenClawSessionFetchError(
+      `Failed to fetch OpenClaw sessions from ${gatewayUrl}`,
+      { cause: error },
+    );
   }
 }
 
@@ -239,10 +255,17 @@ export async function syncSessions(
     throw new Error(`OpenClaw connection ${connection.id} does not have a gateway URL`);
   }
 
-  const activeSessions = await fetchActiveSessions(
-    connection.gatewayUrl,
-    resolveGatewayToken(connection),
-  );
+  const token = resolveGatewayToken(connection);
+  let activeSessions: FetchedOpenClawSession[];
+
+  try {
+    activeSessions = await fetchActiveSessions(connection.gatewayUrl, token);
+  } catch (error) {
+    throw new OpenClawSessionFetchError(
+      `Aborted OpenClaw session sync for connection ${connection.id}`,
+      { cause: error },
+    );
+  }
 
   return db.transaction((tx) => {
     const upserted = upsertSessions(tx as unknown as DB, connection.id, activeSessions);
@@ -257,10 +280,6 @@ export async function syncSessions(
         ),
       )
       .all();
-
-    const activeRows = activeSessionKeys.length > 0
-      ? previouslyActive.filter((session) => activeSessionKeys.includes(session.sessionKey))
-      : [];
 
     const endedCandidates = previouslyActive.filter(
       (session) => !activeSessionKeys.includes(session.sessionKey),
@@ -280,7 +299,7 @@ export async function syncSessions(
       : [];
 
     const byId = new Map<string, OpenClawSession>();
-    for (const session of [...upserted, ...activeRows, ...endedNow]) {
+    for (const session of [...upserted, ...endedNow]) {
       byId.set(session.id, session);
     }
 
