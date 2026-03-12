@@ -43,6 +43,7 @@ mock.module("@clawops/core", {
     and: (...conditions: unknown[]) => ({ type: "and", conditions }),
     eq: (left: unknown, right: unknown) => ({ type: "eq", left, right }),
     lt: (left: unknown, right: unknown) => ({ type: "lt", left, right }),
+    asc: (col: unknown) => ({ type: "asc", col }),
     desc: (col: unknown) => ({ type: "desc", col }),
     sql: Object.assign(
       (strings: TemplateStringsArray, ...values: unknown[]) => ({
@@ -455,5 +456,26 @@ describe("workspace file revisions", () => {
     assert.equal(result.length, 2);
     assert.equal(result[0]?.hash, "hash-new");
     assert.equal(result[1]?.hash, "hash-old");
+  });
+
+  it("listWorkspaceFileRevisions returns stable order when multiple revisions share the same capturedAt", () => {
+    const db = createDb();
+    const sameTimestamp = new Date("2026-03-12T10:00:00.000Z");
+
+    db.revisions.push(
+      { workspaceFileId: "file-1", hash: "hash-a", sizeBytes: 100, gitCommitSha: null, gitBranch: null, source: "sync" as const, capturedAt: sameTimestamp },
+      { workspaceFileId: "file-1", hash: "hash-b", sizeBytes: 200, gitCommitSha: null, gitBranch: null, source: "sync" as const, capturedAt: sameTimestamp },
+      { workspaceFileId: "file-1", hash: "hash-c", sizeBytes: 300, gitCommitSha: null, gitBranch: null, source: "sync" as const, capturedAt: sameTimestamp },
+    );
+
+    const resultA = listWorkspaceFileRevisions(db as never, "file-1");
+    const resultB = listWorkspaceFileRevisions(db as never, "file-1");
+
+    // Order must be deterministic across repeated calls
+    assert.equal(resultA.length, 3);
+    assert.deepEqual(
+      resultA.map((r) => r.hash),
+      resultB.map((r) => r.hash),
+    );
   });
 });

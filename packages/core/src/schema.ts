@@ -184,8 +184,10 @@ export const workspaceFileRevisions = sqliteTable(
       .default(sql`(unixepoch())`),
   },
   (table) => ({
-    workspaceFileIdIdx: index("idx_workspace_file_revisions_file_id").on(table.workspaceFileId),
-    capturedAtIdx: index("idx_workspace_file_revisions_captured_at").on(table.capturedAt),
+    workspaceFileIdCapturedAtIdx: index("idx_workspace_file_revisions_file_captured").on(
+      table.workspaceFileId,
+      table.capturedAt,
+    ),
   }),
 );
 

@@ -1,5 +1,6 @@
 import {
   and,
+  asc,
   desc,
   eq,
   lt,
@@ -231,7 +232,7 @@ export function upsertWorkspaceFiles(
       });
     }
 
-    const revisionRows = [];
+    const revisionRows: typeof workspaceFileRevisions.$inferInsert[] = [];
     for (const row of inserted) {
       const file = uniqueFiles.get(row.relativePath);
       revisionRows.push({
@@ -294,9 +295,9 @@ export function listWorkspaceFileRevisions(
     .select()
     .from(workspaceFileRevisions)
     .where(eq(workspaceFileRevisions.workspaceFileId, workspaceFileId))
-    .orderBy(desc(workspaceFileRevisions.capturedAt));
+    .orderBy(desc(workspaceFileRevisions.capturedAt), asc(workspaceFileRevisions.id));
 
-  if (opts?.limit) {
+  if (typeof opts?.limit === "number" && opts.limit > 0) {
     return base.limit(opts.limit).all();
   }
 

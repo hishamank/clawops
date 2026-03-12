@@ -9,6 +9,4 @@ CREATE TABLE `workspace_file_revisions` (
 	`captured_at` integer NOT NULL DEFAULT (unixepoch())
 );
 --> statement-breakpoint
-CREATE INDEX `idx_workspace_file_revisions_file_id` ON `workspace_file_revisions` (`workspace_file_id`);
---> statement-breakpoint
-CREATE INDEX `idx_workspace_file_revisions_captured_at` ON `workspace_file_revisions` (`captured_at`);
+CREATE INDEX `idx_workspace_file_revisions_file_captured` ON `workspace_file_revisions` (`workspace_file_id`, `captured_at`);
