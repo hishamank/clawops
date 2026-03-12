@@ -137,7 +137,7 @@ export const openclawSessions = sqliteTable(
       .$defaultFn(() => crypto.randomUUID()),
     connectionId: text("connection_id")
       .notNull()
-      .references(() => openclawConnections.id),
+      .references(() => openclawConnections.id, { onDelete: "cascade" }),
     sessionKey: text("session_key").notNull(),
     agentId: text("agent_id"),
     model: text("model"),

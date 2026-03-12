@@ -114,6 +114,7 @@ describe("onboardOpenClaw", () => {
             updated: [],
             unchangedCount: 0,
           };
+        },
         syncSessions: async (_db: unknown, syncedConnection: Record<string, unknown>) => {
           syncSessionsCalls.push(syncedConnection);
           return [];

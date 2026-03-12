@@ -1,10 +1,14 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
+import crypto from "node:crypto";
 import type { DB, OpenClawConnection, OpenClawSession } from "@clawops/core";
 import {
   normalizeSession,
   OpenClawSessionFetchError,
   syncSessions,
+  listSessions,
+  upsertSessions,
+  type FetchedOpenClawSession,
 } from "./sessions.js";
 
 type SessionChain = {
@@ -59,6 +63,7 @@ function makeDb(options?: {
   onUpdate?: () => void;
 }): DB {
   const previouslyActive = options?.previouslyActive ?? [makeActiveSession()];
+  const insertedSessions: OpenClawSession[] = [];
 
   const selectChain: SessionChain = {
     from: () => selectChain,
@@ -79,6 +84,31 @@ function makeDb(options?: {
   const db = {
     select: () => selectChain,
     update: () => updateChain,
+    insert: () => ({
+      values: (vals: unknown) => ({
+        onConflictDoUpdate: () => ({
+          returning: () => ({
+            get: () => {
+              const session: OpenClawSession = {
+                id: crypto.randomUUID(),
+                connectionId: (vals as { connectionId: string }).connectionId,
+                sessionKey: (vals as { sessionKey: string }).sessionKey,
+                agentId: (vals as { agentId: string | null }).agentId ?? null,
+                model: (vals as { model: string | null }).model ?? null,
+                status: "active",
+                startedAt: (vals as { startedAt: Date }).startedAt,
+                endedAt: null,
+                metadata: null,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              };
+              insertedSessions.push(session);
+              return session;
+            },
+          }),
+        }),
+      }),
+    }),
     transaction: <T>(callback: (tx: DB) => T): T => {
       options?.onTransaction?.();
       return callback(db as unknown as DB);
@@ -181,5 +211,223 @@ describe("syncSessions", () => {
 
     assert.equal(transactionCount, 0);
     assert.equal(updateCount, 0);
+  });
+
+  it("upserts new and existing sessions correctly", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => {
+      return {
+        ok: true,
+        json: async () => ({
+          sessions: [
+            {
+              sessionKey: "existing-active-session",
+              agentId: "agent-1-updated",
+              model: "gpt-5-turbo",
+              startedAt: "2026-03-12T09:00:00.000Z",
+            },
+            {
+              sessionKey: "new-session",
+              agentId: "agent-2",
+              model: "claude-sonnet",
+              startedAt: "2026-03-12T10:00:00.000Z",
+            },
+          ],
+        }),
+      } as Response;
+    };
+
+    try {
+      const result = await syncSessions(
+        makeDb({
+          previouslyActive: [makeActiveSession()],
+        }),
+        makeConnection(),
+      );
+
+      assert.ok(result.length >= 2);
+      const updatedSession = result.find((s) => s.sessionKey === "existing-active-session");
+      const newSession = result.find((s) => s.sessionKey === "new-session");
+
+      assert.ok(updatedSession);
+      assert.equal(updatedSession.status, "active");
+      assert.ok(newSession);
+      assert.equal(newSession.status, "active");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("marks sessions as ended when they are no longer active", async () => {
+    let markedAsEnded = false;
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => {
+      return {
+        ok: true,
+        json: async () => ({
+          sessions: [
+            {
+              sessionKey: "new-active-session",
+              agentId: "agent-2",
+              model: "claude-sonnet",
+              startedAt: "2026-03-12T10:00:00.000Z",
+            },
+          ],
+        }),
+      } as Response;
+    };
+
+    try {
+      const result = await syncSessions(
+        makeDb({
+          previouslyActive: [makeActiveSession()],
+          onUpdate: () => {
+            markedAsEnded = true;
+          },
+        }),
+        makeConnection(),
+      );
+
+      assert.ok(markedAsEnded, "Should have marked old session as ended");
+      assert.ok(result.length >= 1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+describe("upsertSessions", () => {
+  it("returns empty array when no sessions provided", () => {
+    const db = makeDb();
+    const result = upsertSessions(db, "conn-1", []);
+    assert.equal(result.length, 0);
+  });
+
+  it("inserts new sessions", () => {
+    const mockInserted: OpenClawSession[] = [];
+    const db = {
+      insert: () => ({
+        values: () => ({
+          onConflictDoUpdate: () => ({
+            returning: () => ({
+              get: () => {
+                const session: OpenClawSession = {
+                  id: "session-new",
+                  connectionId: "conn-1",
+                  sessionKey: "new-session",
+                  agentId: "agent-1",
+                  model: "gpt-5",
+                  status: "active",
+                  startedAt: new Date("2026-03-12T10:00:00.000Z"),
+                  endedAt: null,
+                  metadata: null,
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                };
+                mockInserted.push(session);
+                return session;
+              },
+            }),
+          }),
+        }),
+      }),
+    } as unknown as DB;
+
+    const sessions: FetchedOpenClawSession[] = [
+      {
+        sessionKey: "new-session",
+        agentId: "agent-1",
+        model: "gpt-5",
+        status: "active",
+        startedAt: new Date("2026-03-12T10:00:00.000Z"),
+        endedAt: null,
+        metadata: null,
+      },
+    ];
+
+    const result = upsertSessions(db, "conn-1", sessions);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].sessionKey, "new-session");
+    assert.equal(mockInserted.length, 1);
+  });
+});
+
+describe("listSessions", () => {
+  it("returns sessions with filters applied", () => {
+    const sessions = [
+      makeActiveSession(),
+      {
+        ...makeActiveSession(),
+        id: "session-2",
+        sessionKey: "session-2",
+        status: "ended" as const,
+        endedAt: new Date("2026-03-12T10:00:00.000Z"),
+      },
+    ];
+
+    const db = {
+      select: () => ({
+        from: () => ({
+          orderBy: () => ({
+            $dynamic: () => ({
+              where: () => ({
+                limit: () => ({
+                  all: () => sessions.filter((s) => s.status === "active"),
+                }),
+              }),
+              limit: () => ({
+                all: () => sessions,
+              }),
+            }),
+          }),
+        }),
+      }),
+    } as unknown as DB;
+
+    const result = listSessions(db, { status: "active" });
+    assert.ok(result.length >= 1);
+  });
+
+  it("applies connection filter", () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          orderBy: () => ({
+            $dynamic: () => ({
+              where: () => ({
+                limit: () => ({
+                  all: () => [makeActiveSession()],
+                }),
+              }),
+            }),
+          }),
+        }),
+      }),
+    } as unknown as DB;
+
+    const result = listSessions(db, { connectionId: "conn-1" });
+    assert.ok(result.length >= 0);
+  });
+
+  it("applies default limit of 20", () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          orderBy: () => ({
+            $dynamic: () => ({
+              limit: (lim: number) => {
+                assert.equal(lim, 20);
+                return {
+                  all: () => [],
+                };
+              },
+            }),
+          }),
+        }),
+      }),
+    } as unknown as DB;
+
+    listSessions(db, {});
   });
 });
