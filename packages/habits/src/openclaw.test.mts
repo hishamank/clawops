@@ -183,6 +183,9 @@ function createFakeDb(state: FakeDbState): DB {
         },
       };
     },
+    transaction<T>(callback: (tx: typeof db) => T): T {
+      return callback(db);
+    },
     insert(table: { __table: symbol }) {
       return {
         values(values: HabitInsertValues) {
