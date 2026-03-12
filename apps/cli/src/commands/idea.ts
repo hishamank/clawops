@@ -1,3 +1,5 @@
+/* eslint-disable no-console -- CLI tool uses console for output */
+
 import { Command } from "commander";
 import { ideaAdd, ideaList, ideaGetSections, ideaGetSection, ideaUpdateSection, ideaUpdateSections, ideaGetDraftPrd, ideaSetDraftPrd } from "../lib/client.js";
 import { IDEA_SECTION_KEYS, type IdeaSectionKey, type IdeaSections } from "@clawops/ideas";

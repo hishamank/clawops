@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+/* eslint-disable no-console -- CLI tool uses console for output */
+
 import { Command } from "commander";
 import { agentCmd } from "./commands/agent.js";
 import { cronCmd } from "./commands/cron.js";
