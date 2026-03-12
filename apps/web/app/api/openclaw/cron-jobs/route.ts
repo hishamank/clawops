@@ -46,7 +46,7 @@ export async function GET(req: Request): Promise<NextResponse> {
       }
 
       db.transaction((tx) => {
-        syncCronJobs(tx as DB, connection, getGatewayToken(req));
+        syncCronJobs(tx as unknown as DB, connection, getGatewayToken(req));
 
         tx.insert(events)
           .values({
