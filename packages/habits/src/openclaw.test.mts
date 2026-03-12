@@ -147,7 +147,7 @@ function sortRows<TRow extends Record<string, unknown>>(
 }
 
 function createFakeDb(state: FakeDbState): DB {
-  const db = {
+  const base = {
     select() {
       return {
         from(table: { __table: symbol }) {
@@ -182,9 +182,6 @@ function createFakeDb(state: FakeDbState): DB {
           };
         },
       };
-    },
-    transaction<T>(callback: (tx: typeof db) => T): T {
-      return callback(db);
     },
     insert(table: { __table: symbol }) {
       return {
@@ -240,6 +237,13 @@ function createFakeDb(state: FakeDbState): DB {
           };
         },
       };
+    },
+  };
+
+  const db = {
+    ...base,
+    transaction<T>(callback: (tx: typeof base) => T): T {
+      return callback(base);
     },
   };
 

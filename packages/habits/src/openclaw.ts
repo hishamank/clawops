@@ -241,9 +241,29 @@ export async function fetchCronJobs(
     ? data
     : (data as { jobs?: unknown[] }).jobs ?? [];
 
-  return jobs
-    .filter((job): job is Record<string, unknown> => Boolean(job) && typeof job === "object")
-    .map((job) => normalizeCronJob(job));
+  const normalized: OpenClawCronJob[] = [];
+
+  for (const job of jobs) {
+    if (!job || typeof job !== "object") {
+      continue;
+    }
+
+    const record = job as Record<string, unknown>;
+    const id = record["id"];
+    const name = record["name"];
+
+    if (typeof id !== "string" || id.trim() === "") {
+      throw new Error("Received cron job with missing or empty id from OpenClaw gateway");
+    }
+
+    if (typeof name !== "string" || name.trim() === "") {
+      throw new Error(`Received cron job with missing or empty name from OpenClaw gateway (id="${id}")`);
+    }
+
+    normalized.push(normalizeCronJob(record));
+  }
+
+  return normalized;
 }
 
 export function listCronJobs(
