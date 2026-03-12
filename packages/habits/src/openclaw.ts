@@ -120,11 +120,20 @@ function normalizeCronJob(job: Record<string, unknown>): OpenClawCronJob {
     job["state"] && typeof job["state"] === "object" && !Array.isArray(job["state"])
       ? (job["state"] as Record<string, unknown>)
       : {};
+  const rawEnabled = job["enabled"];
+  const enabled =
+    typeof rawEnabled === "boolean"
+      ? rawEnabled
+      : typeof rawEnabled === "number"
+        ? rawEnabled !== 0
+        : typeof rawEnabled === "string"
+          ? !["false", "0", "off", "no"].includes(rawEnabled.trim().toLowerCase())
+          : true;
 
   return {
     id: String(job["id"] ?? ""),
     name: String(job["name"] ?? ""),
-    enabled: Boolean(job["enabled"] ?? true),
+    enabled,
     scheduleKind:
       typeof job["scheduleKind"] === "string" ? String(job["scheduleKind"]) : schedule.kind,
     scheduleExpr:
@@ -346,6 +355,10 @@ export function upsertCronJobs(
             .returning()
             .get();
 
+      if (!row) {
+        throw new Error(`Failed to upsert cron job "${job.id}" for connection "${connectionId}"`);
+      }
+
       return row;
     }),
   );
@@ -447,26 +460,58 @@ export async function updateConnectionCronJob(
   );
 
   const patchSchedule = patch.schedule !== undefined ? normalizeSchedule(patch.schedule) : null;
-  const resolvedScheduleRaw = remote?.scheduleRaw ?? patchSchedule?.raw ?? localJob.schedule;
+  const resolvedScheduleRaw =
+    remote?.scheduleRaw !== undefined
+      ? remote.scheduleRaw
+      : patchSchedule?.raw !== undefined
+        ? patchSchedule.raw
+        : localJob.schedule;
   const resolvedScheduleKind =
-    remote?.scheduleKind ?? patch.scheduleKind ?? patchSchedule?.kind ?? localJob.scheduleKind;
+    remote?.scheduleKind !== undefined
+      ? remote.scheduleKind
+      : patch.scheduleKind !== undefined
+        ? patch.scheduleKind
+        : patchSchedule?.kind !== undefined
+          ? patchSchedule.kind
+          : localJob.scheduleKind;
   const resolvedScheduleExpr =
-    remote?.scheduleExpr ?? patch.scheduleExpr ?? patchSchedule?.expr ?? localJob.scheduleExpr;
+    remote?.scheduleExpr !== undefined
+      ? remote.scheduleExpr
+      : patch.scheduleExpr !== undefined
+        ? patch.scheduleExpr
+        : patchSchedule?.expr !== undefined
+          ? patchSchedule.expr
+          : localJob.scheduleExpr;
   const resolvedCronExpr =
-    resolvedScheduleKind === "cron" ? resolvedScheduleExpr ?? localJob.cronExpr : null;
+    resolvedScheduleKind === "cron"
+      ? resolvedScheduleExpr !== undefined
+        ? resolvedScheduleExpr
+        : localJob.cronExpr
+      : null;
+  const resolvedName =
+    remote?.name !== undefined ? remote.name : patch.name !== undefined ? patch.name : localJob.name;
+  const resolvedSessionTarget =
+    remote?.sessionTarget !== undefined
+      ? remote.sessionTarget
+      : patch.sessionTarget !== undefined
+        ? patch.sessionTarget
+        : localJob.sessionTarget;
+  const resolvedEnabled =
+    remote?.enabled !== undefined
+      ? remote.enabled
+      : patch.enabled !== undefined
+        ? patch.enabled
+        : localJob.enabled;
 
   const updatedLocal = updateLocalCronJob(db, localCronJobId, {
-    name: remote?.name ?? patch.name ?? localJob.name,
+    name: resolvedName,
     schedule: resolvedScheduleRaw,
     cronExpr: resolvedCronExpr,
     scheduleKind: resolvedScheduleKind,
     scheduleExpr: resolvedScheduleExpr,
-    sessionTarget: remote?.sessionTarget ?? patch.sessionTarget ?? localJob.sessionTarget,
-    enabled: remote?.enabled ?? patch.enabled ?? localJob.enabled,
-    status:
-      (remote?.enabled ?? patch.enabled ?? localJob.enabled)
-        ? "active"
-        : "paused",
+    sessionTarget: resolvedSessionTarget,
+    enabled: resolvedEnabled,
+    status: resolvedEnabled ? "active" : "paused",
     lastSyncedAt: new Date(),
   });
 

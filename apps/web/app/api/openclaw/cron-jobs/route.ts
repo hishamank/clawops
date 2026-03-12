@@ -45,19 +45,21 @@ export async function GET(req: Request): Promise<NextResponse> {
         return jsonError(404, "OpenClaw connection not found", "OPENCLAW_CONNECTION_NOT_FOUND");
       }
 
-      await syncCronJobs(db, connection, getGatewayToken(req));
+      db.transaction((tx) => {
+        syncCronJobs(tx as DB, connection, getGatewayToken(req));
 
-      db.insert(events)
-        .values({
-          id: crypto.randomUUID(),
-          action: "openclaw.cron_jobs.synced",
-          entityType: "openclaw_connection",
-          entityId: connection.id,
-          agentId: auth,
-          meta: JSON.stringify({ connectionId: connection.id }),
-          createdAt: new Date(),
-        })
-        .run();
+        tx.insert(events)
+          .values({
+            id: crypto.randomUUID(),
+            action: "openclaw.cron_jobs.synced",
+            entityType: "openclaw_connection",
+            entityId: connection.id,
+            agentId: auth,
+            meta: JSON.stringify({ connectionId: connection.id }),
+            createdAt: new Date(),
+          })
+          .run();
+      });
     }
 
     return NextResponse.json(
