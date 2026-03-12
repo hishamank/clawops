@@ -84,7 +84,8 @@ export async function PATCH(
     }
 
     if (isNotFoundError(err)) {
-      return jsonError(404, err.message, "NOT_FOUND");
+      const message = err instanceof Error ? err.message : "Not found";
+      return jsonError(404, message, "NOT_FOUND");
     }
 
     return jsonError(

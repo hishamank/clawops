@@ -5,6 +5,7 @@ const eventsInserted: Array<Record<string, unknown>> = [];
 const initAgentCalls: Array<Record<string, unknown>> = [];
 const finishSyncRunWithTxCalls: Array<Record<string, unknown>> = [];
 const upsertConnectionCalls: Array<Record<string, unknown>> = [];
+const upsertCronJobsCalls: Array<Record<string, unknown>> = [];
 const fetchGatewayCronJobsCalls: Array<Record<string, unknown>> = [];
 const syncWorkspaceFilesCalls: Array<Record<string, unknown>> = [];
 const startSyncRunCalls: Array<Record<string, unknown>> = [];
@@ -33,6 +34,7 @@ beforeEach(() => {
   initAgentCalls.length = 0;
   finishSyncRunWithTxCalls.length = 0;
   upsertConnectionCalls.length = 0;
+  upsertCronJobsCalls.length = 0;
   fetchGatewayCronJobsCalls.length = 0;
   syncWorkspaceFilesCalls.length = 0;
   startSyncRunCalls.length = 0;
@@ -69,6 +71,10 @@ describe("onboardOpenClaw", () => {
             },
             created: true,
           };
+        },
+        upsertCronJobs: (_db: unknown, connectionId: string, jobs: Record<string, unknown>[]) => {
+          upsertCronJobsCalls.push({ connectionId, jobs });
+          return [];
         },
         scanOpenClaw: () => ({
           agents: [
@@ -126,6 +132,7 @@ describe("onboardOpenClaw", () => {
     assert.equal(upsertConnectionCalls.length, 1);
     assert.equal(initAgentCalls.length, 1);
     assert.equal(finishSyncRunWithTxCalls.length, 1);
+    assert.equal(upsertCronJobsCalls.length, 1);
     assert.equal(fetchGatewayCronJobsCalls.length, 1);
     assert.equal(syncWorkspaceFilesCalls.length, 1);
     const finishSyncRunInput = finishSyncRunWithTxCalls[0]?.["input"] as Record<string, unknown>;
