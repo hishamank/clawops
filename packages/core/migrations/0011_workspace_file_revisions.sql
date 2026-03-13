@@ -1,6 +1,6 @@
 CREATE TABLE `workspace_file_revisions` (
 	`id` text PRIMARY KEY NOT NULL,
-	`workspace_file_id` text NOT NULL REFERENCES `workspace_files`(`id`) ON DELETE CASCADE,
+	`workspace_file_id` text NOT NULL REFERENCES `workspace_files`(`id`),
 	`hash` text,
 	`size_bytes` integer,
 	`git_commit_sha` text,

@@ -173,7 +173,7 @@ export const workspaceFileRevisions = sqliteTable(
       .$defaultFn(() => crypto.randomUUID()),
     workspaceFileId: text("workspace_file_id")
       .notNull()
-      .references(() => workspaceFiles.id, { onDelete: "cascade" }),
+      .references(() => workspaceFiles.id),
     hash: text("hash"),
     sizeBytes: integer("size_bytes"),
     gitCommitSha: text("git_commit_sha"),
