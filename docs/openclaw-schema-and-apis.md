@@ -660,6 +660,7 @@ Current implementation notes:
 - auth: set `OPENCLAW_EVENTS_SECRET` on the web app, then send either:
   - `x-openclaw-event-token: <secret>`
   - or `x-openclaw-signature: sha256=<hmac of raw body>`
+- or `Authorization: Bearer <secret>`
 - preferred payload fields:
   - `type`
   - `connectionId`

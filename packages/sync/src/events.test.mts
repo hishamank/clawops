@@ -210,6 +210,65 @@ describe("ingestOpenClawInboundEvent", () => {
     assert.equal(runs[0]?.note, "Gateway timed out");
   });
 
+
+  integrationTest("does not reopen an ended session when a duplicate start arrives", () => {
+    ingestOpenClawInboundEvent(db, {
+      type: "session.started",
+      connectionId,
+      occurredAt: "2026-03-13T12:00:00.000Z",
+      agent: { externalId: "alpha-ext" },
+      session: { key: "sess-dup", model: "claude-opus", startedAt: "2026-03-13T12:00:00.000Z" },
+    });
+
+    ingestOpenClawInboundEvent(db, {
+      type: "session.ended",
+      connectionId,
+      occurredAt: "2026-03-13T12:10:00.000Z",
+      agent: { externalId: "alpha-ext" },
+      session: { key: "sess-dup", endedAt: "2026-03-13T12:10:00.000Z" },
+    });
+
+    ingestOpenClawInboundEvent(db, {
+      type: "session.started",
+      connectionId,
+      occurredAt: "2026-03-13T12:11:00.000Z",
+      agent: { externalId: "alpha-ext" },
+      session: { key: "sess-dup", model: "claude-opus", startedAt: "2026-03-13T12:00:00.000Z" },
+    });
+
+    const session = db
+      .select()
+      .from(schema.openclawSessions)
+      .where(schema.eq(schema.openclawSessions.sessionKey, "sess-dup"))
+      .get();
+
+    assert.equal(session?.status, "ended");
+    assert.equal(session?.endedAt?.toISOString(), "2026-03-13T12:10:00.000Z");
+  });
+
+  integrationTest("uses inbound ranAt when recording cron runs", () => {
+    ingestOpenClawInboundEvent(db, {
+      type: "cron.run.completed",
+      connectionId,
+      occurredAt: "2026-03-13T13:05:00.000Z",
+      cron: { externalId: "cron-1" },
+      run: { success: true, ranAt: "2026-03-13T13:00:00.000Z" },
+    });
+
+    const cron = db
+      .select()
+      .from(schema.habits)
+      .where(schema.eq(schema.habits.externalId, "cron-1"))
+      .get();
+    const runs = db
+      .select()
+      .from(schema.habitRuns)
+      .where(schema.eq(schema.habitRuns.habitId, cron?.id ?? ""))
+      .all();
+
+    assert.equal(runs[0]?.ranAt.toISOString(), "2026-03-13T13:00:00.000Z");
+  });
+
   integrationTest("rejects events for unknown connections", () => {
     assert.throws(
       () =>
