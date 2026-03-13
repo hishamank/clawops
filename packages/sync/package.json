@@ -21,6 +21,7 @@
   "dependencies": {
     "@clawops/agents": "workspace:*",
     "@clawops/core": "workspace:*",
+    "@clawops/domain": "workspace:*",
     "@clawops/habits": "workspace:*"
   },
   "exports": {

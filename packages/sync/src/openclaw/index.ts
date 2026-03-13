@@ -7,6 +7,16 @@ export {
   syncWorkspaceFiles,
 } from "./files.js";
 export {
+  triggerSupportedOpenClawEndpoint,
+  updateOpenClawCronAction,
+  writeTrackedOpenClawFile,
+  type OpenClawActionAuditInput,
+  type TriggerSupportedOpenClawEndpointInput,
+  type TriggerSupportedOpenClawEndpointResult,
+  type UpdateOpenClawCronActionInput,
+  type WriteTrackedOpenClawFileInput,
+} from "./actions.js";
+export {
   fetchActiveSessions,
   listSessions,
   syncSessions,

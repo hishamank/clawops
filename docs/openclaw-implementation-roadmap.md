@@ -959,6 +959,7 @@ Deliverables:
 
 - validated event ingestion endpoint
 - normalized internal event contract
+- shared-secret auth contract via `OPENCLAW_EVENTS_SECRET`
 
 Dependencies:
 
