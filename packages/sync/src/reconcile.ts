@@ -218,8 +218,6 @@ async function executeReconcileMode(
   updatedCount: number;
   items: FinishSyncRunItemInput[];
 }> {
-  const gatewayToken = resolveGatewayToken(ctx.connection, { gatewayToken: ctx.gatewayToken });
-
   let agentCount = 0;
   let cronJobCount = 0;
   let workspaceCount = 0;
@@ -240,6 +238,7 @@ async function executeReconcileMode(
 
   // Reconcile cron jobs
   if (shouldRunFull || ctx.mode === "cron") {
+    const gatewayToken = resolveGatewayToken(ctx.connection, { gatewayToken: ctx.gatewayToken });
     const cronResult = await reconcileCronJobs(db, ctx.connection, gatewayToken);
     cronJobCount = cronResult.cronJobCount;
     addedCount += cronResult.addedCount;

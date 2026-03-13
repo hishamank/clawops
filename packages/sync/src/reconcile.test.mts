@@ -7,7 +7,6 @@ import type {
   OpenClawConnection,
   Habit,
   OpenClawSession,
-  WorkspaceFile,
 } from "@clawops/core";
 
 const BASE_CONNECTION: OpenClawConnection = {
@@ -98,30 +97,32 @@ function makeDb(options?: {
 }): DB {
   const runs = options?.runs ?? [BASE_RUN];
   const items = options?.items ?? [BASE_ITEM];
-  const updatedRuns = options?.updatedRuns ?? [
-    {
-      ...BASE_RUN,
-      status: "success",
-      completedAt: new Date("2026-03-11T00:01:00.000Z"),
-      agentCount: 1,
-      cronJobCount: 1,
-      workspaceCount: 1,
-      addedCount: 3,
-      updatedCount: 0,
-      meta: '{"mode":"full","gatewayUrl":"http://localhost:3000"}',
-    },
-  ];
   const insertedRuns = options?.insertedRuns ?? [BASE_RUN];
 
   let selectCall = 0;
+  let lastUpdateValue: Record<string, unknown> = {};
   const updateChain: UpdateChain = {
     set: (value) => {
+      lastUpdateValue = value;
       options?.onUpdateRun?.(value);
       return updateChain;
     },
     where: () => updateChain,
     returning: () => updateChain,
-    all: () => updatedRuns,
+    all: () => {
+      // Return a run with the values that were set
+      return [{
+        ...BASE_RUN,
+        status: "success",
+        completedAt: new Date("2026-03-11T00:01:00.000Z"),
+        agentCount: Number(lastUpdateValue.agentCount ?? 0),
+        cronJobCount: Number(lastUpdateValue.cronJobCount ?? 0),
+        workspaceCount: Number(lastUpdateValue.workspaceCount ?? 0),
+        addedCount: Number(lastUpdateValue.addedCount ?? 0),
+        updatedCount: Number(lastUpdateValue.updatedCount ?? 0),
+        meta: lastUpdateValue.meta as string ?? '{"mode":"full","gatewayUrl":"http://localhost:3000"}',
+      }];
+    },
   };
   const insertChain: InsertChain = {
     values: (values?: unknown[]) => {
@@ -215,25 +216,35 @@ mock.module("@clawops/habits", {
 mock.module("./openclaw/files.js", {
   namedExports: {
     syncWorkspaceFiles: () =>
-      Promise.resolve([
-        {
-          id: "file-1",
-          connectionId: "conn-1",
-          workspacePath: "~/.openclaw/workspace",
-          relativePath: "SOUL.md",
-          fileHash: "abc123",
-          sizeBytes: 1024,
-          lastSeenAt: new Date("2026-03-11T00:00:00.000Z"),
-          createdAt: new Date("2026-03-11T00:00:00.000Z"),
-          updatedAt: new Date("2026-03-11T00:00:00.000Z"),
-        },
-      ] as WorkspaceFile[]),
+      Promise.resolve({
+        fetchedCount: 1,
+        inserted: [
+          {
+            id: "file-1",
+            connectionId: "conn-1",
+            workspacePath: "~/.openclaw/workspace",
+            relativePath: "SOUL.md",
+            fileHash: "abc123",
+            sizeBytes: 1024,
+            lastSeenAt: new Date("2026-03-11T00:00:00.000Z"),
+            createdAt: new Date("2026-03-11T00:00:00.000Z"),
+            updatedAt: new Date("2026-03-11T00:00:00.000Z"),
+          },
+        ],
+        updated: [],
+        unchangedCount: 0,
+      }),
   },
 });
 
 mock.module("./connections.js", {
   namedExports: {
-    getOpenClawConnection: () => BASE_CONNECTION,
+    getOpenClawConnection: (db: DB, connectionId: string) => {
+      if (connectionId === "nonexistent") {
+        return null;
+      }
+      return BASE_CONNECTION;
+    },
   },
 });
 
@@ -256,6 +267,7 @@ describe("reconcile", () => {
       BASE_CONNECTION,
       {
         mode: "full",
+        gatewayToken: "test-token",
       },
     );
 
@@ -270,6 +282,7 @@ describe("reconcile", () => {
   it("runs a sessions-only reconciliation", async () => {
     const result = await reconcile(makeDb(), BASE_CONNECTION, {
       mode: "sessions",
+      gatewayToken: "test-token",
     });
 
     assert.equal(result.agentCount, 1);
@@ -280,6 +293,7 @@ describe("reconcile", () => {
   it("runs a cron-only reconciliation", async () => {
     const result = await reconcile(makeDb(), BASE_CONNECTION, {
       mode: "cron",
+      gatewayToken: "test-token",
     });
 
     assert.equal(result.agentCount, 0);
@@ -298,7 +312,9 @@ describe("reconcile", () => {
   });
 
   it("defaults to full reconciliation mode when not specified", async () => {
-    const result = await reconcile(makeDb(), BASE_CONNECTION);
+    const result = await reconcile(makeDb(), BASE_CONNECTION, {
+      gatewayToken: "test-token",
+    });
 
     assert.equal(result.agentCount, 1);
     assert.equal(result.cronJobCount, 1);
@@ -310,6 +326,7 @@ describe("reconcileConnection", () => {
   it("fetches the connection and runs reconciliation", async () => {
     const result = await reconcileConnection(makeDb(), "conn-1", {
       mode: "full",
+      gatewayToken: "test-token",
     });
 
     assert.equal(result.connection.id, "conn-1");
@@ -317,16 +334,8 @@ describe("reconcileConnection", () => {
   });
 
   it("throws an error when connection is not found", async () => {
-    mock.module("./connections.js", {
-      namedExports: {
-        getOpenClawConnection: () => null,
-      },
-    });
-
-    const { reconcileConnection: reconcileConnection2 } = await import("./reconcile.js");
-
     await assert.rejects(
-      async () => reconcileConnection2(makeDb(), "nonexistent"),
+      async () => reconcileConnection(makeDb(), "nonexistent"),
       (err: Error) => {
         assert.equal(err.message, 'OpenClaw connection "nonexistent" not found');
         return true;
