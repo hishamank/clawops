@@ -1,3 +1,19 @@
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  parseJsonObject,
+  toJsonObject,
+  workflowDefinitions,
+  workflowRuns,
+  workflowRunSteps,
+  type DB,
+  type WorkflowDefinition,
+  type WorkflowRun,
+  type WorkflowRunStep,
+} from "@clawops/core";
+
 export type WorkflowStatus = "draft" | "active" | "paused" | "deprecated";
 
 export type WorkflowTriggerType = "manual" | "scheduled" | "event" | "webhook";
@@ -27,49 +43,8 @@ export type WorkflowStepType =
   | "webhook"
   | "notification";
 
-export interface WorkflowRecord {
-  id: string;
-  name: string;
-  description: string | null;
-  version: string;
-  status: WorkflowStatus;
-  projectId: string | null;
-  triggerType: WorkflowTriggerType;
-  triggerConfig: string | null;
-  steps: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface WorkflowRunRecord {
-  id: string;
-  workflowId: string;
-  status: WorkflowRunStatus;
-  triggeredBy: string | null;
-  triggeredById: string | null;
-  startedAt: Date | null;
-  completedAt: Date | null;
-  error: string | null;
-  metadata: string | null;
-  createdAt: Date;
-}
-
-export interface WorkflowStepRunRecord {
-  id: string;
-  runId: string;
-  stepIndex: number;
-  name: string;
-  type: string;
-  status: WorkflowStepRunStatus;
-  input: string | null;
-  output: string | null;
-  error: string | null;
-  startedAt: Date | null;
-  completedAt: Date | null;
-  createdAt: Date;
-}
-
 export interface WorkflowStepDefinition {
+  key?: string;
   name: string;
   type: WorkflowStepType;
   config?: Record<string, unknown>;
@@ -78,26 +53,23 @@ export interface WorkflowStepDefinition {
   retryCount?: number;
 }
 
-export interface WorkflowStepState {
-  index: number;
-  name: string;
-  type: WorkflowStepType;
-  status: WorkflowStepRunStatus;
-  input?: Record<string, unknown>;
-  output?: Record<string, unknown>;
-  error?: string;
-  startedAt?: Date;
-  completedAt?: Date;
+export interface WorkflowRecord extends WorkflowDefinition {
+  triggerConfigObject: Record<string, unknown>;
+  stepsArray: WorkflowStepDefinition[];
 }
 
-export interface WorkflowContext {
-  workflowId: string;
-  runId: string;
-  triggeredBy: string;
-  triggeredById?: string;
-  variables: Record<string, unknown>;
-  stepOutputs: Record<string, Record<string, unknown>>;
-  metadata?: Record<string, unknown>;
+export interface WorkflowRunRecord extends WorkflowRun {
+  resultObject: Record<string, unknown>;
+  metadataObject: Record<string, unknown>;
+}
+
+export interface WorkflowStepRunRecord extends WorkflowRunStep {
+  inputObject: Record<string, unknown>;
+  resultObject: Record<string, unknown>;
+}
+
+export interface WorkflowRunWithSteps extends WorkflowRunRecord {
+  steps: WorkflowStepRunRecord[];
 }
 
 export interface CreateWorkflowInput {
@@ -113,11 +85,12 @@ export interface CreateWorkflowInput {
 
 export interface UpdateWorkflowInput {
   name?: string;
-  description?: string;
+  description?: string | null;
   version?: string;
   status?: WorkflowStatus;
+  projectId?: string | null;
   triggerType?: WorkflowTriggerType;
-  triggerConfig?: Record<string, unknown>;
+  triggerConfig?: Record<string, unknown> | null;
   steps?: WorkflowStepDefinition[];
 }
 
@@ -127,32 +100,48 @@ export interface ListWorkflowsFilters {
   triggerType?: WorkflowTriggerType;
 }
 
-export interface RunWorkflowInput {
+export interface CreateWorkflowRunInput {
+  workflowId: string;
   triggeredBy: "human" | "agent" | "schedule" | "event";
   triggeredById?: string;
-  variables?: Record<string, unknown>;
+  status?: WorkflowRunStatus;
+  startedAt?: Date;
+  completedAt?: Date;
+  result?: Record<string, unknown>;
+  error?: string;
   metadata?: Record<string, unknown>;
 }
 
-export interface WorkflowWithRuns extends WorkflowRecord {
-  runs: WorkflowRunRecord[];
+export interface UpdateWorkflowRunInput {
+  status?: WorkflowRunStatus;
+  startedAt?: Date | null;
+  completedAt?: Date | null;
+  result?: Record<string, unknown> | null;
+  error?: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
-export interface WorkflowRunWithSteps extends WorkflowRunRecord {
-  steps: WorkflowStepRunRecord[];
+export interface CreateWorkflowRunStepInput {
+  workflowRunId: string;
+  stepIndex: number;
+  stepKey?: string;
+  stepName: string;
+  stepType: WorkflowStepType;
+  status?: WorkflowStepRunStatus;
+  input?: Record<string, unknown>;
+  result?: Record<string, unknown>;
+  error?: string;
+  startedAt?: Date;
+  completedAt?: Date;
 }
 
-export interface WorkflowService {
-  createWorkflow(input: CreateWorkflowInput): WorkflowRecord;
-  getWorkflow(id: string): WorkflowWithRuns | null;
-  listWorkflows(filters?: ListWorkflowsFilters): WorkflowRecord[];
-  updateWorkflow(id: string, updates: UpdateWorkflowInput): WorkflowRecord;
-  deleteWorkflow(id: string): void;
-  runWorkflow(id: string, input: RunWorkflowInput): WorkflowRunRecord;
-  getWorkflowRun(runId: string): WorkflowRunWithSteps | null;
-  listWorkflowRuns(workflowId: string): WorkflowRunRecord[];
-  cancelWorkflowRun(runId: string): WorkflowRunRecord;
-  getWorkflowStepRuns(runId: string): WorkflowStepRunRecord[];
+export interface UpdateWorkflowRunStepInput {
+  status?: WorkflowStepRunStatus;
+  input?: Record<string, unknown> | null;
+  result?: Record<string, unknown> | null;
+  error?: string | null;
+  startedAt?: Date | null;
+  completedAt?: Date | null;
 }
 
 const VALID_STEP_TYPES: WorkflowStepType[] = [
@@ -166,20 +155,139 @@ const VALID_STEP_TYPES: WorkflowStepType[] = [
   "notification",
 ];
 
-function validateParallelStepConfig(
-  step: WorkflowStepDefinition,
-  index: number,
-): void {
-  if (step.type !== "parallel") {
-    return;
+function serializeObject(value: Record<string, unknown> | null | undefined): string | null {
+  if (value == null) {
+    return null;
   }
 
-  const nestedSteps = step.config?.["steps"];
-  if (!Array.isArray(nestedSteps)) {
+  return toJsonObject(value);
+}
+
+function serializeSteps(steps: WorkflowStepDefinition[]): string {
+  return JSON.stringify(steps);
+}
+
+function parseSteps(steps: string): WorkflowStepDefinition[] {
+  try {
+    const parsed: unknown = JSON.parse(steps);
+    if (!Array.isArray(parsed)) {
+      throw new Error("Workflow steps must deserialize to an array");
+    }
+
+    return parsed as WorkflowStepDefinition[];
+  } catch (error) {
     throw new Error(
-      `Step ${index} (${step.name}): parallel steps must have a "steps" array in config`,
+      `Workflow steps must be valid JSON: ${error instanceof Error ? error.message : "unknown error"}`,
     );
   }
+}
+
+function toWorkflowRecord(row: WorkflowDefinition): WorkflowRecord {
+  return {
+    ...row,
+    triggerConfigObject: parseJsonObject(row.triggerConfig),
+    stepsArray: parseSteps(row.steps),
+  };
+}
+
+function toWorkflowRunRecord(row: WorkflowRun): WorkflowRunRecord {
+  return {
+    ...row,
+    resultObject: parseJsonObject(row.result),
+    metadataObject: parseJsonObject(row.metadata),
+  };
+}
+
+function toWorkflowStepRunRecord(row: WorkflowRunStep): WorkflowStepRunRecord {
+  return {
+    ...row,
+    inputObject: parseJsonObject(row.input),
+    resultObject: parseJsonObject(row.result),
+  };
+}
+
+function buildWorkflowFilter(filters: ListWorkflowsFilters = {}) {
+  const conditions = [];
+
+  if (filters.status) {
+    conditions.push(eq(workflowDefinitions.status, filters.status));
+  }
+  if (filters.projectId) {
+    conditions.push(eq(workflowDefinitions.projectId, filters.projectId));
+  }
+  if (filters.triggerType) {
+    conditions.push(eq(workflowDefinitions.triggerType, filters.triggerType));
+  }
+
+  if (conditions.length === 0) {
+    return undefined;
+  }
+
+  return conditions.length === 1 ? conditions[0] : and(...conditions);
+}
+
+function normalizeStepKey(step: WorkflowStepDefinition, index: number): string {
+  return step.key?.trim() || `step-${index + 1}`;
+}
+
+function normalizeWorkflowStep(step: WorkflowStepDefinition, index: number): WorkflowStepDefinition {
+  return {
+    ...step,
+    key: normalizeStepKey(step, index),
+    config: step.config ?? {},
+  };
+}
+
+function normalizeCreateInput(input: CreateWorkflowInput) {
+  validateCreateWorkflow(input);
+  const triggerType = input.triggerType ?? "manual";
+  validateTriggerConfig(triggerType, input.triggerConfig);
+
+  const normalizedSteps = input.steps.map(normalizeWorkflowStep);
+
+  return {
+    name: input.name.trim(),
+    description: input.description?.trim() || null,
+    version: input.version?.trim() || "1",
+    status: input.status ?? "draft",
+    projectId: input.projectId ?? null,
+    triggerType,
+    triggerConfig: serializeObject(input.triggerConfig),
+    steps: serializeSteps(normalizedSteps),
+  };
+}
+
+function normalizeUpdateInput(input: UpdateWorkflowInput) {
+  validateUpdateWorkflow(input);
+
+  const triggerType = input.triggerType;
+  if (triggerType) {
+    validateTriggerConfig(triggerType, input.triggerConfig ?? undefined);
+  }
+
+  return {
+    name: input.name?.trim(),
+    description: input.description === undefined ? undefined : (input.description?.trim() || null),
+    version: input.version?.trim(),
+    status: input.status,
+    projectId: input.projectId,
+    triggerType,
+    triggerConfig:
+      input.triggerConfig === undefined ? undefined : serializeObject(input.triggerConfig),
+    steps:
+      input.steps === undefined
+        ? undefined
+        : serializeSteps(input.steps.map(normalizeWorkflowStep)),
+    updatedAt: new Date(),
+  };
+}
+
+function getReturningRow<T>(row: T | undefined | null, entity: string): T {
+  if (!row) {
+    throw new Error(`Failed to persist ${entity}`);
+  }
+
+  return row;
 }
 
 function validateWorkflowStepArray(steps: WorkflowStepDefinition[]): void {
@@ -189,7 +297,15 @@ function validateWorkflowStepArray(steps: WorkflowStepDefinition[]): void {
 
   for (const [index, step] of steps.entries()) {
     validateWorkflowStep(step, index);
-    validateParallelStepConfig(step, index);
+
+    if (step.type === "parallel") {
+      const nestedSteps = step.config?.["steps"];
+      if (!Array.isArray(nestedSteps)) {
+        throw new Error(
+          `Step ${index} (${step.name}): parallel steps must have a "steps" array in config`,
+        );
+      }
+    }
   }
 }
 
@@ -297,4 +413,174 @@ export function validateTriggerConfig(
       }
       break;
   }
+}
+
+export function createWorkflowDefinition(db: DB, input: CreateWorkflowInput): WorkflowRecord {
+  const row = db
+    .insert(workflowDefinitions)
+    .values(normalizeCreateInput(input))
+    .returning()
+    .get();
+
+  return toWorkflowRecord(getReturningRow(row, "workflow definition"));
+}
+
+export function getWorkflowDefinition(db: DB, id: string): WorkflowRecord | null {
+  const row = db
+    .select()
+    .from(workflowDefinitions)
+    .where(eq(workflowDefinitions.id, id))
+    .get();
+
+  return row ? toWorkflowRecord(row) : null;
+}
+
+export function listWorkflowDefinitions(
+  db: DB,
+  filters: ListWorkflowsFilters = {},
+): WorkflowRecord[] {
+  const whereClause = buildWorkflowFilter(filters);
+  const query = db.select().from(workflowDefinitions);
+  const rows = whereClause ? query.where(whereClause).orderBy(desc(workflowDefinitions.updatedAt)).all() : query.orderBy(desc(workflowDefinitions.updatedAt)).all();
+  return rows.map(toWorkflowRecord);
+}
+
+export function updateWorkflowDefinition(
+  db: DB,
+  id: string,
+  input: UpdateWorkflowInput,
+): WorkflowRecord {
+  const row = db
+    .update(workflowDefinitions)
+    .set(normalizeUpdateInput(input))
+    .where(eq(workflowDefinitions.id, id))
+    .returning()
+    .get();
+
+  return toWorkflowRecord(getReturningRow(row, "workflow definition"));
+}
+
+export function createWorkflowRun(db: DB, input: CreateWorkflowRunInput): WorkflowRunRecord {
+  const row = db
+    .insert(workflowRuns)
+    .values({
+      workflowId: input.workflowId,
+      triggeredBy: input.triggeredBy,
+      triggeredById: input.triggeredById ?? null,
+      status: input.status ?? "pending",
+      startedAt: input.startedAt ?? null,
+      completedAt: input.completedAt ?? null,
+      result: serializeObject(input.result),
+      error: input.error ?? null,
+      metadata: serializeObject(input.metadata),
+    })
+    .returning()
+    .get();
+
+  return toWorkflowRunRecord(getReturningRow(row, "workflow run"));
+}
+
+export function updateWorkflowRun(
+  db: DB,
+  id: string,
+  input: UpdateWorkflowRunInput,
+): WorkflowRunRecord {
+  const row = db
+    .update(workflowRuns)
+    .set({
+      status: input.status,
+      startedAt: input.startedAt,
+      completedAt: input.completedAt,
+      result: input.result === undefined ? undefined : serializeObject(input.result),
+      error: input.error,
+      metadata:
+        input.metadata === undefined ? undefined : serializeObject(input.metadata),
+    })
+    .where(eq(workflowRuns.id, id))
+    .returning()
+    .get();
+
+  return toWorkflowRunRecord(getReturningRow(row, "workflow run"));
+}
+
+export function listWorkflowRuns(db: DB, workflowId: string): WorkflowRunRecord[] {
+  return db
+    .select()
+    .from(workflowRuns)
+    .where(eq(workflowRuns.workflowId, workflowId))
+    .orderBy(desc(workflowRuns.createdAt))
+    .all()
+    .map(toWorkflowRunRecord);
+}
+
+export function getWorkflowRun(db: DB, id: string): WorkflowRunWithSteps | null {
+  const run = db.select().from(workflowRuns).where(eq(workflowRuns.id, id)).get();
+  if (!run) {
+    return null;
+  }
+
+  return {
+    ...toWorkflowRunRecord(run),
+    steps: listWorkflowRunSteps(db, id),
+  };
+}
+
+export function createWorkflowRunStep(
+  db: DB,
+  input: CreateWorkflowRunStepInput,
+): WorkflowStepRunRecord {
+  const row = db
+    .insert(workflowRunSteps)
+    .values({
+      workflowRunId: input.workflowRunId,
+      stepIndex: input.stepIndex,
+      stepKey: input.stepKey ?? `step-${input.stepIndex + 1}`,
+      stepName: input.stepName,
+      stepType: input.stepType,
+      status: input.status ?? "pending",
+      input: serializeObject(input.input),
+      result: serializeObject(input.result),
+      error: input.error ?? null,
+      startedAt: input.startedAt ?? null,
+      completedAt: input.completedAt ?? null,
+    })
+    .returning()
+    .get();
+
+  return toWorkflowStepRunRecord(getReturningRow(row, "workflow run step"));
+}
+
+export function updateWorkflowRunStep(
+  db: DB,
+  id: string,
+  input: UpdateWorkflowRunStepInput,
+): WorkflowStepRunRecord {
+  const row = db
+    .update(workflowRunSteps)
+    .set({
+      status: input.status,
+      input: input.input === undefined ? undefined : serializeObject(input.input),
+      result: input.result === undefined ? undefined : serializeObject(input.result),
+      error: input.error,
+      startedAt: input.startedAt,
+      completedAt: input.completedAt,
+    })
+    .where(eq(workflowRunSteps.id, id))
+    .returning()
+    .get();
+
+  return toWorkflowStepRunRecord(getReturningRow(row, "workflow run step"));
+}
+
+export function listWorkflowRunSteps(
+  db: DB,
+  workflowRunId: string,
+): WorkflowStepRunRecord[] {
+  return db
+    .select()
+    .from(workflowRunSteps)
+    .where(eq(workflowRunSteps.workflowRunId, workflowRunId))
+    .orderBy(asc(workflowRunSteps.stepIndex))
+    .all()
+    .map(toWorkflowStepRunRecord);
 }

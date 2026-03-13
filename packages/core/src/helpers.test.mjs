@@ -10,6 +10,9 @@ function makeStore() {
     projects: [],
     tasks: [],
     activityEvents: [],
+    workflowDefinitions: [],
+    workflowRuns: [],
+    workflowRunSteps: [],
   };
 }
 
@@ -29,6 +32,12 @@ function getRows(store, table) {
       return store.tasks;
     case "activity_events":
       return store.activityEvents;
+    case "workflow_definitions":
+      return store.workflowDefinitions;
+    case "workflow_runs":
+      return store.workflowRuns;
+    case "workflow_run_steps":
+      return store.workflowRunSteps;
     default:
       throw new Error(`Unsupported table: ${tableName}`);
   }
@@ -73,6 +82,23 @@ function matchesCondition(row, condition) {
   return extracted ? row[toRowField(extracted.field)] === extracted.value : true;
 }
 
+function createSelectResult(rows) {
+  return {
+    where(condition) {
+      return createSelectResult(rows.filter((row) => matchesCondition(row, condition)));
+    },
+    orderBy() {
+      return createSelectResult([...rows]);
+    },
+    all() {
+      return rows;
+    },
+    get() {
+      return rows[0];
+    },
+  };
+}
+
 function createDb() {
   const store = makeStore();
 
@@ -84,6 +110,7 @@ function createDb() {
           const inserted = {
             id: values.id ?? crypto.randomUUID(),
             createdAt: values.createdAt ?? new Date(),
+            updatedAt: values.updatedAt ?? new Date(),
             ...normalizeInsertValues(values),
           };
 
@@ -107,26 +134,34 @@ function createDb() {
     select() {
       return {
         from(table) {
-          const rows = getRows(store, table);
+          return createSelectResult(getRows(store, table));
+        },
+      };
+    },
+    update(table) {
+      const rows = getRows(store, table);
+      const state = {
+        values: {},
+      };
+
+      return {
+        set(values) {
+          state.values = values;
+          return this;
+        },
+        where(condition) {
+          const row = rows.find((entry) => matchesCondition(entry, condition));
+          if (row) {
+            Object.assign(row, normalizeInsertValues(state.values));
+          }
 
           return {
-            where(condition) {
-              const matched = rows.filter((row) => matchesCondition(row, condition));
-
+            returning() {
               return {
-                all() {
-                  return matched;
-                },
                 get() {
-                  return matched[0];
+                  return row;
                 },
               };
-            },
-            all() {
-              return rows;
-            },
-            get() {
-              return rows[0];
             },
           };
         },
@@ -192,12 +227,12 @@ describe("activity event helpers", () => {
       entityId: "task-1",
       projectId: "project-1",
       taskId: "task-1",
-      metadata: "{\"retry\":2,\"reason\":\"timeout\"}",
+      metadata: '{"retry":2,"reason":"timeout"}',
     });
 
     assert.ok(event.id);
     assert.equal(event.type, "sync.failed");
-    assert.equal(event.metadata, "{\"retry\":2,\"reason\":\"timeout\"}");
+    assert.equal(event.metadata, '{"retry":2,"reason":"timeout"}');
 
     const persisted = db
       .select()
@@ -270,12 +305,111 @@ describe("activity event helpers", () => {
       severity: "critical",
       type: "hook.failed",
       title: "Hook failed",
-      metadata: "{\"attempt\":3,\"urgent\":true}",
+      metadata: '{"attempt":3,"urgent":true}',
     });
 
     assert.deepStrictEqual(schema.parseActivityEventMetadata(event), {
       attempt: 3,
       urgent: true,
     });
+  });
+});
+
+describe("workflow persistence helpers", () => {
+  it("exports the workflow helper surface from @clawops/core", () => {
+    assert.equal(typeof schema.createWorkflowDefinition, "function");
+    assert.equal(typeof schema.getWorkflowDefinition, "function");
+    assert.equal(typeof schema.listWorkflowDefinitions, "function");
+    assert.equal(typeof schema.startWorkflowRun, "function");
+    assert.equal(typeof schema.recordWorkflowRunStep, "function");
+    assert.equal(typeof schema.finishWorkflowRun, "function");
+  });
+
+  it("creates, gets, and lists workflow definitions with parsed config and steps", () => {
+    const created = schema.createWorkflowDefinition(db, {
+      name: " Task created workflow ",
+      description: " Notify on task create ",
+      status: "active",
+      projectId: "project-1",
+      triggerType: "event",
+      triggerConfig: { eventType: "task.created" },
+      steps: [{ key: "step-1", name: "Notify", type: "notification" }],
+    });
+
+    assert.equal(created.name, "Task created workflow");
+    assert.equal(created.description, "Notify on task create");
+    assert.equal(created.triggerConfigObject.eventType, "task.created");
+    assert.equal(created.stepsArray[0]?.name, "Notify");
+
+    const fetched = schema.getWorkflowDefinition(db, created.id);
+    assert.ok(fetched);
+    assert.equal(fetched?.id, created.id);
+
+    const listed = schema.listWorkflowDefinitions(db, {
+      status: "active",
+      projectId: "project-1",
+      triggerType: "event",
+      limit: 1,
+    });
+
+    assert.equal(listed.length, 1);
+    assert.equal(listed[0]?.id, created.id);
+  });
+
+  it("starts runs, records steps, and finishes runs with parsed metadata", () => {
+    const workflow = schema.createWorkflowDefinition(db, {
+      name: "Deploy workflow",
+      status: "active",
+      triggerType: "manual",
+      steps: [{ name: "Create task", type: "task" }],
+    });
+
+    const run = schema.startWorkflowRun(db, {
+      workflowId: workflow.id,
+      triggeredBy: "human",
+      triggeredById: "agent-1",
+      metadata: { source: "manual-test" },
+    });
+
+    assert.equal(run.status, "running");
+    assert.equal(run.metadataObject.source, "manual-test");
+
+    const step = schema.recordWorkflowRunStep(db, {
+      workflowRunId: run.id,
+      stepIndex: 0,
+      stepName: "Create task",
+      stepType: "task",
+      status: "completed",
+      input: { title: "Follow up" },
+      result: { taskId: "task-1" },
+    });
+
+    assert.equal(step.stepKey, "step-1");
+    assert.equal(step.inputObject.title, "Follow up");
+    assert.equal(step.resultObject.taskId, "task-1");
+
+    const finished = schema.finishWorkflowRun(db, run.id, {
+      status: "completed",
+      result: { createdTaskId: "task-1" },
+      metadata: { source: "manual-test", steps: 1 },
+    });
+
+    assert.equal(finished.status, "completed");
+    assert.equal(finished.resultObject.createdTaskId, "task-1");
+    assert.equal(finished.metadataObject.steps, 1);
+
+    const persistedRun = db
+      .select()
+      .from(schema.workflowRuns)
+      .where(schema.eq(schema.workflowRuns.id, run.id))
+      .get();
+    const persistedStep = db
+      .select()
+      .from(schema.workflowRunSteps)
+      .where(schema.eq(schema.workflowRunSteps.id, step.id))
+      .get();
+
+    assert.equal(persistedRun.status, "completed");
+    assert.equal(persistedStep.stepName, "Create task");
   });
 });

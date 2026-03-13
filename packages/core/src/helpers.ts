@@ -1,4 +1,4 @@
-import { eq, type SQL } from "drizzle-orm";
+import { and, desc, eq, type SQL } from "drizzle-orm";
 import type { DB } from "./db.js";
 import {
   activityEvents,
@@ -6,6 +6,15 @@ import {
   type ActivityEventSeverity,
   type ActivityEventSource,
   type NewActivityEvent,
+  type NewWorkflowDefinition,
+  type NewWorkflowRun,
+  type NewWorkflowRunStep,
+  type WorkflowDefinition,
+  type WorkflowRun,
+  type WorkflowRunStep,
+  workflowDefinitions,
+  workflowRunSteps,
+  workflowRuns,
 } from "./schema.js";
 
 export function parseJsonArray(val: string | null): string[] {
@@ -142,4 +151,292 @@ export function parseActivityEventMetadata(
   event: ActivityEvent,
 ): Record<string, unknown> {
   return parseJsonObject(event.metadata);
+}
+
+// ── Workflow Persistence Helpers ───────────────────────────────────────────
+
+type JsonRecord = Record<string, unknown>;
+type WorkflowStepDefinition = JsonRecord;
+
+export interface WorkflowDefinitionRecord extends WorkflowDefinition {
+  triggerConfigObject: JsonRecord;
+  stepsArray: WorkflowStepDefinition[];
+}
+
+export interface WorkflowRunRecord extends WorkflowRun {
+  resultObject: JsonRecord;
+  metadataObject: JsonRecord;
+}
+
+export interface WorkflowRunStepRecord extends WorkflowRunStep {
+  inputObject: JsonRecord;
+  resultObject: JsonRecord;
+}
+
+export interface ListWorkflowDefinitionFilters {
+  status?: NonNullable<NewWorkflowDefinition["status"]>;
+  projectId?: string;
+  triggerType?: NonNullable<NewWorkflowDefinition["triggerType"]>;
+  limit?: number;
+}
+
+export interface CreateWorkflowDefinitionInput {
+  name: string;
+  description?: string | null;
+  version?: string;
+  status?: NonNullable<NewWorkflowDefinition["status"]>;
+  projectId?: string | null;
+  triggerType?: NonNullable<NewWorkflowDefinition["triggerType"]>;
+  triggerConfig?: JsonRecord | null;
+  steps: WorkflowStepDefinition[];
+}
+
+export interface StartWorkflowRunInput {
+  workflowId: string;
+  triggeredBy: NonNullable<NewWorkflowRun["triggeredBy"]>;
+  triggeredById?: string | null;
+  status?: NonNullable<NewWorkflowRun["status"]>;
+  startedAt?: Date | null;
+  result?: JsonRecord | null;
+  error?: string | null;
+  metadata?: JsonRecord | null;
+}
+
+export interface RecordWorkflowRunStepInput {
+  workflowRunId: string;
+  stepIndex: number;
+  stepKey?: string;
+  stepName: string;
+  stepType: string;
+  status?: NonNullable<NewWorkflowRunStep["status"]>;
+  input?: JsonRecord | null;
+  result?: JsonRecord | null;
+  error?: string | null;
+  startedAt?: Date | null;
+  completedAt?: Date | null;
+}
+
+export interface FinishWorkflowRunInput {
+  status?: Extract<
+    NonNullable<NewWorkflowRun["status"]>,
+    "completed" | "failed" | "cancelled"
+  >;
+  completedAt?: Date | null;
+  result?: JsonRecord | null;
+  error?: string | null;
+  metadata?: JsonRecord | null;
+}
+
+function serializeJsonRecord(value: JsonRecord | null | undefined): string | null {
+  if (value == null) {
+    return null;
+  }
+
+  return toJsonObject(value);
+}
+
+function serializeWorkflowSteps(steps: WorkflowStepDefinition[]): string {
+  return JSON.stringify(steps);
+}
+
+function parseWorkflowSteps(steps: string): WorkflowStepDefinition[] {
+  try {
+    const parsed: unknown = JSON.parse(steps);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.filter(
+      (step): step is WorkflowStepDefinition =>
+        step !== null && typeof step === "object" && !Array.isArray(step),
+    );
+  } catch {
+    return [];
+  }
+}
+
+function toWorkflowDefinitionRecord(row: WorkflowDefinition): WorkflowDefinitionRecord {
+  return {
+    ...row,
+    triggerConfigObject: parseJsonObject(row.triggerConfig),
+    stepsArray: parseWorkflowSteps(row.steps),
+  };
+}
+
+function toWorkflowRunRecord(row: WorkflowRun): WorkflowRunRecord {
+  return {
+    ...row,
+    resultObject: parseJsonObject(row.result),
+    metadataObject: parseJsonObject(row.metadata),
+  };
+}
+
+function toWorkflowRunStepRecord(row: WorkflowRunStep): WorkflowRunStepRecord {
+  return {
+    ...row,
+    inputObject: parseJsonObject(row.input),
+    resultObject: parseJsonObject(row.result),
+  };
+}
+
+function requirePersistedRow<T>(row: T | null | undefined, entity: string): T {
+  if (!row) {
+    throw new Error(`Failed to persist ${entity}`);
+  }
+
+  return row;
+}
+
+function normalizeWorkflowDefinitionInput(
+  input: CreateWorkflowDefinitionInput,
+): Omit<NewWorkflowDefinition, "id" | "createdAt" | "updatedAt"> {
+  const name = input.name.trim();
+  if (name.length === 0) {
+    throw new Error("Workflow definition name is required");
+  }
+
+  if (!Array.isArray(input.steps)) {
+    throw new Error("Workflow definition steps must be an array");
+  }
+
+  return {
+    name,
+    description: input.description?.trim() || null,
+    version: input.version?.trim() || "1",
+    status: input.status ?? "draft",
+    projectId: input.projectId ?? null,
+    triggerType: input.triggerType ?? "manual",
+    triggerConfig: serializeJsonRecord(input.triggerConfig),
+    steps: serializeWorkflowSteps(input.steps),
+  };
+}
+
+export function createWorkflowDefinition(
+  db: DB,
+  input: CreateWorkflowDefinitionInput,
+): WorkflowDefinitionRecord {
+  const row = db
+    .insert(workflowDefinitions)
+    .values(normalizeWorkflowDefinitionInput(input))
+    .returning()
+    .get();
+
+  return toWorkflowDefinitionRecord(requirePersistedRow(row, "workflow definition"));
+}
+
+export function getWorkflowDefinition(
+  db: DB,
+  id: string,
+): WorkflowDefinitionRecord | null {
+  const row = db
+    .select()
+    .from(workflowDefinitions)
+    .where(eq(workflowDefinitions.id, id))
+    .get();
+
+  return row ? toWorkflowDefinitionRecord(row) : null;
+}
+
+export function listWorkflowDefinitions(
+  db: DB,
+  filters: ListWorkflowDefinitionFilters = {},
+): WorkflowDefinitionRecord[] {
+  const conditions: SQL[] = [];
+
+  if (filters.status) {
+    conditions.push(eq(workflowDefinitions.status, filters.status));
+  }
+  if (filters.projectId) {
+    conditions.push(eq(workflowDefinitions.projectId, filters.projectId));
+  }
+  if (filters.triggerType) {
+    conditions.push(eq(workflowDefinitions.triggerType, filters.triggerType));
+  }
+
+  const whereClause =
+    conditions.length === 0
+      ? undefined
+      : conditions.length === 1
+        ? conditions[0]
+        : and(...conditions);
+  const baseQuery = db.select().from(workflowDefinitions);
+  const rows = whereClause
+    ? baseQuery.where(whereClause).orderBy(desc(workflowDefinitions.updatedAt)).all()
+    : baseQuery.orderBy(desc(workflowDefinitions.updatedAt)).all();
+
+  const limitedRows = filters.limit ? rows.slice(0, filters.limit) : rows;
+  return limitedRows.map(toWorkflowDefinitionRecord);
+}
+
+export function startWorkflowRun(
+  db: DB,
+  input: StartWorkflowRunInput,
+): WorkflowRunRecord {
+  const row = db
+    .insert(workflowRuns)
+    .values({
+      workflowId: input.workflowId,
+      triggeredBy: input.triggeredBy,
+      triggeredById: input.triggeredById ?? null,
+      status: input.status ?? "running",
+      startedAt: input.startedAt ?? new Date(),
+      result: serializeJsonRecord(input.result),
+      error: input.error ?? null,
+      metadata: serializeJsonRecord(input.metadata),
+    })
+    .returning()
+    .get();
+
+  return toWorkflowRunRecord(requirePersistedRow(row, "workflow run"));
+}
+
+export function recordWorkflowRunStep(
+  db: DB,
+  input: RecordWorkflowRunStepInput,
+): WorkflowRunStepRecord {
+  const stepName = input.stepName.trim();
+  if (stepName.length === 0) {
+    throw new Error("Workflow run step name is required");
+  }
+
+  const row = db
+    .insert(workflowRunSteps)
+    .values({
+      workflowRunId: input.workflowRunId,
+      stepIndex: input.stepIndex,
+      stepKey: input.stepKey?.trim() || `step-${input.stepIndex + 1}`,
+      stepName,
+      stepType: input.stepType,
+      status: input.status ?? "pending",
+      input: serializeJsonRecord(input.input),
+      result: serializeJsonRecord(input.result),
+      error: input.error ?? null,
+      startedAt: input.startedAt ?? null,
+      completedAt: input.completedAt ?? null,
+    })
+    .returning()
+    .get();
+
+  return toWorkflowRunStepRecord(requirePersistedRow(row, "workflow run step"));
+}
+
+export function finishWorkflowRun(
+  db: DB,
+  runId: string,
+  input: FinishWorkflowRunInput = {},
+): WorkflowRunRecord {
+  const row = db
+    .update(workflowRuns)
+    .set({
+      status: input.status ?? "completed",
+      completedAt: input.completedAt ?? new Date(),
+      result: input.result === undefined ? undefined : serializeJsonRecord(input.result),
+      error: input.error === undefined ? undefined : input.error,
+      metadata: input.metadata === undefined ? undefined : serializeJsonRecord(input.metadata),
+    })
+    .where(eq(workflowRuns.id, runId))
+    .returning()
+    .get();
+
+  return toWorkflowRunRecord(requirePersistedRow(row, "workflow run"));
 }

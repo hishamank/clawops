@@ -7,6 +7,12 @@ export {
   syncWorkspaceFiles,
 } from "./files.js";
 export {
+  OpenClawActionAuthenticationError,
+  OpenClawActionConfigurationError,
+  OpenClawActionError,
+  OpenClawActionNotFoundError,
+  OpenClawActionRemoteError,
+  OpenClawActionValidationError,
   triggerSupportedOpenClawEndpoint,
   updateOpenClawCronAction,
   writeTrackedOpenClawFile,

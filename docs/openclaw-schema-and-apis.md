@@ -458,45 +458,57 @@ This makes it easy to drive activity feed entries and debugging UI.
 
 #### `workflow_definitions`
 
-Suggested fields:
+Persisted fields:
 
 - `id`
 - `name`
 - `description`
+- `version`
 - `status`
+- `projectId`
 - `triggerType`
 - `triggerConfig`
-- `conditionConfig`
-- `actionConfig`
+- `steps`
 - `createdAt`
 - `updatedAt`
 
+Implementation note:
+
+- store `steps` as structured JSON so operator-authored definitions and future templates can share one persistence shape
+
 #### `workflow_runs`
 
-Suggested fields:
+Persisted fields:
 
 - `id`
 - `workflowId`
-- `triggeredByEventId`
-- `status`
-- `startedAt`
-- `completedAt`
-- `error`
-- `meta`
-
-#### `workflow_run_steps`
-
-Suggested fields:
-
-- `id`
-- `workflowRunId`
-- `stepKey`
-- `stepType`
+- `triggeredBy`
+- `triggeredById`
 - `status`
 - `startedAt`
 - `completedAt`
 - `result`
 - `error`
+- `metadata`
+- `createdAt`
+
+#### `workflow_run_steps`
+
+Persisted fields:
+
+- `id`
+- `workflowRunId`
+- `stepIndex`
+- `stepKey`
+- `stepName`
+- `stepType`
+- `status`
+- `input`
+- `result`
+- `error`
+- `startedAt`
+- `completedAt`
+- `createdAt`
 
 ## Package Changes
 
@@ -683,12 +695,17 @@ Current implementation notes:
 
 ### `POST /api/integrations/openclaw/actions/*`
 
-ClawOps-initiated actions back to OpenClaw, such as:
+ClawOps-initiated actions back to OpenClaw. The current action routes are:
 
-- create cron
-- update cron
-- write file
-- trigger webhook
+- `PATCH /api/integrations/openclaw/actions/cron-jobs/:id`
+- `POST /api/integrations/openclaw/actions/files/write`
+- `POST /api/integrations/openclaw/actions/triggers`
+
+Responsibilities:
+
+- validate payloads per action category
+- audit both low-level `events` and higher-level `activity_events`
+- surface remote gateway failures with clear error messages
 
 ## Task Routes
 
@@ -771,6 +788,8 @@ Every major operation should be exposed as a CLI command.
 - `clawops openclaw cron list`
 - `clawops openclaw cron create`
 - `clawops openclaw cron update`
+- `clawops openclaw cron enable`
+- `clawops openclaw cron disable`
 - `clawops openclaw files list`
 - `clawops openclaw files history`
 

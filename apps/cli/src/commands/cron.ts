@@ -1,6 +1,7 @@
 /* eslint-disable no-console -- CLI tool uses console for output */
 
 import { Command } from "commander";
+import { OpenClawActionError } from "@clawops/sync/openclaw";
 import { getAgentId } from "../lib/client.js";
 import type { Habit } from "@clawops/core";
 
@@ -12,6 +13,15 @@ function jsonOut(cmd: Command): boolean {
 
 function getGatewayToken(opts: Record<string, unknown>): string | undefined {
   return (opts["gatewayToken"] as string | undefined) ?? process.env["OPENCLAW_GATEWAY_TOKEN"] ?? undefined;
+}
+
+function handleCronActionError(error: unknown): never {
+  if (error instanceof OpenClawActionError) {
+    console.error(`[${error.code}] ${error.message}`);
+    process.exit(1);
+  }
+
+  throw error;
 }
 
 cronCmd
@@ -57,22 +67,26 @@ async function setEnabled(
   enabled: boolean,
   opts: Record<string, unknown>,
 ): Promise<void> {
-  const agentId = getAgentId();
-  const { db } = await import("@clawops/core/db");
-  const { updateOpenClawCronAction } = await import("@clawops/sync/openclaw");
+  try {
+    const agentId = getAgentId();
+    const { db } = await import("@clawops/core/db");
+    const { updateOpenClawCronAction } = await import("@clawops/sync/openclaw");
 
-  const result = await updateOpenClawCronAction(db, {
-    actorAgentId: agentId,
-    source: "cli",
-    cronJobId: id,
-    patch: { enabled },
-    gatewayToken: getGatewayToken(opts),
-  });
+    const result = await updateOpenClawCronAction(db, {
+      actorAgentId: agentId,
+      source: "cli",
+      cronJobId: id,
+      patch: { enabled },
+      gatewayToken: getGatewayToken(opts),
+    });
 
-  if (jsonOut(cronCmd)) {
-    console.log(JSON.stringify(result.local, null, 2));
-  } else {
-    console.log(`cron job ${result.local.id} ${enabled ? "enabled" : "disabled"}`);
+    if (jsonOut(cronCmd)) {
+      console.log(JSON.stringify(result.local, null, 2));
+    } else {
+      console.log(`cron job ${result.local.id} ${enabled ? "enabled" : "disabled"}`);
+    }
+  } catch (error) {
+    handleCronActionError(error);
   }
 }
 
@@ -121,22 +135,26 @@ cronCmd
       process.exit(1);
     }
 
-    const agentId = getAgentId();
-    const { db } = await import("@clawops/core/db");
-    const { updateOpenClawCronAction } = await import("@clawops/sync/openclaw");
+    try {
+      const agentId = getAgentId();
+      const { db } = await import("@clawops/core/db");
+      const { updateOpenClawCronAction } = await import("@clawops/sync/openclaw");
 
-    const result = await updateOpenClawCronAction(db, {
-      actorAgentId: agentId,
-      source: "cli",
-      cronJobId: id,
-      patch,
-      gatewayToken: getGatewayToken(opts),
-    });
+      const result = await updateOpenClawCronAction(db, {
+        actorAgentId: agentId,
+        source: "cli",
+        cronJobId: id,
+        patch,
+        gatewayToken: getGatewayToken(opts),
+      });
 
-    if (jsonOut(cronCmd)) {
-      console.log(JSON.stringify(result.local, null, 2));
-      return;
+      if (jsonOut(cronCmd)) {
+        console.log(JSON.stringify(result.local, null, 2));
+        return;
+      }
+
+      console.log(`cron job ${result.local.id} updated`);
+    } catch (error) {
+      handleCronActionError(error);
     }
-
-    console.log(`cron job ${result.local.id} updated`);
   });
