@@ -1,14 +1,19 @@
 import {
   and,
+  asc,
+  desc,
   eq,
+  inArray,
   lt,
   openclawConnections,
   parseJsonObject,
   sql,
+  workspaceFileRevisions,
   workspaceFiles,
   type DB,
   type OpenClawConnection,
   type WorkspaceFile,
+  type WorkspaceFileRevision,
 } from "@clawops/core";
 
 type TransactionDb = Parameters<DB["transaction"]>[0] extends (tx: infer T) => unknown ? T : DB;
@@ -18,6 +23,8 @@ export interface OpenClawWorkspaceFile {
   relativePath: string;
   fileHash: string | null;
   sizeBytes: number | null;
+  gitCommitSha?: string | null;
+  gitBranch?: string | null;
 }
 
 export interface WorkspaceFileChange {
@@ -76,6 +83,8 @@ function normalizeWorkspaceFile(record: unknown): OpenClawWorkspaceFile | null {
     relativePath,
     fileHash: toNullableString(raw["fileHash"] ?? raw["file_hash"] ?? raw["hash"] ?? raw["sha256"]),
     sizeBytes: toNullableNumber(raw["sizeBytes"] ?? raw["size_bytes"] ?? raw["size"] ?? raw["bytes"]),
+    gitCommitSha: toNullableString(raw["gitCommitSha"] ?? raw["git_commit_sha"] ?? raw["commitSha"]),
+    gitBranch: toNullableString(raw["gitBranch"] ?? raw["git_branch"] ?? raw["branch"]),
   };
 }
 
@@ -224,6 +233,57 @@ export function upsertWorkspaceFiles(
       });
     }
 
+    const revisionRows: typeof workspaceFileRevisions.$inferInsert[] = [];
+    for (const row of inserted) {
+      const file = uniqueFiles.get(row.relativePath);
+      revisionRows.push({
+        workspaceFileId: row.id,
+        hash: row.fileHash ?? null,
+        sizeBytes: row.sizeBytes ?? null,
+        gitCommitSha: file?.gitCommitSha ?? null,
+        gitBranch: file?.gitBranch ?? null,
+        source: "sync" as const,
+        capturedAt: syncStartedAt,
+      });
+    }
+    for (const change of updated) {
+      const file = uniqueFiles.get(change.file.relativePath);
+      revisionRows.push({
+        workspaceFileId: change.file.id,
+        hash: change.file.fileHash ?? null,
+        sizeBytes: change.file.sizeBytes ?? null,
+        gitCommitSha: file?.gitCommitSha ?? null,
+        gitBranch: file?.gitBranch ?? null,
+        source: "sync" as const,
+        capturedAt: syncStartedAt,
+      });
+    }
+
+    if (revisionRows.length > 0) {
+      tx.insert(workspaceFileRevisions).values(revisionRows).run();
+    }
+
+    // Explicitly remove revisions for stale files before deleting the files.
+    // This avoids FK constraint violations (PRAGMA foreign_keys = ON) while
+    // keeping the behavior explicit — no silent cascade, no hidden data loss.
+    const staleFileIds = tx
+      .select({ id: workspaceFiles.id })
+      .from(workspaceFiles)
+      .where(
+        and(
+          eq(workspaceFiles.connectionId, connectionId),
+          lt(workspaceFiles.lastSeenAt, syncStartedAt),
+        ),
+      )
+      .all()
+      .map((row) => row.id);
+
+    if (staleFileIds.length > 0) {
+      tx.delete(workspaceFileRevisions)
+        .where(inArray(workspaceFileRevisions.workspaceFileId, staleFileIds))
+        .run();
+    }
+
     tx.delete(workspaceFiles)
       .where(
         and(
@@ -246,6 +306,24 @@ export function upsertWorkspaceFiles(
       unchangedCount,
     };
   });
+}
+
+export function listWorkspaceFileRevisions(
+  db: DB,
+  workspaceFileId: string,
+  opts?: { limit?: number },
+): WorkspaceFileRevision[] {
+  const base = db
+    .select()
+    .from(workspaceFileRevisions)
+    .where(eq(workspaceFileRevisions.workspaceFileId, workspaceFileId))
+    .orderBy(desc(workspaceFileRevisions.capturedAt), asc(workspaceFileRevisions.id));
+
+  if (typeof opts?.limit === "number" && opts.limit > 0) {
+    return base.limit(opts.limit).all();
+  }
+
+  return base.all();
 }
 
 function resolveGatewayToken(connection: OpenClawConnection): string | null {

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import crypto from "node:crypto";
 
 // ── Agents ──────────────────────────────────────────────────────────────────
@@ -160,6 +160,34 @@ export const openclawSessions = sqliteTable(
     connectionSessionKeyUnique: uniqueIndex(
       "openclaw_sessions_connection_session_key_unique",
     ).on(table.connectionId, table.sessionKey),
+  }),
+);
+
+// ── Workspace File Revisions ────────────────────────────────────────────────
+
+export const workspaceFileRevisions = sqliteTable(
+  "workspace_file_revisions",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    workspaceFileId: text("workspace_file_id")
+      .notNull()
+      .references(() => workspaceFiles.id),
+    hash: text("hash"),
+    sizeBytes: integer("size_bytes"),
+    gitCommitSha: text("git_commit_sha"),
+    gitBranch: text("git_branch"),
+    source: text("source").notNull().default("sync"),
+    capturedAt: integer("captured_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (table) => ({
+    workspaceFileIdCapturedAtIdx: index("idx_workspace_file_revisions_file_captured").on(
+      table.workspaceFileId,
+      table.capturedAt,
+    ),
   }),
 );
 
@@ -550,6 +578,8 @@ export type WorkspaceFile = typeof workspaceFiles.$inferSelect;
 export type NewWorkspaceFile = typeof workspaceFiles.$inferInsert;
 export type OpenClawSession = typeof openclawSessions.$inferSelect;
 export type NewOpenClawSession = typeof openclawSessions.$inferInsert;
+export type WorkspaceFileRevision = typeof workspaceFileRevisions.$inferSelect;
+export type NewWorkspaceFileRevision = typeof workspaceFileRevisions.$inferInsert;
 
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
