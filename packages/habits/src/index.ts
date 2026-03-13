@@ -224,7 +224,7 @@ export function logHeartbeat(db: DB, agentId: string): HabitRun {
       habit = created;
     }
 
-    const now = input.ranAt ?? new Date();
+    const now = new Date();
 
     const [run] = tx
       .insert(habitRuns)
