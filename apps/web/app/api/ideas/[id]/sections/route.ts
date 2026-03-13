@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { events, type DB } from "@clawops/core";
+import { events, createActivityEvent, type DB } from "@clawops/core";
 import { getIdeaSections, updateIdeaSections } from "@clawops/ideas";
 import { NotFoundError } from "@clawops/domain";
 import { getDb, jsonError } from "@/lib/server/runtime";
@@ -54,6 +54,18 @@ export async function PATCH(
           meta: JSON.stringify({ updatedSections: Object.keys(body.sections) }),
         })
         .run();
+      try {
+        createActivityEvent(tx as unknown as DB, {
+          source: "user",
+          type: "idea.updated",
+          title: `Idea sections updated: ${result.title}`,
+          entityType: "idea",
+          entityId: id,
+          metadata: JSON.stringify({ updatedSections: Object.keys(body.sections) }),
+        });
+      } catch {
+        // best-effort
+      }
       return result;
     });
 

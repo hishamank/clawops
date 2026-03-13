@@ -1,4 +1,5 @@
 import {
+  createActivityEvent,
   desc,
   eq,
   or,
@@ -96,6 +97,19 @@ export function startSyncRun(db: DB, input: StartSyncRunInput = {}): SyncRun {
     throw new Error("Failed to create sync run");
   }
 
+  try {
+    createActivityEvent(db, {
+      source: "sync",
+      type: "sync.started",
+      title: `Sync started (${run.syncType})`,
+      entityType: "sync_run",
+      entityId: run.id,
+      metadata: JSON.stringify({ syncType: run.syncType, connectionId: run.connectionId }),
+    });
+  } catch {
+    // best-effort: don't let activity event failure break sync
+  }
+
   return run;
 }
 
@@ -144,6 +158,33 @@ function finishSyncRunTx(
   }
 
   const items = listSyncRunItemsByRunIds(db, [run.id]);
+
+  try {
+    const isFailed = input.status === "failed";
+    createActivityEvent(db, {
+      source: "sync",
+      severity: isFailed ? "error" : "info",
+      type: isFailed ? "sync.failed" : "sync.completed",
+      title: isFailed
+        ? `Sync failed${input.error ? `: ${input.error}` : ""}`
+        : `Sync completed (${input.agentCount ?? 0} agents, ${input.cronJobCount ?? 0} cron jobs)`,
+      entityType: "sync_run",
+      entityId: run.id,
+      metadata: JSON.stringify({
+        status: input.status,
+        agentCount: input.agentCount ?? 0,
+        cronJobCount: input.cronJobCount ?? 0,
+        workspaceCount: input.workspaceCount ?? 0,
+        addedCount: input.addedCount ?? 0,
+        updatedCount: input.updatedCount ?? 0,
+        removedCount: input.removedCount ?? 0,
+        error: input.error,
+      }),
+    });
+  } catch {
+    // best-effort: don't let activity event failure break sync
+  }
+
   return buildSyncRunSummary(run, items);
 }
 
