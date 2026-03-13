@@ -3,6 +3,7 @@ import {
   asc,
   desc,
   eq,
+  inArray,
   lt,
   openclawConnections,
   parseJsonObject,
@@ -260,6 +261,27 @@ export function upsertWorkspaceFiles(
 
     if (revisionRows.length > 0) {
       tx.insert(workspaceFileRevisions).values(revisionRows).run();
+    }
+
+    // Explicitly remove revisions for stale files before deleting the files.
+    // This avoids FK constraint violations (PRAGMA foreign_keys = ON) while
+    // keeping the behavior explicit — no silent cascade, no hidden data loss.
+    const staleFileIds = tx
+      .select({ id: workspaceFiles.id })
+      .from(workspaceFiles)
+      .where(
+        and(
+          eq(workspaceFiles.connectionId, connectionId),
+          lt(workspaceFiles.lastSeenAt, syncStartedAt),
+        ),
+      )
+      .all()
+      .map((row) => row.id);
+
+    if (staleFileIds.length > 0) {
+      tx.delete(workspaceFileRevisions)
+        .where(inArray(workspaceFileRevisions.workspaceFileId, staleFileIds))
+        .run();
     }
 
     tx.delete(workspaceFiles)

@@ -45,6 +45,7 @@ mock.module("@clawops/core", {
     lt: (left: unknown, right: unknown) => ({ type: "lt", left, right }),
     asc: (col: unknown) => ({ type: "asc", col }),
     desc: (col: unknown) => ({ type: "desc", col }),
+    inArray: (col: unknown, vals: unknown[]) => ({ type: "inArray", col, vals }),
     sql: Object.assign(
       (strings: TemplateStringsArray, ...values: unknown[]) => ({
         type: "sql",
