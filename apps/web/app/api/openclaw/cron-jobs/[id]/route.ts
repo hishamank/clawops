@@ -79,7 +79,7 @@ export async function PATCH(
 
     try {
       createActivityEvent(db as DB, {
-        source: "user",
+        source: "agent",
         type: "cron.updated",
         title: `Cron job updated: ${updated.local.name}`,
         entityType: "cron_job",
