@@ -59,28 +59,15 @@ async function setEnabled(
 ): Promise<void> {
   const agentId = getAgentId();
   const { db } = await import("@clawops/core/db");
-  const { events } = await import("@clawops/core");
-  const { updateConnectionCronJob } = await import("@clawops/habits");
+  const { updateOpenClawCronAction } = await import("@clawops/sync/openclaw");
 
-  const result = await updateConnectionCronJob(
-    db,
-    id,
-    { enabled },
-    getGatewayToken(opts),
-  );
-
-  db.insert(events)
-    .values({
-      agentId,
-      action: "openclaw.cron_job.updated",
-      entityType: "habit",
-      entityId: result.local.id,
-      meta: JSON.stringify({
-        enabled,
-        externalId: result.local.externalId,
-      }),
-    })
-    .run();
+  const result = await updateOpenClawCronAction(db, {
+    actorAgentId: agentId,
+    source: "cli",
+    cronJobId: id,
+    patch: { enabled },
+    gatewayToken: getGatewayToken(opts),
+  });
 
   if (jsonOut(cronCmd)) {
     console.log(JSON.stringify(result.local, null, 2));
@@ -103,4 +90,53 @@ cronCmd
   .option("--gateway-token <token>", "Gateway token for the OpenClaw connection")
   .action(async (id: string, opts: Record<string, unknown>) => {
     await setEnabled(id, false, opts);
+  });
+
+cronCmd
+  .command("update <id>")
+  .description("Update an OpenClaw cron job")
+  .option("--name <value>", "Set the cron job name")
+  .option("--schedule-kind <value>", "Set the schedule kind")
+  .option("--schedule-expr <value>", "Set the schedule expression")
+  .option("--session-target <value>", "Set the target session")
+  .option("--enable", "Enable the cron job")
+  .option("--disable", "Disable the cron job")
+  .option("--gateway-token <token>", "Gateway token for the OpenClaw connection")
+  .action(async (id: string, opts: Record<string, unknown>) => {
+    const patch = {
+      name: opts["name"] as string | undefined,
+      scheduleKind: opts["scheduleKind"] as string | undefined,
+      scheduleExpr: opts["scheduleExpr"] as string | undefined,
+      sessionTarget: opts["sessionTarget"] as string | undefined,
+      enabled:
+        opts["enable"] === true
+          ? true
+          : opts["disable"] === true
+            ? false
+            : undefined,
+    };
+
+    if (Object.values(patch).every((value) => value === undefined)) {
+      console.error("Provide at least one field to update.");
+      process.exit(1);
+    }
+
+    const agentId = getAgentId();
+    const { db } = await import("@clawops/core/db");
+    const { updateOpenClawCronAction } = await import("@clawops/sync/openclaw");
+
+    const result = await updateOpenClawCronAction(db, {
+      actorAgentId: agentId,
+      source: "cli",
+      cronJobId: id,
+      patch,
+      gatewayToken: getGatewayToken(opts),
+    });
+
+    if (jsonOut(cronCmd)) {
+      console.log(JSON.stringify(result.local, null, 2));
+      return;
+    }
+
+    console.log(`cron job ${result.local.id} updated`);
   });

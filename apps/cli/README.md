@@ -163,6 +163,28 @@ clawops agent heartbeat
 
 ---
 
+### `clawops cron`
+
+Manage synced OpenClaw cron jobs.
+
+```bash
+# List synced cron jobs
+clawops cron list
+
+# Enable or disable a cron job
+clawops cron enable <id>
+clawops cron disable <id>
+
+# Update name/schedule/session target through the shared OpenClaw action layer
+clawops cron update <id> --name "Nightly review" --schedule-kind cron --schedule-expr "0 2 * * *"
+```
+
+Mutation side effects:
+- `enable`, `disable`, and `update` all use the shared outbound OpenClaw action helpers from `@clawops/sync/openclaw`.
+- Each mutation writes both low-level audit events and structured activity events.
+
+---
+
 ### `clawops task`
 
 Manage tasks.

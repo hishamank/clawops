@@ -152,8 +152,8 @@ function parseGatewaySessions(data: unknown): FetchedOpenClawSession[] {
     .filter((session): session is FetchedOpenClawSession => session !== null);
 }
 
-function resolveGatewayToken(connection: OpenClawConnection): string {
-  const token = process.env["OPENCLAW_GATEWAY_TOKEN"]?.trim();
+function resolveGatewayToken(connection: OpenClawConnection, tokenOverride?: string): string {
+  const token = tokenOverride?.trim() || process.env["OPENCLAW_GATEWAY_TOKEN"]?.trim();
 
   if (connection.hasGatewayToken && !token) {
     throw new Error(
@@ -250,12 +250,13 @@ export function upsertSessions(
 export async function syncSessions(
   db: DB,
   connection: OpenClawConnection,
+  tokenOverride?: string,
 ): Promise<OpenClawSessionRecord[]> {
   if (!connection.gatewayUrl) {
     throw new Error(`OpenClaw connection ${connection.id} does not have a gateway URL`);
   }
 
-  const token = resolveGatewayToken(connection);
+  const token = resolveGatewayToken(connection, tokenOverride);
   let activeSessions: FetchedOpenClawSession[];
 
   try {

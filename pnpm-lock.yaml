@@ -341,13 +341,25 @@ importers:
       '@clawops/core':
         specifier: workspace:*
         version: link:../core
+      '@clawops/domain':
+        specifier: workspace:*
+        version: link:../domain
       '@clawops/habits':
         specifier: workspace:*
         version: link:../habits
     devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.12
+        version: 7.6.13
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.13
+      better-sqlite3:
+        specifier: ^11.7.0
+        version: 11.10.0
+      drizzle-orm:
+        specifier: ^0.38.0
+        version: 0.38.4(@types/better-sqlite3@7.6.13)(@types/react@19.2.14)(better-sqlite3@11.10.0)(react@19.2.4)
       tsx:
         specifier: ^4.21.0
         version: 4.21.0

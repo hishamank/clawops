@@ -654,6 +654,32 @@ Responsibilities:
 - update relevant local state
 - optionally trigger workflows
 
+Current implementation notes:
+
+- route: `POST /api/integrations/openclaw/events`
+- auth: set `OPENCLAW_EVENTS_SECRET` on the web app, then send either:
+  - `x-openclaw-event-token: <secret>`
+  - or `x-openclaw-signature: sha256=<hmac of raw body>`
+- preferred payload fields:
+  - `type`
+  - `connectionId`
+  - `occurredAt`
+  - `agent.externalId` for agent or session events
+  - `session.key` for session events
+  - `cron.externalId` for cron run events
+- currently supported inbound event types:
+  - `agent.heartbeat`
+  - `session.started`
+  - `session.ended`
+  - `cron.run.completed`
+- current local state effects:
+  - heartbeat updates the linked agent status and records a heartbeat run
+  - session events upsert `openclaw_sessions`
+  - cron run events record a `habit_runs` row for the synced cron job
+- every accepted event writes both:
+  - low-level `events`
+  - richer `activity_events`
+
 ### `POST /api/integrations/openclaw/actions/*`
 
 ClawOps-initiated actions back to OpenClaw, such as:

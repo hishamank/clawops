@@ -9,18 +9,20 @@ const paramsSchema = z.object({
   id: z.string().min(1),
 });
 
-const patchBodySchema = z.object({
-  enabled: z.boolean().optional(),
-  name: z.string().min(1).optional(),
-  schedule: z.unknown().optional(),
-  scheduleKind: z.string().min(1).nullable().optional(),
-  scheduleExpr: z.string().min(1).nullable().optional(),
-  sessionTarget: z.string().min(1).nullable().optional(),
-  gatewayToken: z.string().min(1).optional(),
-}).refine(
-  (body) => Object.keys(body).some((key) => key !== "gatewayToken"),
-  "At least one cron job field must be provided",
-);
+const patchBodySchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    name: z.string().min(1).optional(),
+    schedule: z.unknown().optional(),
+    scheduleKind: z.string().min(1).nullable().optional(),
+    scheduleExpr: z.string().min(1).nullable().optional(),
+    sessionTarget: z.string().min(1).nullable().optional(),
+    gatewayToken: z.string().min(1).optional(),
+  })
+  .refine(
+    (body) => Object.keys(body).some((key) => key !== "gatewayToken"),
+    "At least one cron job field must be provided",
+  );
 
 export async function PATCH(
   req: Request,
@@ -34,14 +36,7 @@ export async function PATCH(
   try {
     const { id } = paramsSchema.parse(await params);
     const body = patchBodySchema.parse(await req.json());
-    const db = getDb();
-    const gatewayToken =
-      body.gatewayToken ??
-      req.headers.get("x-openclaw-gateway-token") ??
-      process.env["OPENCLAW_GATEWAY_TOKEN"] ??
-      undefined;
-
-    const updated = await updateOpenClawCronAction(db, {
+    const result = await updateOpenClawCronAction(getDb(), {
       actorAgentId: auth,
       source: "api",
       cronJobId: id,
@@ -53,18 +48,24 @@ export async function PATCH(
         scheduleExpr: body.scheduleExpr,
         sessionTarget: body.sessionTarget,
       },
-      gatewayToken,
+      gatewayToken:
+        body.gatewayToken
+        ?? req.headers.get("x-openclaw-gateway-token")
+        ?? undefined,
     });
 
-    return NextResponse.json(updated.local);
+    return NextResponse.json(result.local);
   } catch (err) {
     if (err instanceof z.ZodError) {
       return jsonError(400, err.message, "VALIDATION_ERROR");
     }
 
     if (isNotFoundError(err)) {
-      const message = err instanceof Error ? err.message : "Not found";
-      return jsonError(404, message, "NOT_FOUND");
+      return jsonError(
+        404,
+        err instanceof Error ? err.message : "OpenClaw cron job not found",
+        "NOT_FOUND",
+      );
     }
 
     return jsonError(
