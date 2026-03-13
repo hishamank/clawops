@@ -7,6 +7,7 @@ import {
 } from "@clawops/core";
 import { syncSessions } from "./openclaw/sessions.js";
 import { syncCronJobs } from "@clawops/habits";
+import { NotFoundError } from "@clawops/domain";
 import { syncWorkspaceFiles, type WorkspaceFileSyncResult } from "./openclaw/files.js";
 import { finishSyncRunWithTx, startSyncRun, type FinishSyncRunItemInput } from "./runs.js";
 
@@ -101,7 +102,7 @@ function resolveGatewayToken(connection: OpenClawConnection, options?: Reconcile
 
   if (connection.hasGatewayToken && !token) {
     throw new Error(
-      `OPENCLAW_GATEWAY_TOKEN is required to reconcile sessions for connection ${connection.id}`,
+      `OPENCLAW_GATEWAY_TOKEN is required for OpenClaw gateway calls on connection ${connection.id}`,
     );
   }
 
@@ -114,20 +115,22 @@ function resolveGatewayToken(connection: OpenClawConnection, options?: Reconcile
 async function reconcileSessions(
   db: DB,
   connection: OpenClawConnection,
+  options?: ReconcileOptions,
 ): Promise<{ agentCount: number; addedCount: number; updatedCount: number; items: FinishSyncRunItemInput[] }> {
-  const sessions = await syncSessions(db, connection);
+  const sessions = await syncSessions(db, connection, options?.gatewayToken);
 
   const activeSessions = sessions.filter((s) => s.status === "active");
   const endedSessions = sessions.filter((s) => s.status === "ended");
 
   const items: FinishSyncRunItemInput[] = sessions.map((session) => ({
     itemType: "agent" as const,
-    itemExternalId: session.sessionKey,
+    itemExternalId: session.agentId ?? session.sessionKey,
     changeType: session.status === "active" ? "seen" as const : "updated" as const,
     summary: `Session ${session.status} for agent ${session.agentId ?? "unknown"}`,
     meta: {
       model: session.model,
       startedAt: session.startedAt.toISOString(),
+      sessionKey: session.sessionKey,
     },
   }));
 
@@ -179,8 +182,9 @@ async function reconcileCronJobs(
 async function reconcileFiles(
   db: DB,
   connection: OpenClawConnection,
+  options?: ReconcileOptions,
 ): Promise<{ workspaceCount: number; addedCount: number; updatedCount: number; items: FinishSyncRunItemInput[] }> {
-  const result: WorkspaceFileSyncResult = await syncWorkspaceFiles(db, connection);
+  const result: WorkspaceFileSyncResult = await syncWorkspaceFiles(db, connection, options?.gatewayToken);
 
   const allFiles: WorkspaceFile[] = [...result.inserted, ...result.updated.map((change) => change.file)];
 
@@ -229,7 +233,7 @@ async function executeReconcileMode(
 
   // Reconcile sessions
   if (shouldRunFull || ctx.mode === "sessions") {
-    const sessionResult = await reconcileSessions(db, ctx.connection);
+    const sessionResult = await reconcileSessions(db, ctx.connection, { gatewayToken: ctx.gatewayToken });
     agentCount = sessionResult.agentCount;
     addedCount += sessionResult.addedCount;
     updatedCount += sessionResult.updatedCount;
@@ -248,7 +252,7 @@ async function executeReconcileMode(
 
   // Reconcile workspace files
   if (shouldRunFull || ctx.mode === "files") {
-    const fileResult = await reconcileFiles(db, ctx.connection);
+    const fileResult = await reconcileFiles(db, ctx.connection, { gatewayToken: ctx.gatewayToken });
     workspaceCount = fileResult.workspaceCount;
     addedCount += fileResult.addedCount;
     updatedCount += fileResult.updatedCount;
@@ -351,7 +355,7 @@ export async function reconcile(
     return {
       syncRunId: run.id,
       connection,
-      completedAt: new Date(),
+      completedAt: summary.completedAt ?? new Date(),
       agentCount: summary.agentCount,
       cronJobCount: summary.cronJobCount,
       workspaceCount: summary.workspaceCount,
@@ -416,7 +420,7 @@ export async function reconcileConnection(
 
   const connection = getOpenClawConnection(db, connectionId);
   if (!connection) {
-    throw new Error(`OpenClaw connection "${connectionId}" not found`);
+    throw new NotFoundError(`OpenClaw connection "${connectionId}" not found`);
   }
 
   return reconcile(db, connection, options);

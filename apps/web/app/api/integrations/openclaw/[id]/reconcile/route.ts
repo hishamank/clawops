@@ -5,6 +5,7 @@ import { z } from "zod";
 import { reconcileConnection } from "@clawops/sync";
 import {
   getDb,
+  isNotFoundError,
   jsonError,
   parseSearch,
   requireAgentId,
@@ -23,6 +24,10 @@ const bodySchema = z.object({
   gatewayToken: z.string().min(1).optional(),
 });
 
+function getGatewayToken(req: Request): string | undefined {
+  return req.headers.get("x-openclaw-gateway-token")?.trim() || undefined;
+}
+
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -38,6 +43,7 @@ export async function GET(
 
     const result = await reconcileConnection(getDb(), id, {
       mode,
+      gatewayToken: getGatewayToken(req),
       actorAgentId: auth ?? undefined,
     });
 
@@ -46,7 +52,7 @@ export async function GET(
       syncRunId: result.syncRunId,
       connectionId: result.connection.id,
       connectionName: result.connection.name,
-      mode: result.items.length > 0 ? "full" : mode ?? "full",
+      mode: mode ?? "full",
       completedAt: result.completedAt.toISOString(),
       counts: {
         agents: result.agentCount,
@@ -63,9 +69,7 @@ export async function GET(
     }
 
     return jsonError(
-      err instanceof Error && err.message.includes("not found")
-        ? 404
-        : 500,
+      isNotFoundError(err) ? 404 : 500,
       err instanceof Error ? err.message : "Failed to reconcile OpenClaw connection",
       "RECONCILE_ERROR",
     );
@@ -87,7 +91,7 @@ export async function POST(
 
     const result = await reconcileConnection(getDb(), id, {
       mode: body.mode,
-      gatewayToken: body.gatewayToken,
+      gatewayToken: body.gatewayToken ?? getGatewayToken(req),
       actorAgentId: auth ?? undefined,
     });
 
@@ -113,9 +117,7 @@ export async function POST(
     }
 
     return jsonError(
-      err instanceof Error && err.message.includes("not found")
-        ? 404
-        : 500,
+      isNotFoundError(err) ? 404 : 500,
       err instanceof Error ? err.message : "Failed to reconcile OpenClaw connection",
       "RECONCILE_ERROR",
     );

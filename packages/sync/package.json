@@ -17,6 +17,7 @@
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.0.0",
     "better-sqlite3": "^11.7.0",
+    "drizzle-orm": "^0.38.0",
     "tsx": "^4.21.0",
     "typescript": "^5.7.0"
   },
@@ -24,8 +25,7 @@
     "@clawops/agents": "workspace:*",
     "@clawops/core": "workspace:*",
     "@clawops/domain": "workspace:*",
-    "@clawops/habits": "workspace:*",
-    "drizzle-orm": "^0.38.0"
+    "@clawops/habits": "workspace:*"
   },
   "exports": {
     ".": {

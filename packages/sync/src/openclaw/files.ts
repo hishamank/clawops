@@ -326,7 +326,11 @@ export function listWorkspaceFileRevisions(
   return base.all();
 }
 
-function resolveGatewayToken(connection: OpenClawConnection): string | null {
+function resolveGatewayToken(connection: OpenClawConnection, tokenOverride?: string): string | null {
+  if (typeof tokenOverride == "string" && tokenOverride.trim()) {
+    return tokenOverride.trim();
+  }
+
   const meta = parseJsonObject(connection.meta);
   const token = meta["gatewayToken"];
   if (typeof token === "string" && token.trim()) {
@@ -340,12 +344,13 @@ function resolveGatewayToken(connection: OpenClawConnection): string | null {
 export async function syncWorkspaceFiles(
   db: DB,
   connection: OpenClawConnection,
+  tokenOverride?: string,
 ): Promise<WorkspaceFileSyncResult> {
   if (!connection.gatewayUrl) {
     throw new Error(`Connection ${connection.id} is missing a gateway URL`);
   }
 
-  const token = resolveGatewayToken(connection);
+  const token = resolveGatewayToken(connection, tokenOverride);
   if (!token) {
     throw new Error(
       `Connection ${connection.id} has no gateway token available in meta.gatewayToken or OPENCLAW_GATEWAY_TOKEN`,
