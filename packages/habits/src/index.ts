@@ -82,6 +82,7 @@ export function updateHabit(
 interface LogHabitRunInput {
   success: boolean;
   note?: string;
+  ranAt?: Date;
 }
 
 export function logHabitRun(
@@ -104,7 +105,7 @@ export function logHabitRun(
       );
     }
 
-    const now = new Date();
+    const now = input.ranAt ?? new Date();
 
     const [run] = tx
       .insert(habitRuns)

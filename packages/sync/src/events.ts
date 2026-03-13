@@ -511,6 +511,21 @@ function upsertOpenClawSessionState(
   const serializedMetadata = input.metadata ? toJsonObject(input.metadata) : null;
 
   if (input.status === "active") {
+    const existing = db
+      .select()
+      .from(openclawSessions)
+      .where(
+        and(
+          eq(openclawSessions.connectionId, input.connectionId),
+          eq(openclawSessions.sessionKey, input.sessionKey),
+        ),
+      )
+      .get();
+
+    if (existing?.status === "ended" && existing.endedAt) {
+      return existing;
+    }
+
     return db
       .insert(openclawSessions)
       .values({
@@ -814,6 +829,7 @@ function ingestOpenClawInboundEventTx(
   const run = logHabitRun(db, cron.id, cron.agentId, {
     success: normalizedEvent.success,
     note: normalizedEvent.note ?? undefined,
+    ranAt: normalizedEvent.ranAt,
   });
   stateChanges.push("cron_run.recorded", "habit.last_run.updated");
 

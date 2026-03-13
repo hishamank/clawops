@@ -7,6 +7,7 @@ import {
   OpenClawInboundEventValidationError,
 } from "@clawops/sync";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import {
   getDb,
   jsonError,
@@ -37,7 +38,9 @@ function parseBearerToken(req: Request): string | null {
   return token;
 }
 
-function authenticateInboundEvent(req: Request, rawBody: string): NextResponse | null {
+const inboundEnvelopeSchema = z.object({}).passthrough();
+
+function authenticateInboundEvent(req: Request, rawBody: Buffer): NextResponse | null {
   const secret = process.env["OPENCLAW_EVENTS_SECRET"]?.trim();
   if (!secret) {
     return jsonError(
@@ -73,8 +76,8 @@ function authenticateInboundEvent(req: Request, rawBody: string): NextResponse |
 }
 
 export async function POST(req: Request): Promise<NextResponse> {
-  const rawBody = await req.text();
-  const authError = authenticateInboundEvent(req, rawBody);
+  const rawBuffer = Buffer.from(await req.arrayBuffer());
+  const authError = authenticateInboundEvent(req, rawBuffer);
   if (authError) {
     return authError;
   }
@@ -82,7 +85,8 @@ export async function POST(req: Request): Promise<NextResponse> {
   let body: unknown;
 
   try {
-    body = rawBody ? (JSON.parse(rawBody) as unknown) : {};
+    body = rawBuffer.length > 0 ? (JSON.parse(rawBuffer.toString("utf8")) as unknown) : {};
+    body = inboundEnvelopeSchema.parse(body);
   } catch {
     return jsonError(400, "Request body must be valid JSON", "VALIDATION_ERROR");
   }
