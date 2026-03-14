@@ -362,11 +362,11 @@ export function listWorkflowDefinitions(
       : conditions.length === 1
         ? conditions[0]
         : and(...conditions);
-  let q = db.select().from(workflowDefinitions);
-  if (whereClause) q = q.where(whereClause) as typeof q;
-  q = q.orderBy(desc(workflowDefinitions.updatedAt)) as typeof q;
-  if (filters.limit && filters.limit > 0) q = q.limit(filters.limit) as typeof q;
-  const rows = q.all();
+  const baseQuery = db.select().from(workflowDefinitions);
+  const allRows = whereClause
+    ? baseQuery.where(whereClause).orderBy(desc(workflowDefinitions.updatedAt)).all()
+    : baseQuery.orderBy(desc(workflowDefinitions.updatedAt)).all();
+  const rows = filters.limit && filters.limit > 0 ? allRows.slice(0, filters.limit) : allRows;
   return rows.map(toWorkflowDefinitionRecord);
 }
 
