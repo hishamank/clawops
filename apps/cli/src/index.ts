@@ -13,6 +13,7 @@ import { onboardCmd } from "./commands/onboard.js";
 import { sessionCmd } from "./commands/session.js";
 import { syncCmd } from "./commands/sync.js";
 import { webCmd } from "./commands/web.js";
+import { workflowCmd } from "./commands/workflow.js";
 import { ensureMigrated } from "./lib/client.js";
 
 const program = new Command();
@@ -33,6 +34,7 @@ program.addCommand(onboardCmd);
 program.addCommand(sessionCmd);
 program.addCommand(syncCmd);
 program.addCommand(webCmd);
+program.addCommand(workflowCmd);
 
 program.hook("preAction", () => {
   try {

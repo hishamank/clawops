@@ -53,6 +53,9 @@ importers:
       '@clawops/tasks':
         specifier: workspace:^
         version: link:../../packages/tasks
+      '@clawops/workflows':
+        specifier: workspace:*
+        version: link:../../packages/workflows
       '@inquirer/prompts':
         specifier: ^7.0.0
         version: 7.10.1(@types/node@22.19.13)

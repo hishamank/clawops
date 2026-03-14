@@ -1,0 +1,260 @@
+/* eslint-disable no-console -- CLI tool uses console for output */
+
+import { Command } from "commander";
+import * as fs from "node:fs";
+import {
+  workflowCreate,
+  workflowGet,
+  workflowList,
+  workflowUpdate,
+  workflowRunCreate,
+  workflowRunList,
+  workflowRunGet,
+  type WorkflowStepDefinition,
+} from "../lib/client.js";
+
+export const workflowCmd = new Command("workflow").description("Manage workflows");
+
+workflowCmd
+  .command("create")
+  .description("Create a new workflow")
+  .requiredOption("--name <name>", "Workflow name")
+  .option("--desc <description>", "Workflow description")
+  .option("--status <status>", "Workflow status (draft, active, paused, deprecated)", "draft")
+  .option("--trigger-type <type>", "Trigger type (manual, scheduled, event, webhook)", "manual")
+  .option("--trigger-config <json>", "Trigger config as JSON string")
+  .option("--project <id>", "Project ID")
+  .option("--steps <file>", "Path to steps JSON file")
+  .option("--json", "Output raw JSON")
+  .action(async (opts) => {
+    let triggerConfig: Record<string, unknown> | undefined;
+    if (opts.triggerConfig) {
+      try {
+        triggerConfig = JSON.parse(opts.triggerConfig) as Record<string, unknown>;
+      } catch {
+        console.error("Invalid JSON for --trigger-config");
+        process.exit(1);
+      }
+    }
+
+    let steps: Array<{ name: string; type: string; config?: Record<string, unknown> }>;
+    if (opts.steps) {
+      try {
+        const content = fs.readFileSync(opts.steps, "utf-8");
+        steps = JSON.parse(content);
+      } catch (err) {
+        console.error(`Failed to read steps file: ${err instanceof Error ? err.message : err}`);
+        process.exit(1);
+      }
+    } else {
+      console.error("Error: --steps <file> is required");
+      process.exit(1);
+    }
+
+    const workflow = await workflowCreate({
+      name: opts.name,
+      description: opts.desc,
+      status: opts.status as "draft" | "active" | "paused" | "deprecated",
+      triggerType: opts.triggerType as "manual" | "scheduled" | "event" | "webhook",
+      triggerConfig,
+      projectId: opts.project,
+      steps: steps as WorkflowStepDefinition[],
+    });
+
+    if (opts.json) {
+      console.log(JSON.stringify(workflow, null, 2));
+    } else {
+      console.log(`Created workflow ${workflow.id}: ${workflow.name}`);
+    }
+  });
+
+workflowCmd
+  .command("list")
+  .description("List workflows")
+  .option("--status <status>", "Filter by status (draft, active, paused, deprecated)")
+  .option("--trigger-type <type>", "Filter by trigger type")
+  .option("--project <id>", "Filter by project")
+  .option("--json", "Output raw JSON")
+  .action(async (opts) => {
+    const workflows = await workflowList({
+      status: opts.status as "draft" | "active" | "paused" | "deprecated" | undefined,
+      triggerType: opts.triggerType as "manual" | "scheduled" | "event" | "webhook" | undefined,
+      projectId: opts.project,
+    });
+
+    if (opts.json) {
+      console.log(JSON.stringify(workflows, null, 2));
+    } else if (workflows.length === 0) {
+      console.log("No workflows found.");
+    } else {
+      for (const w of workflows) {
+        console.log(`[${w.status}] ${w.id}  ${w.name} (${w.triggerType})`);
+      }
+    }
+  });
+
+workflowCmd
+  .command("inspect")
+  .description("Inspect a workflow")
+  .argument("<id>", "Workflow ID")
+  .option("--json", "Output raw JSON")
+  .action(async (id: string, opts) => {
+    const workflow = await workflowGet(id);
+
+    if (!workflow) {
+      console.error(`Workflow not found: ${id}`);
+      process.exit(1);
+    }
+
+    if (opts.json) {
+      console.log(JSON.stringify(workflow, null, 2));
+    } else {
+      console.log(`ID:        ${workflow.id}`);
+      console.log(`Name:      ${workflow.name}`);
+      console.log(`Status:    ${workflow.status}`);
+      console.log(`Trigger:   ${workflow.triggerType}`);
+      console.log(`Project:   ${workflow.projectId ?? "(none)"}`);
+      console.log(`Version:   ${workflow.version}`);
+      console.log(`Created:   ${workflow.createdAt}`);
+      console.log(`Updated:   ${workflow.updatedAt}`);
+      if (workflow.description) {
+        console.log(`\nDescription:\n${workflow.description}`);
+      }
+      console.log(`\nSteps:`);
+      for (const step of workflow.stepsArray) {
+        console.log(`  - ${step.name} (${step.type})`);
+      }
+    }
+  });
+
+workflowCmd
+  .command("update")
+  .description("Update a workflow")
+  .argument("<id>", "Workflow ID")
+  .option("--name <name>", "Workflow name")
+  .option("--desc <description>", "Workflow description")
+  .option("--status <status>", "Workflow status (draft, active, paused, deprecated)")
+  .option("--trigger-type <type>", "Trigger type (manual, scheduled, event, webhook)")
+  .option("--trigger-config <json>", "Trigger config as JSON string")
+  .option("--steps <file>", "Path to steps JSON file")
+  .option("--json", "Output raw JSON")
+  .action(async (id: string, opts) => {
+    let triggerConfig: Record<string, unknown> | null | undefined;
+    if (opts.triggerConfig !== undefined) {
+      if (opts.triggerConfig === "null") {
+        triggerConfig = null;
+      } else {
+        try {
+          triggerConfig = JSON.parse(opts.triggerConfig) as Record<string, unknown>;
+        } catch {
+          console.error("Invalid JSON for --trigger-config");
+          process.exit(1);
+        }
+      }
+    }
+
+    let steps: Array<{ name: string; type: string; config?: Record<string, unknown> }> | undefined;
+    if (opts.steps) {
+      try {
+        const content = fs.readFileSync(opts.steps, "utf-8");
+        steps = JSON.parse(content) as never;
+      } catch (err) {
+        console.error(`Failed to read steps file: ${err instanceof Error ? err.message : err}`);
+        process.exit(1);
+      }
+    }
+
+    const workflow = await workflowUpdate(id, {
+      name: opts.name,
+      description: opts.desc,
+      status: opts.status as "draft" | "active" | "paused" | "deprecated" | undefined,
+      triggerType: opts.triggerType as "manual" | "scheduled" | "event" | "webhook" | undefined,
+      triggerConfig,
+      steps: steps as WorkflowStepDefinition[] | undefined,
+    });
+
+    if (opts.json) {
+      console.log(JSON.stringify(workflow, null, 2));
+    } else {
+      console.log(`Updated workflow ${workflow.id}: ${workflow.name}`);
+    }
+  });
+
+workflowCmd
+  .command("run")
+  .description("Trigger a workflow run")
+  .argument("<workflow-id>", "Workflow ID")
+  .option("--triggered-by <source>", "Trigger source (human, agent, schedule, event)", "human")
+  .option("--triggered-by-id <id>", "ID of the trigger source")
+  .option("--json", "Output raw JSON")
+  .action(async (workflowId: string, opts) => {
+    const run = await workflowRunCreate({
+      workflowId,
+      triggeredBy: opts.triggeredBy as "human" | "agent" | "schedule" | "event",
+      triggeredById: opts.triggeredById,
+    });
+
+    if (opts.json) {
+      console.log(JSON.stringify(run, null, 2));
+    } else {
+      console.log(`Started workflow run ${run.id} for workflow ${workflowId}`);
+    }
+  });
+
+workflowCmd
+  .command("runs")
+  .description("List workflow runs")
+  .argument("<workflow-id>", "Workflow ID")
+  .option("--json", "Output raw JSON")
+  .action(async (workflowId: string, opts) => {
+    const runs = await workflowRunList(workflowId);
+
+    if (opts.json) {
+      console.log(JSON.stringify(runs, null, 2));
+    } else if (runs.length === 0) {
+      console.log("No workflow runs found.");
+    } else {
+      for (const r of runs) {
+        console.log(`[${r.status}] ${r.id}  triggered by ${r.triggeredBy}  ${r.createdAt}`);
+      }
+    }
+  });
+
+workflowCmd
+  .command("inspect-run")
+  .description("Inspect a workflow run")
+  .argument("<run-id>", "Workflow run ID")
+  .option("--json", "Output raw JSON")
+  .action(async (runId: string, opts) => {
+    const run = await workflowRunGet(runId);
+
+    if (!run) {
+      console.error(`Workflow run not found: ${runId}`);
+      process.exit(1);
+    }
+
+    if (opts.json) {
+      console.log(JSON.stringify(run, null, 2));
+    } else {
+      console.log(`Run ID:       ${run.id}`);
+      console.log(`Workflow:     ${run.workflowId}`);
+      console.log(`Status:       ${run.status}`);
+      console.log(`Triggered By: ${run.triggeredBy}`);
+      console.log(`Started:      ${run.startedAt ?? "(not started)"}`);
+      console.log(`Completed:    ${run.completedAt ?? "(not completed)"}`);
+      if (run.error) {
+        console.log(`Error:        ${run.error}`);
+      }
+      if (run.result) {
+        console.log(`\nResult:`);
+        console.log(JSON.stringify(run.resultObject, null, 2));
+      }
+      console.log(`\nSteps:`);
+      for (const step of run.steps) {
+        console.log(`  [${step.status}] ${step.stepName} (${step.stepType})`);
+        if (step.error) {
+          console.log(`    Error: ${step.error}`);
+        }
+      }
+    }
+  });
