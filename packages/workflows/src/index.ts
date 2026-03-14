@@ -179,6 +179,7 @@ function parseSteps(steps: string): WorkflowStepDefinition[] {
   } catch (error) {
     throw new Error(
       `Workflow steps must be valid JSON: ${error instanceof Error ? error.message : "unknown error"}`,
+      { cause: error },
     );
   }
 }
