@@ -23,4 +23,10 @@ export {
 } from "./openclaw/actions.js";
 export { listWorkspaceFileRevisions } from "./openclaw/files.js";
 export type { WorkspaceFileRevision } from "@clawops/core";
+export {
+  getAgentMessage,
+  listAgentMessages,
+  createAgentMessage,
+  upsertAgentMessages,
+} from "./openclaw/messages.js";
 export * as openclaw from "./openclaw/index.js";

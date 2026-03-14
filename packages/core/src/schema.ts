@@ -163,6 +163,44 @@ export const openclawSessions = sqliteTable(
   }),
 );
 
+// ── Agent Messages ───────────────────────────────────────────────────────────
+
+export const agentMessages = sqliteTable(
+  "agent_messages",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    connectionId: text("connection_id")
+      .notNull()
+      .references(() => openclawConnections.id, { onDelete: "cascade" }),
+    fromAgentId: text("from_agent_id"),
+    toAgentId: text("to_agent_id"),
+    sessionId: text("session_id").references(() => openclawSessions.id, {
+      onDelete: "set null",
+    }),
+    channel: text("channel"),
+    messageType: text("message_type"),
+    summary: text("summary"),
+    content: text("content"),
+    meta: text("meta"),
+    sentAt: integer("sent_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (table) => ({
+    connectionSentAtIdx: index("idx_agent_messages_connection_sent").on(
+      table.connectionId,
+      table.sentAt,
+    ),
+    fromAgentIdx: index("idx_agent_messages_from_agent").on(table.fromAgentId),
+    toAgentIdx: index("idx_agent_messages_to_agent").on(table.toAgentId),
+  }),
+);
+
 // ── Workspace File Revisions ────────────────────────────────────────────────
 
 export const workspaceFileRevisions = sqliteTable(
@@ -700,6 +738,8 @@ export type WorkspaceFile = typeof workspaceFiles.$inferSelect;
 export type NewWorkspaceFile = typeof workspaceFiles.$inferInsert;
 export type OpenClawSession = typeof openclawSessions.$inferSelect;
 export type NewOpenClawSession = typeof openclawSessions.$inferInsert;
+export type AgentMessage = typeof agentMessages.$inferSelect;
+export type NewAgentMessage = typeof agentMessages.$inferInsert;
 export type WorkspaceFileRevision = typeof workspaceFileRevisions.$inferSelect;
 export type NewWorkspaceFileRevision = typeof workspaceFileRevisions.$inferInsert;
 

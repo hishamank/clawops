@@ -40,3 +40,12 @@ export type {
   WorkspaceFileSyncResult,
 } from "./files.js";
 export type { WorkspaceFileRevision, NewWorkspaceFileRevision } from "@clawops/core";
+export {
+  getAgentMessage,
+  listAgentMessages,
+  createAgentMessage,
+  upsertAgentMessages,
+  type AgentMessageFilters,
+  type AgentMessageRecord,
+  type CreateAgentMessageInput,
+} from "./messages.js";
