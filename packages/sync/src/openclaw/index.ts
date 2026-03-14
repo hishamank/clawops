@@ -1,21 +1,28 @@
 export { scanOpenClaw } from "./scanner.js";
 export { fetchGatewayAgents, fetchGatewayCronJobs } from "./gateway.js";
 export {
+  OpenClawActionError,
+  triggerAgent,
+  triggerSupportedOpenClawEndpoint,
+  updateCronJob,
+  updateOpenClawCronAction,
+  writeTrackedFile,
+  writeTrackedOpenClawFile,
+  type OpenClawActionResult,
+  type TriggerAgentMessage,
+  type TriggerAgentResult,
+  type TriggerSupportedOpenClawEndpointInput,
+  type TriggerSupportedOpenClawEndpointResult,
+  type UpdateOpenClawCronActionInput,
+  type WriteTrackedFileResult,
+  type WriteTrackedOpenClawFileInput,
+} from "./actions.js";
+export {
   fetchWorkspaceFiles,
   listWorkspaceFileRevisions,
   upsertWorkspaceFiles,
   syncWorkspaceFiles,
 } from "./files.js";
-export {
-  triggerSupportedOpenClawEndpoint,
-  updateOpenClawCronAction,
-  writeTrackedOpenClawFile,
-  type OpenClawActionAuditInput,
-  type TriggerSupportedOpenClawEndpointInput,
-  type TriggerSupportedOpenClawEndpointResult,
-  type UpdateOpenClawCronActionInput,
-  type WriteTrackedOpenClawFileInput,
-} from "./actions.js";
 export {
   fetchActiveSessions,
   listSessions,

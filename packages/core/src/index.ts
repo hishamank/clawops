@@ -10,6 +10,22 @@ export {
   normalizeActivityEvent,
   buildActivityEventQueryConditions,
   parseActivityEventMetadata,
+  createWorkflowDefinition,
+  getWorkflowDefinition,
+  listWorkflowDefinitions,
+  startWorkflowRun,
+  recordWorkflowRunStep,
+  finishWorkflowRun,
 } from "./helpers.js";
-export type { ActivityEventFilters } from "./helpers.js";
+export type {
+  ActivityEventFilters,
+  CreateWorkflowDefinitionInput,
+  FinishWorkflowRunInput,
+  ListWorkflowDefinitionFilters,
+  RecordWorkflowRunStepInput,
+  StartWorkflowRunInput,
+  WorkflowDefinitionRecord,
+  WorkflowRunRecord,
+  WorkflowRunStepRecord,
+} from "./helpers.js";
 export { sql, eq, asc, desc, and, gte, lt, inArray, or } from "drizzle-orm";

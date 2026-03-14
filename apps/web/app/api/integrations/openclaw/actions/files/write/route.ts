@@ -18,15 +18,18 @@ export async function POST(req: Request): Promise<NextResponse> {
     return auth;
   }
 
+  const gatewayToken = req.headers.get("x-openclaw-gateway-token") ?? undefined;
+
   try {
     const body = writeFileBodySchema.parse(await req.json());
-    const file = writeTrackedOpenClawFile(getDb(), {
+    const file = await writeTrackedOpenClawFile(getDb(), {
       actorAgentId: auth,
       source: "api",
       connectionId: body.connectionId,
       relativePath: body.relativePath,
       content: body.content,
       workspacePath: body.workspacePath,
+      gatewayToken,
     });
 
     return NextResponse.json(file);

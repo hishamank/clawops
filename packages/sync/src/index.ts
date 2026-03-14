@@ -14,4 +14,10 @@ export {
   type OpenClawSessionRecord,
   type OpenClawSessionStatus,
 } from "./openclaw/sessions.js";
+export {
+  OpenClawActionError,
+  triggerAgent,
+  updateCronJob,
+  writeTrackedFile,
+} from "./openclaw/actions.js";
 export * as openclaw from "./openclaw/index.js";

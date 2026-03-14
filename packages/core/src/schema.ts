@@ -529,6 +529,123 @@ export const syncRunItems = sqliteTable("sync_run_items", {
     .default(sql`(unixepoch())`),
 });
 
+// ── Workflow Persistence ────────────────────────────────────────────────────
+
+export const workflowDefinitions = sqliteTable(
+  "workflow_definitions",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    name: text("name").notNull(),
+    description: text("description"),
+    version: text("version").notNull().default("1"),
+    status: text("status", {
+      enum: ["draft", "active", "paused", "deprecated"],
+    })
+      .notNull()
+      .default("draft"),
+    projectId: text("project_id").references(() => projects.id, {
+      onDelete: "set null",
+    }),
+    triggerType: text("trigger_type", {
+      enum: ["manual", "scheduled", "event", "webhook"],
+    })
+      .notNull()
+      .default("manual"),
+    triggerConfig: text("trigger_config"),
+    steps: text("steps").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (table) => ({
+    projectStatusIdx: index("idx_workflow_definitions_project_status").on(
+      table.projectId,
+      table.status,
+    ),
+    statusIdx: index("idx_workflow_definitions_status").on(table.status),
+  }),
+);
+
+export const workflowRuns = sqliteTable(
+  "workflow_runs",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    workflowId: text("workflow_id")
+      .notNull()
+      .references(() => workflowDefinitions.id, { onDelete: "cascade" }),
+    triggeredBy: text("triggered_by", {
+      enum: ["human", "agent", "schedule", "event"],
+    }).notNull(),
+    triggeredById: text("triggered_by_id"),
+    status: text("status", {
+      enum: ["pending", "running", "paused", "completed", "failed", "cancelled"],
+    })
+      .notNull()
+      .default("pending"),
+    startedAt: integer("started_at", { mode: "timestamp" }),
+    completedAt: integer("completed_at", { mode: "timestamp" }),
+    result: text("result"),
+    error: text("error"),
+    metadata: text("metadata"),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (table) => ({
+    workflowStartedIdx: index("idx_workflow_runs_workflow_started").on(
+      table.workflowId,
+      table.startedAt,
+    ),
+    statusIdx: index("idx_workflow_runs_status").on(table.status),
+  }),
+);
+
+export const workflowRunSteps = sqliteTable(
+  "workflow_run_steps",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    workflowRunId: text("workflow_run_id")
+      .notNull()
+      .references(() => workflowRuns.id, { onDelete: "cascade" }),
+    stepIndex: integer("step_index").notNull(),
+    stepKey: text("step_key").notNull(),
+    stepName: text("step_name").notNull(),
+    stepType: text("step_type").notNull(),
+    status: text("status", {
+      enum: ["pending", "running", "completed", "failed", "skipped"],
+    })
+      .notNull()
+      .default("pending"),
+    input: text("input"),
+    result: text("result"),
+    error: text("error"),
+    startedAt: integer("started_at", { mode: "timestamp" }),
+    completedAt: integer("completed_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (table) => ({
+    runStepIndexUnique: uniqueIndex("workflow_run_steps_run_step_index_unique").on(
+      table.workflowRunId,
+      table.stepIndex,
+    ),
+    runStatusIdx: index("idx_workflow_run_steps_run_status").on(
+      table.workflowRunId,
+      table.status,
+    ),
+  }),
+);
+
 // ── Task Templates ──────────────────────────────────────────────────────────
 
 export const taskTemplates = sqliteTable("task_templates", {
@@ -623,6 +740,15 @@ export type NewSyncRun = typeof syncRuns.$inferInsert;
 
 export type SyncRunItem = typeof syncRunItems.$inferSelect;
 export type NewSyncRunItem = typeof syncRunItems.$inferInsert;
+
+export type WorkflowDefinition = typeof workflowDefinitions.$inferSelect;
+export type NewWorkflowDefinition = typeof workflowDefinitions.$inferInsert;
+
+export type WorkflowRun = typeof workflowRuns.$inferSelect;
+export type NewWorkflowRun = typeof workflowRuns.$inferInsert;
+
+export type WorkflowRunStep = typeof workflowRunSteps.$inferSelect;
+export type NewWorkflowRunStep = typeof workflowRunSteps.$inferInsert;
 
 export type TaskTemplate = typeof taskTemplates.$inferSelect;
 export type NewTaskTemplate = typeof taskTemplates.$inferInsert;
