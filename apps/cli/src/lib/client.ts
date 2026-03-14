@@ -6,12 +6,28 @@ import type {
   Project,
   Milestone,
   AgentSession,
+  TaskRelation,
 } from "@clawops/core";
 import { events } from "@clawops/core";
 import { db as coreDb } from "@clawops/core/db";
 import { runMigrations } from "@clawops/core/migrate";
 import { createTask, listTasks, updateTask, completeTask, getTaskSpec, setTaskSpec, appendTaskSpec, createTaskRelation, deleteTaskRelation, listTaskRelations, type CreateTaskRelationInput, type TaskRelationWithTask } from "@clawops/tasks";
-import type { TaskRelation } from "@clawops/core";
+import {
+  createWorkflowDefinition,
+  getWorkflowDefinition,
+  listWorkflowDefinitions,
+  updateWorkflowDefinition,
+  createWorkflowRun,
+  listWorkflowRuns,
+  getWorkflowRun,
+  type WorkflowRecord,
+  type WorkflowRunRecord,
+  type WorkflowRunWithSteps,
+  type CreateWorkflowInput,
+  type UpdateWorkflowInput,
+  type ListWorkflowsFilters,
+  type WorkflowStepDefinition,
+} from "@clawops/workflows";
 import { createIdea, listIdeas, getIdeaSections, getIdeaSection, updateIdeaSection, updateIdeaSections, getIdeaDraftPrd, setIdeaDraftPrd, type IdeaSectionKey, type IdeaSections } from "@clawops/ideas";
 import {
   createProject,
@@ -338,3 +354,66 @@ export async function taskRelationDelete(
   ensureMigrated();
   deleteTaskRelation(getDb(), relationId);
 }
+
+// ── Workflow Functions ─────────────────────────────────────────────────────
+
+export async function workflowCreate(input: CreateWorkflowInput): Promise<WorkflowRecord> {
+  ensureMigrated();
+  return createWorkflowDefinition(getDb(), input);
+}
+
+export async function workflowGet(id: string): Promise<WorkflowRecord | null> {
+  ensureMigrated();
+  const db = getDb();
+  const result = getWorkflowDefinition(db, id);
+  if (result) {
+    logReadEvent(db, "workflow", id);
+  }
+  return result;
+}
+
+export async function workflowList(filters?: ListWorkflowsFilters): Promise<WorkflowRecord[]> {
+  ensureMigrated();
+  const db = getDb();
+  const result = listWorkflowDefinitions(db, filters);
+  for (const w of result) {
+    logReadEvent(db, "workflow", w.id);
+  }
+  return result;
+}
+
+export async function workflowUpdate(id: string, input: UpdateWorkflowInput): Promise<WorkflowRecord> {
+  ensureMigrated();
+  return updateWorkflowDefinition(getDb(), id, input);
+}
+
+export async function workflowRunCreate(input: {
+  workflowId: string;
+  triggeredBy: "human" | "agent" | "schedule" | "event";
+  triggeredById?: string;
+}): Promise<WorkflowRunRecord> {
+  ensureMigrated();
+  return createWorkflowRun(getDb(), { ...input, status: "pending" });
+}
+
+export async function workflowRunList(workflowId: string): Promise<WorkflowRunRecord[]> {
+  ensureMigrated();
+  const db = getDb();
+  const result = listWorkflowRuns(db, workflowId);
+  for (const r of result) {
+    logReadEvent(db, "workflow_run", r.id);
+  }
+  return result;
+}
+
+export async function workflowRunGet(id: string): Promise<WorkflowRunWithSteps | null> {
+  ensureMigrated();
+  const db = getDb();
+  const result = getWorkflowRun(db, id);
+  if (result) {
+    logReadEvent(db, "workflow_run", id);
+  }
+  return result;
+}
+
+export type { WorkflowStepDefinition };
