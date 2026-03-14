@@ -265,6 +265,10 @@ export const tasks = sqliteTable("tasks", {
   summary: text("summary"),
   specContent: text("spec_content"),
   specUpdatedAt: integer("spec_updated_at", { mode: "timestamp" }),
+  templateId: text("template_id").references(() => taskTemplates.id),
+  stageId: text("stage_id").references(() => taskTemplateStages.id),
+  properties: text("properties"),
+  ideaId: text("idea_id").references(() => ideas.id),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),

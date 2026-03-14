@@ -70,7 +70,7 @@ mock.module("drizzle-orm", {
   },
 });
 
-const { createTask, getTask, listTasks, updateTask } = await import("../dist/index.js");
+const { createTask, getTask, listTasks, updateTask, parseTaskProperties } = await import("../dist/index.js");
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
@@ -124,5 +124,33 @@ describe("updateTask", () => {
   it("returns updated task", () => {
     const result = updateTask(makeDb(), "task-1", { status: "done" });
     assert.ok(result);
+  });
+});
+
+describe("parseTaskProperties", () => {
+  it("returns {} for null properties", () => {
+    const result = parseTaskProperties({ ...FAKE_TASK, properties: null });
+    assert.deepStrictEqual(result, {});
+  });
+
+  it("returns {} for invalid JSON", () => {
+    const result = parseTaskProperties({ ...FAKE_TASK, properties: "not json" });
+    assert.deepStrictEqual(result, {});
+  });
+
+  it("parses valid JSON properties", () => {
+    const result = parseTaskProperties({
+      ...FAKE_TASK,
+      properties: JSON.stringify({ key: "value", num: 42 }),
+    });
+    assert.deepStrictEqual(result, { key: "value", num: 42 });
+  });
+
+  it("returns {} for JSON array", () => {
+    const result = parseTaskProperties({
+      ...FAKE_TASK,
+      properties: JSON.stringify([1, 2, 3]),
+    });
+    assert.deepStrictEqual(result, {});
   });
 });
