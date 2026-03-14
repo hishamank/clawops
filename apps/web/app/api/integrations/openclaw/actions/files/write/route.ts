@@ -20,7 +20,7 @@ export async function POST(req: Request): Promise<NextResponse> {
 
   try {
     const body = writeFileBodySchema.parse(await req.json());
-    const file = writeTrackedOpenClawFile(getDb(), {
+    const file = await writeTrackedOpenClawFile(getDb(), {
       actorAgentId: auth,
       source: "api",
       connectionId: body.connectionId,

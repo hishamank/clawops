@@ -51,20 +51,26 @@ export interface WriteTrackedFileResult extends Record<string, unknown> {
   relativePath?: string;
 }
 
-export interface UpdateOpenClawCronActionInput {
+export interface OpenClawActionAuditInput {
+  actorAgentId?: string | null;
+  source?: "api" | "cli" | "workflow" | "operator" | "system";
+}
+
+export interface UpdateOpenClawCronActionInput extends OpenClawActionAuditInput {
   cronJobId: string;
   patch: UpdateCronJobPatch;
   gatewayToken?: string;
 }
 
-export interface WriteTrackedOpenClawFileInput {
+export interface WriteTrackedOpenClawFileInput extends OpenClawActionAuditInput {
+  workspacePath?: string;
   connectionId: string;
   relativePath: string;
   content: string;
   gatewayToken?: string;
 }
 
-export interface TriggerSupportedOpenClawEndpointInput {
+export interface TriggerSupportedOpenClawEndpointInput extends OpenClawActionAuditInput {
   connectionId: string;
   endpoint: string;
   body?: Record<string, unknown>;
@@ -127,7 +133,7 @@ async function requestGatewayAction(
     body: Record<string, unknown>;
     actionName: string;
   },
-): Promise<unknown> {
+): Promise<{ status: number; body: unknown }> {
   const url = new URL(pathname, gatewayUrl).toString();
 
   let response: Response;
@@ -164,7 +170,7 @@ async function requestGatewayAction(
     );
   }
 
-  return responseBody;
+  return { status: response.status, body: responseBody };
 }
 
 function requireConnection(db: DB, connectionId: string): OpenClawConnection {
@@ -241,7 +247,7 @@ export async function updateCronJob(
   cronId: string,
   patch: UpdateCronJobPatch,
 ): Promise<OpenClawActionResult> {
-  const response = await requestGatewayAction(
+  const { body } = await requestGatewayAction(
     gatewayUrl,
     token,
     `/api/cron-jobs/${encodeURIComponent(cronId)}`,
@@ -252,8 +258,8 @@ export async function updateCronJob(
     },
   );
 
-  return response && typeof response === "object" && !Array.isArray(response)
-    ? (response as Record<string, unknown>)
+  return body && typeof body === "object" && !Array.isArray(body)
+    ? (body as Record<string, unknown>)
     : null;
 }
 
@@ -263,7 +269,7 @@ export async function triggerAgent(
   agentId: string,
   message: string | TriggerAgentMessage,
 ): Promise<TriggerAgentResult | null> {
-  const response = await requestGatewayAction(
+  const { body } = await requestGatewayAction(
     gatewayUrl,
     token,
     `/api/sessions/${encodeURIComponent(agentId)}/send`,
@@ -274,8 +280,8 @@ export async function triggerAgent(
     },
   );
 
-  return response && typeof response === "object" && !Array.isArray(response)
-    ? (response as TriggerAgentResult)
+  return body && typeof body === "object" && !Array.isArray(body)
+    ? (body as TriggerAgentResult)
     : null;
 }
 
@@ -285,7 +291,7 @@ export async function writeTrackedFile(
   filePath: string,
   content: string,
 ): Promise<WriteTrackedFileResult | null> {
-  const response = await requestGatewayAction(
+  const { body } = await requestGatewayAction(
     gatewayUrl,
     token,
     "/api/workspace/files",
@@ -296,8 +302,8 @@ export async function writeTrackedFile(
     },
   );
 
-  return response && typeof response === "object" && !Array.isArray(response)
-    ? (response as WriteTrackedFileResult)
+  return body && typeof body === "object" && !Array.isArray(body)
+    ? (body as WriteTrackedFileResult)
     : null;
 }
 
@@ -356,17 +362,23 @@ export async function triggerSupportedOpenClawEndpoint(
   const connection = requireConnection(db, input.connectionId);
   const gatewayUrl = resolveGatewayUrl(connection);
   const token = resolveGatewayToken(connection, input.gatewayToken);
+  if (input.endpoint.startsWith("//")) {
+    throw createActionError(
+      `Invalid endpoint "${input.endpoint}": protocol-relative URLs are not allowed`,
+      { code: "OPENCLAW_INVALID_ENDPOINT", status: 400 },
+    );
+  }
   const pathname = input.endpoint.startsWith("/")
     ? input.endpoint
     : `/${input.endpoint}`;
-  const response = await requestGatewayAction(gatewayUrl, token, pathname, {
+  const result = await requestGatewayAction(gatewayUrl, token, pathname, {
     method: "POST",
     body: input.body ?? {},
     actionName: `trigger OpenClaw endpoint "${pathname}"`,
   });
 
   return {
-    status: 200,
-    response,
+    status: result.status,
+    response: result.body,
   };
 }

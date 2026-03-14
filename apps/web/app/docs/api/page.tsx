@@ -38,6 +38,7 @@ const routes = [
   "PATCH /api/integrations/openclaw/actions/cron-jobs/:id",
   "POST /api/integrations/openclaw/actions/files/write",
   "POST /api/integrations/openclaw/actions/triggers",
+  "POST /api/integrations/openclaw/events",
   "GET /api/activity",
   "POST /api/sync/openclaw",
   "GET /api/sync/openclaw",

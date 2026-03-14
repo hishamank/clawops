@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
     "lint": "eslint src/",
-    "test": "node --experimental-test-module-mocks --import tsx/esm --test src/*.test.mts"
+    "test": "node --experimental-test-module-mocks --import tsx/esm --test test/*.test.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

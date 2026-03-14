@@ -9,6 +9,7 @@ import {
   workflowRuns,
   workflowRunSteps,
   type DB,
+  type SQL,
   type WorkflowDefinition,
   type WorkflowRun,
   type WorkflowRunStep,
@@ -207,7 +208,7 @@ function toWorkflowStepRunRecord(row: WorkflowRunStep): WorkflowStepRunRecord {
 }
 
 function buildWorkflowFilter(filters: ListWorkflowsFilters = {}) {
-  const conditions = [];
+  const conditions: SQL[] = [];
 
   if (filters.status) {
     conditions.push(eq(workflowDefinitions.status, filters.status));
@@ -282,8 +283,11 @@ function normalizeUpdateInput(input: UpdateWorkflowInput) {
   };
 }
 
-function getReturningRow<T>(row: T | undefined | null, entity: string): T {
+function getReturningRow<T>(row: T | undefined | null, entity: string, operation: "insert" | "update" = "insert"): T {
   if (!row) {
+    if (operation === "update") {
+      throw new Error(`${entity} not found`);
+    }
     throw new Error(`Failed to persist ${entity}`);
   }
 
@@ -457,7 +461,7 @@ export function updateWorkflowDefinition(
     .returning()
     .get();
 
-  return toWorkflowRecord(getReturningRow(row, "workflow definition"));
+  return toWorkflowRecord(getReturningRow(row, "workflow definition", "update"));
 }
 
 export function createWorkflowRun(db: DB, input: CreateWorkflowRunInput): WorkflowRunRecord {
@@ -500,7 +504,7 @@ export function updateWorkflowRun(
     .returning()
     .get();
 
-  return toWorkflowRunRecord(getReturningRow(row, "workflow run"));
+  return toWorkflowRunRecord(getReturningRow(row, "workflow run", "update"));
 }
 
 export function listWorkflowRuns(db: DB, workflowId: string): WorkflowRunRecord[] {
@@ -569,7 +573,7 @@ export function updateWorkflowRunStep(
     .returning()
     .get();
 
-  return toWorkflowStepRunRecord(getReturningRow(row, "workflow run step"));
+  return toWorkflowStepRunRecord(getReturningRow(row, "workflow run step", "update"));
 }
 
 export function listWorkflowRunSteps(
