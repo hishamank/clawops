@@ -15,11 +15,24 @@ taskCmd
   .option("--project <id>", "Project ID")
   .option("--assignee <id>", "Assignee agent ID")
   .option("--spec <file>", "Path to spec file")
+  .option("--template-id <id>", "Task template ID")
+  .option("--stage-id <id>", "Task template stage ID")
+  .option("--properties <json>", "Task properties as JSON string")
+  .option("--idea-id <id>", "Linked idea ID")
   .option("--json", "Output raw JSON")
   .action(async (opts) => {
     let specContent: string | undefined;
     if (opts.spec) {
       specContent = fs.readFileSync(opts.spec, "utf-8");
+    }
+    let properties: Record<string, unknown> | undefined;
+    if (opts.properties) {
+      try {
+        properties = JSON.parse(opts.properties) as Record<string, unknown>;
+      } catch {
+        console.error("Invalid JSON for --properties");
+        process.exit(1);
+      }
     }
     const task = await taskCreate({
       title: opts.title,
@@ -28,6 +41,10 @@ taskCmd
       projectId: opts.project,
       assigneeId: opts.assignee,
       specContent,
+      templateId: opts.templateId,
+      stageId: opts.stageId,
+      properties,
+      ideaId: opts.ideaId,
     });
     if (opts.json) {
       console.log(JSON.stringify(task, null, 2));
@@ -68,11 +85,32 @@ taskCmd
   .argument("<id>", "Task ID")
   .requiredOption("--status <status>", "New status")
   .option("--priority <priority>", "New priority")
+  .option("--template-id <id>", "Task template ID")
+  .option("--stage-id <id>", "Task template stage ID")
+  .option("--properties <json>", "Task properties as JSON string")
+  .option("--idea-id <id>", "Linked idea ID")
   .option("--json", "Output raw JSON")
   .action(async (id: string, opts) => {
+    let properties: Record<string, unknown> | null | undefined;
+    if (opts.properties !== undefined) {
+      if (opts.properties === "null") {
+        properties = null;
+      } else {
+        try {
+          properties = JSON.parse(opts.properties) as Record<string, unknown>;
+        } catch {
+          console.error("Invalid JSON for --properties");
+          process.exit(1);
+        }
+      }
+    }
     const task = await taskUpdate(id, {
       status: opts.status,
       priority: opts.priority,
+      templateId: opts.templateId,
+      stageId: opts.stageId,
+      properties,
+      ideaId: opts.ideaId,
     });
     if (opts.json) {
       console.log(JSON.stringify(task, null, 2));

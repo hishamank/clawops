@@ -59,6 +59,10 @@ export async function taskCreate(input: {
   projectId?: string;
   assigneeId?: string;
   specContent?: string;
+  templateId?: string;
+  stageId?: string;
+  properties?: Record<string, unknown>;
+  ideaId?: string;
 }): Promise<Task> {
   ensureMigrated();
   return createTask(getDb(), { ...input, source: "cli" });
@@ -81,7 +85,14 @@ export async function taskList(filters?: {
 
 export async function taskUpdate(
   id: string,
-  updates: { status: Task["status"]; priority?: Task["priority"] },
+  updates: {
+    status: Task["status"];
+    priority?: Task["priority"];
+    templateId?: string;
+    stageId?: string;
+    properties?: Record<string, unknown> | null;
+    ideaId?: string;
+  },
 ): Promise<Task> {
   ensureMigrated();
   return updateTask(getDb(), id, updates);

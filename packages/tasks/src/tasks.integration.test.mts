@@ -10,7 +10,7 @@ import * as schema from "@clawops/core";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const { createTask, getTask, listTasks, updateTask, completeTask } = await import(
+const { createTask, getTask, listTasks, updateTask, completeTask, parseTaskProperties } = await import(
   "@clawops/tasks"
 );
 
@@ -91,5 +91,48 @@ describe("tasks (integration)", () => {
     assert.ok(fetched);
     assert.strictEqual(fetched.artifacts.length, 1);
     assert.strictEqual(fetched.artifacts[0].label, "PR");
+  });
+
+  it("createTask with templateId, stageId, properties, and ideaId", () => {
+    const task = createTask(db, {
+      title: "Templated task",
+      templateId: null as unknown as string,
+      stageId: null as unknown as string,
+      properties: { priority_score: 95, tags: ["urgent"] },
+      ideaId: null as unknown as string,
+    });
+
+    assert.ok(task.id);
+    assert.strictEqual(task.title, "Templated task");
+    const props = parseTaskProperties(task);
+    assert.strictEqual(props.priority_score, 95);
+    assert.deepStrictEqual(props.tags, ["urgent"]);
+  });
+
+  it("updateTask sets and clears properties", () => {
+    const task = createTask(db, {
+      title: "Props task",
+      properties: { foo: "bar" },
+    });
+
+    const props1 = parseTaskProperties(task);
+    assert.strictEqual(props1.foo, "bar");
+
+    const updated = updateTask(db, task.id, { properties: { baz: 123 } });
+    const props2 = parseTaskProperties(updated);
+    assert.strictEqual(props2.baz, 123);
+    assert.strictEqual(props2.foo, undefined);
+
+    const cleared = updateTask(db, task.id, { properties: null });
+    const props3 = parseTaskProperties(cleared);
+    assert.deepStrictEqual(props3, {});
+  });
+
+  it("parseTaskProperties returns {} for null and invalid JSON", () => {
+    const task = createTask(db, { title: "No props" });
+    assert.deepStrictEqual(parseTaskProperties(task), {});
+
+    const fakeTask = { ...task, properties: "invalid{json" };
+    assert.deepStrictEqual(parseTaskProperties(fakeTask), {});
   });
 });

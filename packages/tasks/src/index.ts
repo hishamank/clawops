@@ -16,6 +16,10 @@ interface CreateTaskInput {
   dueDate?: Date;
   specContent?: string;
   specUpdatedAt?: Date | null;
+  templateId?: string;
+  stageId?: string;
+  properties?: Record<string, unknown>;
+  ideaId?: string;
 }
 
 export function createTask(db: DB, input: CreateTaskInput): Task {
@@ -32,6 +36,10 @@ export function createTask(db: DB, input: CreateTaskInput): Task {
       dueDate: input.dueDate,
       specContent: input.specContent,
       specUpdatedAt: input.specContent ? new Date() : null,
+      templateId: input.templateId,
+      stageId: input.stageId,
+      properties: input.properties ? JSON.stringify(input.properties) : undefined,
+      ideaId: input.ideaId,
     })
     .returning()
     .all();
@@ -103,12 +111,21 @@ interface UpdateTaskInput {
   assigneeId?: string;
   projectId?: string;
   dueDate?: Date;
+  templateId?: string;
+  stageId?: string;
+  properties?: Record<string, unknown> | null;
+  ideaId?: string;
 }
 
 export function updateTask(db: DB, id: string, updates: UpdateTaskInput): Task {
+  const { properties, ...rest } = updates;
+  const setClause: Record<string, unknown> = { ...rest };
+  if (properties !== undefined) {
+    setClause.properties = properties === null ? null : JSON.stringify(properties);
+  }
   const rows = db
     .update(tasks)
-    .set(updates)
+    .set(setClause)
     .where(eq(tasks.id, id))
     .returning()
     .all();
@@ -225,4 +242,17 @@ export function appendTaskSpec(
   return rows[0];
 }
 
-// ── listTasks (updated) ────────────────────────────────────────────────────
+// ── parseTaskProperties ───────────────────────────────────────────────────
+
+export function parseTaskProperties(task: Task): Record<string, unknown> {
+  if (!task.properties) return {};
+  try {
+    const parsed: unknown = JSON.parse(task.properties);
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+    return {};
+  } catch {
+    return {};
+  }
+}

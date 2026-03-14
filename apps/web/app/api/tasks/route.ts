@@ -21,6 +21,10 @@ const createTaskBody = z.object({
   source: taskSourceEnum.optional(),
   dueDate: z.string().datetime().optional(),
   specContent: z.string().optional(),
+  templateId: z.string().optional(),
+  stageId: z.string().optional(),
+  properties: z.record(z.string(), z.unknown()).optional(),
+  ideaId: z.string().optional(),
 });
 
 const listTasksQuery = z.object({
