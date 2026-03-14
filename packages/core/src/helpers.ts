@@ -240,19 +240,19 @@ function serializeWorkflowSteps(steps: WorkflowStepDefinition[]): string {
 }
 
 function parseWorkflowSteps(steps: string): WorkflowStepDefinition[] {
+  let parsed: unknown;
   try {
-    const parsed: unknown = JSON.parse(steps);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed.filter(
-      (step): step is WorkflowStepDefinition =>
-        step !== null && typeof step === "object" && !Array.isArray(step),
-    );
-  } catch {
-    return [];
+    parsed = JSON.parse(steps);
+  } catch (error) {
+    throw new Error(`Workflow steps are not valid JSON: ${error instanceof Error ? error.message : "unknown error"}`, { cause: error });
   }
+  if (!Array.isArray(parsed)) {
+    throw new Error("Workflow steps must deserialize to an array");
+  }
+  return parsed.filter(
+    (step): step is WorkflowStepDefinition =>
+      step !== null && typeof step === "object" && !Array.isArray(step),
+  );
 }
 
 function toWorkflowDefinitionRecord(row: WorkflowDefinition): WorkflowDefinitionRecord {
@@ -300,6 +300,10 @@ function normalizeWorkflowDefinitionInput(
 
   if (!Array.isArray(input.steps)) {
     throw new Error("Workflow definition steps must be an array");
+  }
+
+  if (input.steps.length === 0) {
+    throw new Error("Workflow definition must have at least one step");
   }
 
   return {

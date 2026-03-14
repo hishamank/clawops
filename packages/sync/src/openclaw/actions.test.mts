@@ -35,7 +35,7 @@ describe("updateCronJob", () => {
     assert.deepEqual(result, { id: "cron-1", enabled: false });
     assert.ok(request);
     assert.equal(request.method, "PATCH");
-    assert.equal(request.url, "https://gateway.example.test/api/cron-jobs/cron-1");
+    assert.equal(request.url, "https://gateway.example.test/api/cron/cron-1");
     assert.equal(request.headers.get("authorization"), "Bearer secret-token");
     assert.deepEqual(await request.json(), { enabled: false });
   });

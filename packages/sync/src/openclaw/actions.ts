@@ -250,7 +250,7 @@ export async function updateCronJob(
   const { body } = await requestGatewayAction(
     gatewayUrl,
     token,
-    `/api/cron-jobs/${encodeURIComponent(cronId)}`,
+    `/api/cron/${encodeURIComponent(cronId)}`,
     {
       method: "PATCH",
       body: patch as Record<string, unknown>,
