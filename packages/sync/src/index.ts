@@ -20,4 +20,6 @@ export {
   updateCronJob,
   writeTrackedFile,
 } from "./openclaw/actions.js";
+export { listWorkspaceFileRevisions } from "./openclaw/files.js";
+export type { WorkspaceFileRevision } from "@clawops/core";
 export * as openclaw from "./openclaw/index.js";

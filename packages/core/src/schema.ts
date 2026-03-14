@@ -178,6 +178,7 @@ export const workspaceFileRevisions = sqliteTable(
     sizeBytes: integer("size_bytes"),
     gitCommitSha: text("git_commit_sha"),
     gitBranch: text("git_branch"),
+    content: text("content"),
     source: text("source").notNull().default("sync"),
     capturedAt: integer("captured_at", { mode: "timestamp" })
       .notNull()
