@@ -51,7 +51,6 @@ function computeSimpleDiff(leftContent: string, rightContent: string): DiffLine[
   const rightLines = rightContent.split("\n");
   const lines: DiffLine[] = [];
 
-  const maxLen = Math.max(leftLines.length, rightLines.length);
   let leftIdx = 0;
   let rightIdx = 0;
 

@@ -43,11 +43,9 @@ function renderTimeAgo(value?: Date | null): string {
 function RevisionRow({
   revision,
   index,
-  fileId,
 }: {
   revision: WorkspaceFileRevision;
   index: number;
-  fileId: string;
 }) {
   return (
     <div className="flex items-start justify-between gap-4 rounded-xl border border-border px-4 py-3">
@@ -201,7 +199,6 @@ export default async function FileDetailPage({
                     key={revision.id}
                     revision={revision}
                     index={revisions.length - 1 - index}
-                    fileId={fileId}
                   />
                 ))}
               </div>
