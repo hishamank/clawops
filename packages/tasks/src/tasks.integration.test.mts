@@ -96,10 +96,7 @@ describe("tasks (integration)", () => {
   it("createTask with templateId, stageId, properties, and ideaId", () => {
     const task = createTask(db, {
       title: "Templated task",
-      templateId: null as unknown as string,
-      stageId: null as unknown as string,
       properties: { priority_score: 95, tags: ["urgent"] },
-      ideaId: null as unknown as string,
     });
 
     assert.ok(task.id);

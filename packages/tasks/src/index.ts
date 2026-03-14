@@ -111,10 +111,10 @@ interface UpdateTaskInput {
   assigneeId?: string;
   projectId?: string;
   dueDate?: Date;
-  templateId?: string;
-  stageId?: string;
+  templateId?: string | null;
+  stageId?: string | null;
   properties?: Record<string, unknown> | null;
-  ideaId?: string;
+  ideaId?: string | null;
 }
 
 export function updateTask(db: DB, id: string, updates: UpdateTaskInput): Task {

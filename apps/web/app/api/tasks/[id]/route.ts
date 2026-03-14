@@ -19,10 +19,10 @@ const updateTaskBody = z.object({
   assigneeId: z.string().optional(),
   projectId: z.string().optional(),
   dueDate: z.string().datetime().optional(),
-  templateId: z.string().optional(),
-  stageId: z.string().optional(),
+  templateId: z.string().nullable().optional(),
+  stageId: z.string().nullable().optional(),
   properties: z.record(z.string(), z.unknown()).nullable().optional(),
-  ideaId: z.string().optional(),
+  ideaId: z.string().nullable().optional(),
 });
 
 export async function GET(

@@ -28,7 +28,12 @@ taskCmd
     let properties: Record<string, unknown> | undefined;
     if (opts.properties) {
       try {
-        properties = JSON.parse(opts.properties) as Record<string, unknown>;
+        const rawProps = JSON.parse(opts.properties) as unknown;
+        if (rawProps === null || typeof rawProps !== "object" || Array.isArray(rawProps)) {
+          console.error("--properties must be a JSON object (e.g., '{\"key\": \"value\"}')");
+          process.exit(1);
+        }
+        properties = rawProps as Record<string, unknown>;
       } catch {
         console.error("Invalid JSON for --properties");
         process.exit(1);
@@ -97,7 +102,12 @@ taskCmd
         properties = null;
       } else {
         try {
-          properties = JSON.parse(opts.properties) as Record<string, unknown>;
+          const rawProps = JSON.parse(opts.properties) as unknown;
+          if (rawProps === null || typeof rawProps !== "object" || Array.isArray(rawProps)) {
+            console.error("--properties must be a JSON object (e.g., '{\"key\": \"value\"}')");
+            process.exit(1);
+          }
+          properties = rawProps as Record<string, unknown>;
         } catch {
           console.error("Invalid JSON for --properties");
           process.exit(1);
