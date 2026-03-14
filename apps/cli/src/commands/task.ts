@@ -1,7 +1,7 @@
 /* eslint-disable no-console -- CLI tool uses console for output */
 
 import { Command } from "commander";
-import { taskCreate, taskList, taskUpdate, taskDone, taskSpec, taskSpecSet, taskSpecSetFile, taskSpecAppend } from "../lib/client.js";
+import { taskCreate, taskList, taskUpdate, taskDone, taskSpec, taskSpecSet, taskSpecSetFile, taskSpecAppend, taskRelationsList, taskRelationCreate, taskRelationDelete } from "../lib/client.js";
 import * as fs from "node:fs";
 
 export const taskCmd = new Command("task").description("Manage tasks");
@@ -199,5 +199,74 @@ taskCmd
       console.log(JSON.stringify(result, null, 2));
     } else {
       console.log(`Task ${id} spec updated.`);
+    }
+  });
+
+taskCmd
+  .command("relations")
+  .description("List all relations for a task")
+  .argument("<id>", "Task ID")
+  .option("--json", "Output raw JSON")
+  .action(async (id: string, opts) => {
+    const relations = await taskRelationsList(id);
+    if (opts.json) {
+      console.log(JSON.stringify(relations, null, 2));
+    } else if (relations.length === 0) {
+      console.log("No relations found.");
+    } else {
+      for (const r of relations) {
+        console.log(
+          `[${r.relation.type}] ${r.direction}  ${r.relation.id}  ${r.task.id}  ${r.task.title}`,
+        );
+      }
+    }
+  });
+
+taskCmd
+  .command("block")
+  .description("Declare that a task blocks another task")
+  .argument("<id>", "Task ID (the blocker)")
+  .argument("<targetId>", "Task ID to be blocked")
+  .option("--json", "Output raw JSON")
+  .action(async (id: string, targetId: string, opts) => {
+    const relation = await taskRelationCreate(id, {
+      fromTaskId: id,
+      toTaskId: targetId,
+      type: "blocks",
+    });
+    if (opts.json) {
+      console.log(JSON.stringify(relation, null, 2));
+    } else {
+      console.log(`Task ${id} now blocks ${targetId}`);
+    }
+  });
+
+taskCmd
+  .command("unblock")
+  .description("Remove a blocks relation between two tasks")
+  .argument("<id>", "Task ID (the blocker)")
+  .argument("<targetId>", "Task ID that was blocked")
+  .option("--json", "Output raw JSON")
+  .action(async (id: string, targetId: string, opts) => {
+    const relations = await taskRelationsList(id);
+    const edge = relations.find(
+      (r) =>
+        r.relation.type === "blocks" &&
+        r.relation.fromTaskId === id &&
+        r.relation.toTaskId === targetId,
+    );
+    if (!edge) {
+      if (opts.json) {
+        console.log(JSON.stringify({ message: "No blocking relation found" }));
+      } else {
+        console.log("No blocking relation found.");
+      }
+      return;
+    }
+    await taskRelationDelete(id, edge.relation.id);
+    if (opts.json) {
+      console.log(JSON.stringify({ message: "Relation removed" }));
+    } else {
+      console.log("Relation removed.");
     }
   });

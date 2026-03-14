@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
-import type { DB, Task, Artifact } from "@clawops/core";
-import { tasks, artifacts, usageLogs } from "@clawops/core";
+import type { DB, Task, Artifact, ResourceLink } from "@clawops/core";
+import { tasks, artifacts, usageLogs, resourceLinks } from "@clawops/core";
 import { calcCost } from "@clawops/domain";
 
 // ── createTask ─────────────────────────────────────────────────────────────
@@ -242,6 +242,16 @@ export function appendTaskSpec(
   return rows[0];
 }
 
+export {
+  createTaskRelation,
+  deleteTaskRelation,
+  listTaskRelations,
+  getBlockersForTask,
+  isTaskBlocked,
+  type CreateTaskRelationInput,
+  type TaskRelationWithTask,
+} from "./relations.js";
+
 // ── parseTaskProperties ───────────────────────────────────────────────────
 
 export function parseTaskProperties(task: Task): Record<string, unknown> {
@@ -255,4 +265,63 @@ export function parseTaskProperties(task: Task): Record<string, unknown> {
   } catch {
     return {};
   }
+}
+
+interface AddTaskResourceLinkInput {
+  provider: string;
+  resourceType: string;
+  label?: string;
+  url: string;
+  externalId?: string;
+  meta?: Record<string, unknown>;
+}
+
+export function addTaskResourceLink(
+  db: DB,
+  taskId: string,
+  input: AddTaskResourceLinkInput,
+): ResourceLink {
+  const row = db
+    .insert(resourceLinks)
+    .values({
+      entityType: "task",
+      entityId: taskId,
+      provider: input.provider,
+      resourceType: input.resourceType,
+      label: input.label,
+      url: input.url,
+      externalId: input.externalId,
+      meta: input.meta ? JSON.stringify(input.meta) : undefined,
+    })
+    .returning()
+    .get();
+  return row;
+}
+
+export function listTaskResourceLinks(db: DB, taskId: string): ResourceLink[] {
+  return db
+    .select()
+    .from(resourceLinks)
+    .where(and(eq(resourceLinks.entityType, "task"), eq(resourceLinks.entityId, taskId)))
+    .orderBy(resourceLinks.createdAt)
+    .all();
+}
+
+export function removeTaskResourceLink(
+  db: DB,
+  taskId: string,
+  linkId: string,
+): ResourceLink | null {
+  const link = db
+    .select()
+    .from(resourceLinks)
+    .where(eq(resourceLinks.id, linkId))
+    .get();
+  if (!link || link.entityType !== "task" || link.entityId !== taskId) {
+    return null;
+  }
+  db.delete(resourceLinks)
+    .where(eq(resourceLinks.id, linkId))
+    .run();
+  return link;
 }

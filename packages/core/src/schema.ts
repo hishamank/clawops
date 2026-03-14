@@ -313,6 +313,34 @@ export const tasks = sqliteTable("tasks", {
     .default(sql`(unixepoch())`),
 });
 
+// ── Task Relations ──────────────────────────────────────────────────────────
+
+export const taskRelations = sqliteTable(
+  "task_relations",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    fromTaskId: text("from_task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    toTaskId: text("to_task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    type: text("type", { enum: ["blocks", "depends-on", "related-to"] }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (table) => ({
+    uniqueRelation: uniqueIndex("task_relations_from_to_type_unique").on(
+      table.fromTaskId, table.toTaskId, table.type,
+    ),
+    fromTaskIdx: index("idx_task_relations_from").on(table.fromTaskId),
+    toTaskIdx: index("idx_task_relations_to").on(table.toTaskId),
+  }),
+);
+
 // ── Artifacts ───────────────────────────────────────────────────────────────
 
 export const artifacts = sqliteTable("artifacts", {
@@ -689,6 +717,31 @@ export const workflowRunSteps = sqliteTable(
   }),
 );
 
+// ── Resource Links ──────────────────────────────────────────────────────────
+
+export const resourceLinks = sqliteTable(
+  "resource_links",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id").notNull(),
+    provider: text("provider").notNull(),
+    resourceType: text("resource_type").notNull(),
+    label: text("label"),
+    url: text("url").notNull(),
+    externalId: text("external_id"),
+    meta: text("meta"),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (table) => ({
+    entityIdx: index("idx_resource_links_entity").on(table.entityType, table.entityId),
+  }),
+);
+
 // ── Task Templates ──────────────────────────────────────────────────────────
 
 export const taskTemplates = sqliteTable("task_templates", {
@@ -752,6 +805,9 @@ export type NewMilestone = typeof milestones.$inferInsert;
 export type Task = typeof tasks.$inferSelect;
 export type NewTask = typeof tasks.$inferInsert;
 
+export type ResourceLink = typeof resourceLinks.$inferSelect;
+export type NewResourceLink = typeof resourceLinks.$inferInsert;
+
 export type Artifact = typeof artifacts.$inferSelect;
 export type NewArtifact = typeof artifacts.$inferInsert;
 
@@ -794,6 +850,9 @@ export type NewWorkflowRun = typeof workflowRuns.$inferInsert;
 
 export type WorkflowRunStep = typeof workflowRunSteps.$inferSelect;
 export type NewWorkflowRunStep = typeof workflowRunSteps.$inferInsert;
+
+export type TaskRelation = typeof taskRelations.$inferSelect;
+export type NewTaskRelation = typeof taskRelations.$inferInsert;
 
 export type TaskTemplate = typeof taskTemplates.$inferSelect;
 export type NewTaskTemplate = typeof taskTemplates.$inferInsert;

@@ -10,7 +10,8 @@ import type {
 import { events } from "@clawops/core";
 import { db as coreDb } from "@clawops/core/db";
 import { runMigrations } from "@clawops/core/migrate";
-import { createTask, listTasks, updateTask, completeTask, getTaskSpec, setTaskSpec, appendTaskSpec } from "@clawops/tasks";
+import { createTask, listTasks, updateTask, completeTask, getTaskSpec, setTaskSpec, appendTaskSpec, createTaskRelation, deleteTaskRelation, listTaskRelations, type CreateTaskRelationInput, type TaskRelationWithTask } from "@clawops/tasks";
+import type { TaskRelation } from "@clawops/core";
 import { createIdea, listIdeas, getIdeaSections, getIdeaSection, updateIdeaSection, updateIdeaSections, getIdeaDraftPrd, setIdeaDraftPrd, type IdeaSectionKey, type IdeaSections } from "@clawops/ideas";
 import {
   createProject,
@@ -313,4 +314,27 @@ export async function taskSpecSetFile(id: string, filePath: string): Promise<Tas
 export async function taskSpecAppend(id: string, content: string): Promise<Task> {
   ensureMigrated();
   return appendTaskSpec(getDb(), id, content);
+}
+
+// ── Task Relation Functions ─────────────────────────────────────────────────
+
+export async function taskRelationsList(taskId: string): Promise<TaskRelationWithTask[]> {
+  ensureMigrated();
+  return listTaskRelations(getDb(), taskId);
+}
+
+export async function taskRelationCreate(
+  _taskId: string,
+  input: CreateTaskRelationInput,
+): Promise<TaskRelation> {
+  ensureMigrated();
+  return createTaskRelation(getDb(), input);
+}
+
+export async function taskRelationDelete(
+  _taskId: string,
+  relationId: string,
+): Promise<void> {
+  ensureMigrated();
+  deleteTaskRelation(getDb(), relationId);
 }

@@ -10,9 +10,17 @@ import * as schema from "@clawops/core";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const { createTask, getTask, listTasks, updateTask, completeTask, parseTaskProperties } = await import(
-  "@clawops/tasks"
-);
+const {
+  createTask,
+  getTask,
+  listTasks,
+  updateTask,
+  completeTask,
+  parseTaskProperties,
+  addTaskResourceLink,
+  listTaskResourceLinks,
+  removeTaskResourceLink,
+} = await import("@clawops/tasks");
 
 let db: DB;
 
@@ -24,6 +32,44 @@ before(() => {
   });
 });
 
+describe("task resource links", () => {
+  it("adds, lists, and removes a resource link", () => {
+    const task = createTask(db, { title: "Link task" });
+    const link = addTaskResourceLink(db, task.id, {
+      provider: "github",
+      resourceType: "issue",
+      url: "https://github.com/hishamank/clawops/issues/123",
+      externalId: "123",
+      meta: { context: "issue" },
+      label: "Issue link",
+    });
+
+    const links = listTaskResourceLinks(db, task.id);
+    assert.strictEqual(links.length, 1);
+    assert.strictEqual(links[0].id, link.id);
+    assert.strictEqual(links[0].provider, "github");
+    assert.strictEqual(JSON.parse(links[0].meta ?? "{}").context, "issue");
+
+    const removed = removeTaskResourceLink(db, task.id, link.id);
+    assert.strictEqual(removed?.id, link.id);
+    assert.strictEqual(listTaskResourceLinks(db, task.id).length, 0);
+  });
+
+  it("refuses to remove a link for another task", () => {
+    const primary = createTask(db, { title: "Primary task" });
+    const other = createTask(db, { title: "Other task" });
+    const link = addTaskResourceLink(db, primary.id, {
+      provider: "github",
+      resourceType: "issue",
+      url: "https://example.com/resource",
+    });
+
+    const removed = removeTaskResourceLink(db, other.id, link.id);
+    assert.strictEqual(removed, null);
+    const remaining = listTaskResourceLinks(db, primary.id);
+    assert.strictEqual(remaining.length, 1);
+  });
+});
 describe("tasks (integration)", () => {
   it("createTask inserts a row and returns it", () => {
     const task = createTask(db, { title: "Integration task" });
