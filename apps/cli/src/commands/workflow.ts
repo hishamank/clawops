@@ -30,18 +30,43 @@ workflowCmd
     let triggerConfig: Record<string, unknown> | undefined;
     if (opts.triggerConfig) {
       try {
-        triggerConfig = JSON.parse(opts.triggerConfig) as Record<string, unknown>;
+        const parsed = JSON.parse(opts.triggerConfig) as unknown;
+        if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+          console.error("--trigger-config must be a JSON object (e.g., '{\"key\": \"value\"}')");
+          process.exit(1);
+        }
+        triggerConfig = parsed as Record<string, unknown>;
       } catch {
         console.error("Invalid JSON for --trigger-config");
         process.exit(1);
       }
     }
 
-    let steps: Array<{ name: string; type: string; config?: Record<string, unknown> }>;
+    let steps: WorkflowStepDefinition[];
     if (opts.steps) {
       try {
         const content = fs.readFileSync(opts.steps, "utf-8");
-        steps = JSON.parse(content);
+        const parsed = JSON.parse(content) as unknown;
+        if (!Array.isArray(parsed)) {
+          console.error("Steps file must contain a JSON array");
+          process.exit(1);
+        }
+        for (const [index, step] of parsed.entries()) {
+          if (step === null || typeof step !== "object" || Array.isArray(step)) {
+            console.error(`Step ${index} must be an object`);
+            process.exit(1);
+          }
+          const stepObj = step as Record<string, unknown>;
+          if (!stepObj.name || typeof stepObj.name !== "string") {
+            console.error(`Step ${index}: name is required and must be a string`);
+            process.exit(1);
+          }
+          if (!stepObj.type || typeof stepObj.type !== "string") {
+            console.error(`Step ${index}: type is required and must be a string`);
+            process.exit(1);
+          }
+        }
+        steps = parsed as WorkflowStepDefinition[];
       } catch (err) {
         console.error(`Failed to read steps file: ${err instanceof Error ? err.message : err}`);
         process.exit(1);
@@ -145,7 +170,12 @@ workflowCmd
         triggerConfig = null;
       } else {
         try {
-          triggerConfig = JSON.parse(opts.triggerConfig) as Record<string, unknown>;
+          const parsed = JSON.parse(opts.triggerConfig) as unknown;
+          if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+            console.error("--trigger-config must be a JSON object (e.g., '{\"key\": \"value\"}')");
+            process.exit(1);
+          }
+          triggerConfig = parsed as Record<string, unknown>;
         } catch {
           console.error("Invalid JSON for --trigger-config");
           process.exit(1);
@@ -153,11 +183,31 @@ workflowCmd
       }
     }
 
-    let steps: Array<{ name: string; type: string; config?: Record<string, unknown> }> | undefined;
+    let steps: WorkflowStepDefinition[] | undefined;
     if (opts.steps) {
       try {
         const content = fs.readFileSync(opts.steps, "utf-8");
-        steps = JSON.parse(content) as never;
+        const parsed = JSON.parse(content) as unknown;
+        if (!Array.isArray(parsed)) {
+          console.error("Steps file must contain a JSON array");
+          process.exit(1);
+        }
+        for (const [index, step] of parsed.entries()) {
+          if (step === null || typeof step !== "object" || Array.isArray(step)) {
+            console.error(`Step ${index} must be an object`);
+            process.exit(1);
+          }
+          const stepObj = step as Record<string, unknown>;
+          if (!stepObj.name || typeof stepObj.name !== "string") {
+            console.error(`Step ${index}: name is required and must be a string`);
+            process.exit(1);
+          }
+          if (!stepObj.type || typeof stepObj.type !== "string") {
+            console.error(`Step ${index}: type is required and must be a string`);
+            process.exit(1);
+          }
+        }
+        steps = parsed as WorkflowStepDefinition[];
       } catch (err) {
         console.error(`Failed to read steps file: ${err instanceof Error ? err.message : err}`);
         process.exit(1);
