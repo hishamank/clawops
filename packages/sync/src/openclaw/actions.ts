@@ -1,5 +1,8 @@
 import {
+  eq,
   parseJsonObject,
+  workspaceFileRevisions,
+  workspaceFiles,
   type DB,
   type OpenClawConnection,
 } from "@clawops/core";
@@ -353,6 +356,77 @@ export async function writeTrackedOpenClawFile(
     input.relativePath,
     input.content,
   );
+}
+
+export interface RevertTrackedOpenClawFileInput extends OpenClawActionAuditInput {
+  revisionId: string;
+  gatewayToken?: string;
+}
+
+export interface RevertTrackedOpenClawFileResult {
+  revision: { id: string; workspaceFileId: string; capturedAt: Date | null };
+  file: { id: string; connectionId: string; relativePath: string };
+  gatewayResult: WriteTrackedFileResult | null;
+}
+
+export async function revertTrackedOpenClawFile(
+  db: DB,
+  input: RevertTrackedOpenClawFileInput,
+): Promise<RevertTrackedOpenClawFileResult> {
+  const revision = db
+    .select()
+    .from(workspaceFileRevisions)
+    .where(eq(workspaceFileRevisions.id, input.revisionId))
+    .get();
+
+  if (!revision) {
+    throw createActionError(
+      `Workspace file revision "${input.revisionId}" not found`,
+      { code: "REVISION_NOT_FOUND", status: 404 },
+    );
+  }
+
+  if (revision.content === null || revision.content === undefined) {
+    throw createActionError(
+      `Workspace file revision "${input.revisionId}" has no stored content`,
+      { code: "REVISION_CONTENT_MISSING", status: 422 },
+    );
+  }
+
+  const file = db
+    .select()
+    .from(workspaceFiles)
+    .where(eq(workspaceFiles.id, revision.workspaceFileId))
+    .get();
+
+  if (!file) {
+    throw createActionError(
+      `Workspace file "${revision.workspaceFileId}" not found`,
+      { code: "WORKSPACE_FILE_NOT_FOUND", status: 404 },
+    );
+  }
+
+  const connection = requireConnection(db, file.connectionId);
+  const gatewayResult = await writeTrackedFile(
+    resolveGatewayUrl(connection),
+    resolveGatewayToken(connection, input.gatewayToken),
+    file.relativePath,
+    revision.content,
+  );
+
+  return {
+    revision: {
+      id: revision.id,
+      workspaceFileId: revision.workspaceFileId,
+      capturedAt: revision.capturedAt,
+    },
+    file: {
+      id: file.id,
+      connectionId: file.connectionId,
+      relativePath: file.relativePath,
+    },
+    gatewayResult,
+  };
 }
 
 export async function triggerSupportedOpenClawEndpoint(

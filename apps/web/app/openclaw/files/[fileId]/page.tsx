@@ -9,6 +9,7 @@ import { getDb } from "@/lib/server/runtime";
 import { eq, workspaceFiles, type WorkspaceFile } from "@clawops/core";
 import { listWorkspaceFileRevisions, type WorkspaceFileRevision } from "@clawops/sync";
 import { notFound } from "next/navigation";
+import { RevertButton } from "./revert-button";
 
 export const dynamic = "force-dynamic";
 
@@ -43,9 +44,11 @@ function renderTimeAgo(value?: Date | null): string {
 function RevisionRow({
   revision,
   index,
+  fileId,
 }: {
   revision: WorkspaceFileRevision;
   index: number;
+  fileId: string;
 }) {
   return (
     <div className="flex items-start justify-between gap-4 rounded-xl border border-border px-4 py-3">
@@ -92,6 +95,12 @@ function RevisionRow({
           Source: <span className="font-medium">{revision.source}</span>
         </p>
       </div>
+
+      <RevertButton
+        revisionId={revision.id}
+        fileId={fileId}
+        hasContent={revision.content !== null}
+      />
     </div>
   );
 }
@@ -199,6 +208,7 @@ export default async function FileDetailPage({
                     key={revision.id}
                     revision={revision}
                     index={revisions.length - 1 - index}
+                    fileId={fileId}
                   />
                 ))}
               </div>

@@ -16,6 +16,7 @@ export {
 } from "./openclaw/sessions.js";
 export {
   OpenClawActionError,
+  revertTrackedOpenClawFile,
   triggerAgent,
   updateCronJob,
   writeTrackedFile,
