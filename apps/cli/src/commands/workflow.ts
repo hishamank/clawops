@@ -13,6 +13,40 @@ import {
   type WorkflowStepDefinition,
 } from "../lib/client.js";
 
+const VALID_STATUSES = ["draft", "active", "paused", "deprecated"] as const;
+const VALID_TRIGGER_TYPES = ["manual", "scheduled", "event", "webhook"] as const;
+const VALID_TRIGGERED_BY = ["human", "agent", "schedule", "event"] as const;
+
+type ValidStatus = typeof VALID_STATUSES[number];
+type ValidTriggerType = typeof VALID_TRIGGER_TYPES[number];
+type ValidTriggeredBy = typeof VALID_TRIGGERED_BY[number];
+
+function validateStatus(value: string | undefined, fieldName: string): ValidStatus | undefined {
+  if (value === undefined) return undefined;
+  if (!VALID_STATUSES.includes(value as ValidStatus)) {
+    console.error(`Invalid ${fieldName}: ${value}. Must be one of: ${VALID_STATUSES.join(", ")}`);
+    process.exit(1);
+  }
+  return value as ValidStatus;
+}
+
+function validateTriggerType(value: string | undefined, fieldName: string): ValidTriggerType | undefined {
+  if (value === undefined) return undefined;
+  if (!VALID_TRIGGER_TYPES.includes(value as ValidTriggerType)) {
+    console.error(`Invalid ${fieldName}: ${value}. Must be one of: ${VALID_TRIGGER_TYPES.join(", ")}`);
+    process.exit(1);
+  }
+  return value as ValidTriggerType;
+}
+
+function validateTriggeredBy(value: string, fieldName: string): ValidTriggeredBy {
+  if (!VALID_TRIGGERED_BY.includes(value as ValidTriggeredBy)) {
+    console.error(`Invalid ${fieldName}: ${value}. Must be one of: ${VALID_TRIGGERED_BY.join(", ")}`);
+    process.exit(1);
+  }
+  return value as ValidTriggeredBy;
+}
+
 export const workflowCmd = new Command("workflow").description("Manage workflows");
 
 workflowCmd
@@ -20,13 +54,16 @@ workflowCmd
   .description("Create a new workflow")
   .requiredOption("--name <name>", "Workflow name")
   .option("--desc <description>", "Workflow description")
-  .option("--status <status>", "Workflow status (draft, active, paused, deprecated)", "draft")
-  .option("--trigger-type <type>", "Trigger type (manual, scheduled, event, webhook)", "manual")
+  .option("--status <status>", "Workflow status", "draft")
+  .option("--trigger-type <type>", "Trigger type", "manual")
   .option("--trigger-config <json>", "Trigger config as JSON string")
   .option("--project <id>", "Project ID")
-  .option("--steps <file>", "Path to steps JSON file")
+  .requiredOption("--steps <file>", "Path to steps JSON file")
   .option("--json", "Output raw JSON")
   .action(async (opts) => {
+    const status = validateStatus(opts.status, "status");
+    const triggerType = validateTriggerType(opts.triggerType, "trigger-type");
+
     let triggerConfig: Record<string, unknown> | undefined;
     if (opts.triggerConfig) {
       try {
@@ -43,47 +80,42 @@ workflowCmd
     }
 
     let steps: WorkflowStepDefinition[];
-    if (opts.steps) {
-      try {
-        const content = fs.readFileSync(opts.steps, "utf-8");
-        const parsed = JSON.parse(content) as unknown;
-        if (!Array.isArray(parsed)) {
-          console.error("Steps file must contain a JSON array");
-          process.exit(1);
-        }
-        for (const [index, step] of parsed.entries()) {
-          if (step === null || typeof step !== "object" || Array.isArray(step)) {
-            console.error(`Step ${index} must be an object`);
-            process.exit(1);
-          }
-          const stepObj = step as Record<string, unknown>;
-          if (!stepObj.name || typeof stepObj.name !== "string") {
-            console.error(`Step ${index}: name is required and must be a string`);
-            process.exit(1);
-          }
-          if (!stepObj.type || typeof stepObj.type !== "string") {
-            console.error(`Step ${index}: type is required and must be a string`);
-            process.exit(1);
-          }
-        }
-        steps = parsed as WorkflowStepDefinition[];
-      } catch (err) {
-        console.error(`Failed to read steps file: ${err instanceof Error ? err.message : err}`);
+    try {
+      const content = fs.readFileSync(opts.steps, "utf-8");
+      const parsed = JSON.parse(content) as unknown;
+      if (!Array.isArray(parsed)) {
+        console.error("Steps file must contain a JSON array");
         process.exit(1);
       }
-    } else {
-      console.error("Error: --steps <file> is required");
+      for (const [index, step] of parsed.entries()) {
+        if (step === null || typeof step !== "object" || Array.isArray(step)) {
+          console.error(`Step ${index} must be an object`);
+          process.exit(1);
+        }
+        const stepObj = step as Record<string, unknown>;
+        if (!stepObj.name || typeof stepObj.name !== "string") {
+          console.error(`Step ${index}: name is required and must be a string`);
+          process.exit(1);
+        }
+        if (!stepObj.type || typeof stepObj.type !== "string") {
+          console.error(`Step ${index}: type is required and must be a string`);
+          process.exit(1);
+        }
+      }
+      steps = parsed as WorkflowStepDefinition[];
+    } catch (err) {
+      console.error(`Failed to read steps file: ${err instanceof Error ? err.message : err}`);
       process.exit(1);
     }
 
     const workflow = await workflowCreate({
       name: opts.name,
       description: opts.desc,
-      status: opts.status as "draft" | "active" | "paused" | "deprecated",
-      triggerType: opts.triggerType as "manual" | "scheduled" | "event" | "webhook",
+      status,
+      triggerType,
       triggerConfig,
       projectId: opts.project,
-      steps: steps as WorkflowStepDefinition[],
+      steps,
     });
 
     if (opts.json) {
@@ -96,14 +128,17 @@ workflowCmd
 workflowCmd
   .command("list")
   .description("List workflows")
-  .option("--status <status>", "Filter by status (draft, active, paused, deprecated)")
+  .option("--status <status>", "Filter by status")
   .option("--trigger-type <type>", "Filter by trigger type")
   .option("--project <id>", "Filter by project")
   .option("--json", "Output raw JSON")
   .action(async (opts) => {
+    const status = validateStatus(opts.status, "status");
+    const triggerType = validateTriggerType(opts.triggerType, "trigger-type");
+
     const workflows = await workflowList({
-      status: opts.status as "draft" | "active" | "paused" | "deprecated" | undefined,
-      triggerType: opts.triggerType as "manual" | "scheduled" | "event" | "webhook" | undefined,
+      status,
+      triggerType,
       projectId: opts.project,
     });
 
@@ -158,12 +193,15 @@ workflowCmd
   .argument("<id>", "Workflow ID")
   .option("--name <name>", "Workflow name")
   .option("--desc <description>", "Workflow description")
-  .option("--status <status>", "Workflow status (draft, active, paused, deprecated)")
-  .option("--trigger-type <type>", "Trigger type (manual, scheduled, event, webhook)")
+  .option("--status <status>", "Workflow status")
+  .option("--trigger-type <type>", "Trigger type")
   .option("--trigger-config <json>", "Trigger config as JSON string")
   .option("--steps <file>", "Path to steps JSON file")
   .option("--json", "Output raw JSON")
   .action(async (id: string, opts) => {
+    const status = validateStatus(opts.status, "status");
+    const triggerType = validateTriggerType(opts.triggerType, "trigger-type");
+
     let triggerConfig: Record<string, unknown> | null | undefined;
     if (opts.triggerConfig !== undefined) {
       if (opts.triggerConfig === "null") {
@@ -217,10 +255,10 @@ workflowCmd
     const workflow = await workflowUpdate(id, {
       name: opts.name,
       description: opts.desc,
-      status: opts.status as "draft" | "active" | "paused" | "deprecated" | undefined,
-      triggerType: opts.triggerType as "manual" | "scheduled" | "event" | "webhook" | undefined,
+      status,
+      triggerType,
       triggerConfig,
-      steps: steps as WorkflowStepDefinition[] | undefined,
+      steps,
     });
 
     if (opts.json) {
@@ -234,13 +272,15 @@ workflowCmd
   .command("run")
   .description("Trigger a workflow run")
   .argument("<workflow-id>", "Workflow ID")
-  .option("--triggered-by <source>", "Trigger source (human, agent, schedule, event)", "human")
+  .option("--triggered-by <source>", "Trigger source", "human")
   .option("--triggered-by-id <id>", "ID of the trigger source")
   .option("--json", "Output raw JSON")
   .action(async (workflowId: string, opts) => {
+    const triggeredBy = validateTriggeredBy(opts.triggeredBy, "triggered-by");
+
     const run = await workflowRunCreate({
       workflowId,
-      triggeredBy: opts.triggeredBy as "human" | "agent" | "schedule" | "event",
+      triggeredBy,
       triggeredById: opts.triggeredById,
     });
 
