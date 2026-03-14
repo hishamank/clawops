@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Activity, Plug, Clock4 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -327,9 +328,10 @@ export default async function OpenClawPage(): Promise<React.JSX.Element> {
             ) : (
               <div className="space-y-3">
                 {trackedFiles.map((file) => (
-                  <div
+                  <Link
                     key={file.id}
-                    className="flex items-center justify-between rounded-xl border border-border px-4 py-3"
+                    href={`/openclaw/files/${file.id}`}
+                    className="flex items-center justify-between rounded-xl border border-border px-4 py-3 transition-colors hover:bg-accent"
                   >
                     <div>
                       <p className="text-sm font-semibold">{file.relativePath}</p>
@@ -340,7 +342,7 @@ export default async function OpenClawPage(): Promise<React.JSX.Element> {
                     <span className="text-xs text-muted-foreground">
                       {file.sizeBytes != null ? `${file.sizeBytes} bytes` : "—"}
                     </span>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}
