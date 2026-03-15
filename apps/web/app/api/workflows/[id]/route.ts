@@ -11,25 +11,30 @@ import {
 } from "@clawops/workflows";
 import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
 
-const workflowStatusValues = ["draft", "active", "paused", "deprecated"] as const;
-const triggerTypeValues = ["manual", "scheduled", "event", "webhook"] as const;
+const workflowStatusEnum = z.enum(["draft", "active", "paused", "deprecated"]);
+const workflowTriggerTypeEnum = z.enum(["manual", "scheduled", "event", "webhook"]);
+
+const workflowStepSchema = z.object({
+  key: z.string().optional(),
+  name: z.string().min(1),
+  type: z.enum(["task", "agent", "script", "condition", "parallel", "wait", "webhook", "notification"]),
+  config: z.record(z.string(), z.unknown()).optional(),
+  condition: z.string().optional(),
+  onError: z.enum(["stop", "continue", "retry"]).optional(),
+  retryCount: z.number().int().min(0).max(10).optional(),
+});
+
+const idParams = z.object({ id: z.string().min(1) });
 
 const updateWorkflowBody = z.object({
   name: z.string().min(1).optional(),
   description: z.string().nullable().optional(),
-  status: z.enum(workflowStatusValues).optional(),
-  triggerType: z.enum(triggerTypeValues).optional(),
-  triggerConfig: z.record(z.string(), z.unknown()).nullable().optional(),
+  version: z.string().optional(),
+  status: workflowStatusEnum.optional(),
   projectId: z.string().nullable().optional(),
-  steps: z.array(z.object({
-    name: z.string().min(1),
-    type: z.string().min(1),
-    key: z.string().optional(),
-    config: z.record(z.string(), z.unknown()).optional(),
-    condition: z.string().optional(),
-    onError: z.enum(["stop", "continue", "retry"]).optional(),
-    retryCount: z.number().int().min(0).max(10).optional(),
-  })).min(1).optional(),
+  triggerType: workflowTriggerTypeEnum.optional(),
+  triggerConfig: z.record(z.string(), z.unknown()).nullable().optional(),
+  steps: z.array(workflowStepSchema).min(1).optional(),
 }).transform((data) => ({
   ...data,
   steps: data.steps as WorkflowStepDefinition[] | undefined,
@@ -39,31 +44,28 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
-export async function GET(req: Request, { params }: RouteParams): Promise<NextResponse> {
+export async function GET(_req: Request, { params }: RouteParams): Promise<NextResponse> {
   try {
-    const { id } = await params;
+    const { id } = idParams.parse(await params);
     const workflow = getWorkflowDefinition(getDb(), id);
-
-    if (!workflow) {
-      return jsonError(404, "Workflow not found", "NOT_FOUND");
-    }
-
+    if (!workflow) return jsonError(404, "Workflow not found", "WORKFLOW_NOT_FOUND");
     return NextResponse.json(workflow);
   } catch (err) {
+    if (err instanceof z.ZodError) return jsonError(400, err.message, "VALIDATION_ERROR");
     return jsonError(500, err instanceof Error ? err.message : "Failed to get workflow", "INTERNAL_ERROR");
   }
 }
 
 export async function PATCH(req: Request, { params }: RouteParams): Promise<NextResponse> {
   try {
-    const { id } = await params;
+    const { id } = idParams.parse(await params);
     const body = updateWorkflowBody.parse(await req.json());
     const db = getDb();
     const agentId = getAgentIdFromApiKey(req) ?? undefined;
 
     const existing = getWorkflowDefinition(db, id);
     if (!existing) {
-      return jsonError(404, "Workflow not found", "NOT_FOUND");
+      return jsonError(404, "Workflow not found", "WORKFLOW_NOT_FOUND");
     }
 
     if (body.steps || body.triggerType || body.triggerConfig) {
@@ -83,23 +85,22 @@ export async function PATCH(req: Request, { params }: RouteParams): Promise<Next
       const w = updateWorkflowDefinition(tx as unknown as DB, id, {
         name: body.name,
         description: body.description,
+        version: body.version,
         status: body.status,
         triggerType: body.triggerType,
         triggerConfig: body.triggerConfig,
         projectId: body.projectId,
         steps: body.steps,
       });
-
       tx.insert(events)
         .values({
           action: "workflow.updated",
           entityType: "workflow",
           entityId: w.id,
           agentId,
-          meta: JSON.stringify({ name: w.name }),
+          meta: JSON.stringify({ fields: Object.keys(body) }),
         })
         .run();
-
       createActivityEvent(tx as unknown as DB, {
         source: agentId ? "agent" : "user",
         type: "workflow.updated",
@@ -107,9 +108,8 @@ export async function PATCH(req: Request, { params }: RouteParams): Promise<Next
         entityType: "workflow",
         entityId: w.id,
         agentId,
-        metadata: JSON.stringify({ name: w.name, status: w.status }),
+        metadata: JSON.stringify({ fields: Object.keys(body), status: body.status }),
       });
-
       return w;
     });
 

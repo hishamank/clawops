@@ -589,3 +589,6 @@ export function listWorkflowRunSteps(
     .all()
     .map(toWorkflowStepRunRecord);
 }
+
+export { executeWorkflow, matchEventTrigger, evaluateCondition, WorkflowNotActiveError } from "./engine.js";
+export type { WorkflowExecutionInput } from "./engine.js";
