@@ -106,7 +106,7 @@ importers:
         specifier: workspace:^
         version: link:../../packages/tasks
       '@clawops/workflows':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../packages/workflows
       '@radix-ui/react-slot':
         specifier: ^1.1.1
@@ -431,6 +431,15 @@ importers:
       '@clawops/core':
         specifier: workspace:*
         version: link:../core
+      '@clawops/notifications':
+        specifier: workspace:*
+        version: link:../notifications
+      '@clawops/sync':
+        specifier: workspace:*
+        version: link:../sync
+      '@clawops/tasks':
+        specifier: workspace:*
+        version: link:../tasks
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.12
