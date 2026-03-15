@@ -56,7 +56,7 @@ mock.module("drizzle-orm", {
   namedExports: { eq: () => ({}) },
 });
 
-const { createIdea, listIdeas, listIdeaTasks, createIdeaTask, promoteIdeaToProject } = await import("../dist/index.js");
+const { createIdea, listIdeas, listIdeaTasks, createIdeaTask } = await import("../dist/index.js");
 
 describe("createIdea", () => {
   it("returns an idea row", () => {

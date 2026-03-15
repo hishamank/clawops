@@ -1,5 +1,5 @@
 import { eq, and } from "drizzle-orm";
-import type { DB, Idea, NewIdea, Project, Task, NewTask } from "@clawops/core";
+import type { DB, Idea, NewIdea, Project, Task } from "@clawops/core";
 import { ideas, projects, tasks, parseJsonArray, toJsonArray, parseJsonObject, toJsonObject } from "@clawops/core";
 import type { IdeaStatus, TaskStatus, TaskPriority, Source } from "@clawops/domain";
 import { NotFoundError, ConflictError } from "@clawops/domain";
