@@ -7,6 +7,7 @@ import {
   taskLinkRemove,
   taskCreate,
   taskList,
+  taskPullable,
   taskUpdate,
   taskDone,
   taskSpec,
@@ -114,6 +115,33 @@ taskCmd
     } else if (tasks.length === 0) {
       console.log("No tasks found.");
     } else {
+      for (const t of tasks) {
+        console.log(`[${t.status}] ${t.id}  ${t.title}`);
+      }
+    }
+  });
+
+taskCmd
+  .command("pullable")
+  .description("List tasks eligible for autonomous pickup by an agent")
+  .option("--project <id>", "Filter by project")
+  .option("--priority <priority>", "Filter by priority (low, medium, high, urgent)")
+  .option("--template <id>", "Filter by template ID")
+  .option("--stage <id>", "Filter by stage ID")
+  .option("--json", "Output raw JSON")
+  .action(async (opts) => {
+    const tasks = await taskPullable({
+      projectId: opts.project,
+      priority: opts.priority,
+      templateId: opts.template,
+      stageId: opts.stage,
+    });
+    if (opts.json) {
+      console.log(JSON.stringify(tasks, null, 2));
+    } else if (tasks.length === 0) {
+      console.log("No pullable tasks found.");
+    } else {
+      console.log(`Found ${tasks.length} pullable task(s):`);
       for (const t of tasks) {
         console.log(`[${t.status}] ${t.id}  ${t.title}`);
       }

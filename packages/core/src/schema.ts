@@ -308,6 +308,9 @@ export const tasks = sqliteTable("tasks", {
   stageId: text("stage_id").references(() => taskTemplateStages.id),
   properties: text("properties"),
   ideaId: text("idea_id").references(() => ideas.id),
+  autoPullEligible: integer("auto_pull_eligible", { mode: "boolean" })
+    .notNull()
+    .default(true),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
