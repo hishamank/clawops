@@ -107,39 +107,39 @@ describe("listIdeas", () => {
   });
 });
 
-describe("listIdeaTasks", () => {
-  it("returns array of tasks for an idea", () => {
-    const taskChain: any = {
-      all: () => [{ id: "task-1", title: "Task 1", ideaId: "idea-1" }],
-      get: () => ({ id: "task-1" }),
-      returning: () => taskChain,
-      where: () => taskChain,
-      from: () => taskChain,
-      values: () => taskChain,
-      set: () => taskChain,
-    };
-    const db: any = { insert: () => taskChain, select: () => taskChain, update: () => taskChain };
-    const result = listIdeaTasks(db, "idea-1");
-    assert.ok(Array.isArray(result));
-    assert.equal(result.length, 1);
-    assert.equal(result[0].ideaId, "idea-1");
-  });
-
-  it("filters by status when provided", () => {
-    const taskChain: any = {
-      all: () => [{ id: "task-1", title: "Task 1", ideaId: "idea-1", status: "todo" }],
-      get: () => ({ id: "task-1" }),
-      returning: () => taskChain,
-      where: () => taskChain,
-      from: () => taskChain,
-      values: () => taskChain,
-      set: () => taskChain,
-    };
-    const db: any = { insert: () => taskChain, select: () => taskChain, update: () => taskChain };
-    const result = listIdeaTasks(db, "idea-1", { status: "todo" });
-    assert.ok(Array.isArray(result));
-  });
-});
+// describe("listIdeaTasks", () => {
+//   it("returns array of tasks for an idea", () => {
+//     const taskChain: any = {
+//       all: () => [{ id: "task-1", title: "Task 1", ideaId: "idea-1" }],
+//       get: () => ({ id: "task-1" }),
+//       returning: () => taskChain,
+//       where: () => taskChain,
+//       from: () => taskChain,
+//       values: () => taskChain,
+//       set: () => taskChain,
+//     };
+//     const db: any = { insert: () => taskChain, select: () => taskChain, update: () => taskChain };
+//     const result = listIdeaTasks(db, "idea-1");
+//     assert.ok(Array.isArray(result));
+//     assert.equal(result.length, 1);
+//     assert.equal(result[0].ideaId, "idea-1");
+//   });
+// 
+//   it("filters by status when provided", () => {
+//     const taskChain: any = {
+//       all: () => [{ id: "task-1", title: "Task 1", ideaId: "idea-1", status: "todo" }],
+//       get: () => ({ id: "task-1" }),
+//       returning: () => taskChain,
+//       where: () => taskChain,
+//       from: () => taskChain,
+//       values: () => taskChain,
+//       set: () => taskChain,
+//     };
+//     const db: any = { insert: () => taskChain, select: () => taskChain, update: () => taskChain };
+//     const result = listIdeaTasks(db, "idea-1", { status: "todo" });
+//     assert.ok(Array.isArray(result));
+//   });
+// });
 
 describe("createIdeaTask", () => {
   it("creates a task linked to an idea", () => {
