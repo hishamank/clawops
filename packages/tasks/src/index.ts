@@ -267,7 +267,7 @@ export function parseTaskProperties(task: Task): Record<string, unknown> {
   }
 }
 
-interface AddTaskResourceLinkInput {
+export interface AddTaskResourceLinkInput {
   provider: string;
   resourceType: string;
   label?: string;
@@ -312,16 +312,16 @@ export function removeTaskResourceLink(
   taskId: string,
   linkId: string,
 ): ResourceLink | null {
-  const link = db
-    .select()
-    .from(resourceLinks)
-    .where(eq(resourceLinks.id, linkId))
-    .get();
-  if (!link || link.entityType !== "task" || link.entityId !== taskId) {
-    return null;
-  }
-  db.delete(resourceLinks)
-    .where(eq(resourceLinks.id, linkId))
-    .run();
-  return link;
+  const deletedRows = db
+    .delete(resourceLinks)
+    .where(
+      and(
+        eq(resourceLinks.id, linkId),
+        eq(resourceLinks.entityType, "task"),
+        eq(resourceLinks.entityId, taskId),
+      ),
+    )
+    .returning()
+    .all();
+  return deletedRows[0] ?? null;
 }

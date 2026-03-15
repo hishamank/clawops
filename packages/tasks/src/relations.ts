@@ -1,4 +1,4 @@
-import { eq, or, and } from "drizzle-orm";
+import { eq, or, and, inArray } from "drizzle-orm";
 import { taskRelations, tasks, type DB, type TaskRelation, type Task } from "@clawops/core";
 
 export interface CreateTaskRelationInput {
@@ -39,11 +39,34 @@ export function listTaskRelations(
     )
     .all();
 
+  if (relations.length === 0) {
+    return [];
+  }
+
+  const otherIdsSet = new Set<string>();
+  for (const relation of relations) {
+    const otherId =
+      relation.fromTaskId === taskId ? relation.toTaskId : relation.fromTaskId;
+    otherIdsSet.add(otherId);
+  }
+
+  const otherIds = Array.from(otherIdsSet);
+  if (otherIds.length === 0) {
+    return [];
+  }
+
+  const otherTasks = db
+    .select()
+    .from(tasks)
+    .where(inArray(tasks.id, otherIds))
+    .all();
+  const taskById = new Map(otherTasks.map((task) => [task.id, task]));
+
   const results: TaskRelationWithTask[] = [];
   for (const relation of relations) {
     const otherId =
       relation.fromTaskId === taskId ? relation.toTaskId : relation.fromTaskId;
-    const task = db.select().from(tasks).where(eq(tasks.id, otherId)).get();
+    const task = taskById.get(otherId);
     if (task) {
       results.push({
         relation,
