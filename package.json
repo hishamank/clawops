@@ -10,7 +10,8 @@
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "clean": "turbo run clean",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "check": "turbo run typecheck lint test build"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

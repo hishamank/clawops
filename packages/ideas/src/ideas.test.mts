@@ -37,7 +37,7 @@ mock.module("@clawops/core", {
     db: makeDb(),
     ideas: Symbol("ideas"),
     projects: Symbol("projects"),
-    tasks: Symbol("tasks"),
+    tasks: { ideaId: Symbol("tasks.ideaId"), status: Symbol("tasks.status") },
     parseJsonArray: (v: string | null) => (v ? JSON.parse(v) : []),
     parseJsonObject: (v: string | null) => (v ? JSON.parse(v) : {}),
     toJsonArray: (v: string[]) => JSON.stringify(v),
@@ -54,10 +54,10 @@ mock.module("@clawops/domain", {
 });
 
 mock.module("drizzle-orm", {
-  namedExports: { eq: () => ({}) },
+  namedExports: { eq: () => ({}), and: (..._args: unknown[]) => ({}) },
 });
 
-const { createIdea, listIdeas, listIdeaTasks, createIdeaTask } = await import("../dist/index.js");
+const { createIdea, listIdeas, createIdeaTask } = await import("../dist/index.js");
 
 describe("createIdea", () => {
   it("returns an idea row", () => {

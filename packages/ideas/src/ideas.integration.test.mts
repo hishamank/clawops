@@ -158,6 +158,7 @@ function createDbFromState(state: StoreState): RuntimeDb {
                 .map((row) => Object.assign(row, values));
 
               return {
+                run() {},
                 returning() {
                   return {
                     all() {
@@ -165,7 +166,6 @@ function createDbFromState(state: StoreState): RuntimeDb {
                     },
                   };
                 },
-                run() {},
               };
             },
           };
