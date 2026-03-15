@@ -6,6 +6,7 @@ import {
   OpenClawInboundEventProcessingError,
   OpenClawInboundEventValidationError,
 } from "@clawops/sync";
+import { matchEventTrigger, executeWorkflow } from "@clawops/workflows";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
@@ -92,7 +93,29 @@ export async function POST(req: Request): Promise<NextResponse> {
   }
 
   try {
-    const result = ingestOpenClawInboundEvent(getDb(), body);
+    const db = getDb();
+    const result = ingestOpenClawInboundEvent(db, body);
+
+    const matchedWorkflows = matchEventTrigger(db, result.normalizedEvent.type);
+    const triggeredRunIds: string[] = [];
+    if (matchedWorkflows.length > 0) {
+      const runResults = await Promise.allSettled(
+        matchedWorkflows.map((w) =>
+          executeWorkflow(db, w.id, {
+            triggeredBy: "event",
+            metadata: {
+              eventType: result.normalizedEvent.type,
+              lowLevelEventId: result.lowLevelEvent.id,
+            },
+          }),
+        ),
+      );
+      for (const r of runResults) {
+        if (r.status === "fulfilled") {
+          triggeredRunIds.push(r.value);
+        }
+      }
+    }
 
     return NextResponse.json(
       {
@@ -102,6 +125,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         lowLevelEventId: result.lowLevelEvent.id,
         activityEventId: result.activityEvent.id,
         stateChanges: result.stateChanges,
+        triggeredRunIds,
       },
       { status: 201 },
     );

@@ -20,7 +20,7 @@
     "@clawops/projects": "workspace:^",
     "@clawops/sync": "workspace:^",
     "@clawops/tasks": "workspace:^",
-    "@clawops/workflows": "workspace:*",
+    "@clawops/workflows": "workspace:^",
     "@tailwindcss/postcss": "^4.2.1",
     "autoprefixer": "^10.4.27",
     "class-variance-authority": "^0.7.1",
