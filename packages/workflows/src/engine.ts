@@ -13,6 +13,13 @@ import {
   type WorkflowStepDefinition,
 } from "./index.js";
 
+export class WorkflowNotActiveError extends Error {
+  constructor(workflowId: string, status: string) {
+    super(`Workflow "${workflowId}" is not active (status: ${status})`);
+    this.name = "WorkflowNotActiveError";
+  }
+}
+
 export interface WorkflowExecutionInput {
   triggeredBy?: "human" | "agent" | "schedule" | "event";
   triggeredById?: string;
@@ -108,7 +115,16 @@ async function dispatchAction(
         if (typeof taskId !== "string") {
           throw new Error('task step with action "update" requires taskId in config');
         }
-        const task = updateTask(db, taskId, config as unknown as Parameters<typeof updateTask>[2]);
+        const VALID_UPDATE_FIELDS = [
+          "title", "description", "status", "priority",
+          "assigneeId", "projectId", "dueDate",
+          "templateId", "stageId", "properties", "ideaId",
+        ];
+        const updates: Record<string, unknown> = {};
+        for (const field of VALID_UPDATE_FIELDS) {
+          if (field in config) updates[field] = config[field];
+        }
+        const task = updateTask(db, taskId, updates as unknown as Parameters<typeof updateTask>[2]);
         return { id: task.id, title: task.title, status: task.status };
       }
     }
@@ -172,7 +188,7 @@ export async function executeWorkflow(
     throw new Error(`Workflow "${workflowId}" not found`);
   }
   if (workflow.status !== "active") {
-    throw new Error(`Workflow "${workflowId}" is not active (status: ${workflow.status})`);
+    throw new WorkflowNotActiveError(workflowId, workflow.status);
   }
 
   const triggeredBy = input.triggeredBy ?? "human";
@@ -255,15 +271,14 @@ export async function executeWorkflow(
     }
 
     if (stepFailed) {
-      const onError = step.onError ?? "stop";
-      if (onError === "stop") {
+      if (step.onError === "continue") {
+        stepResults[stepKey] = { error: stepError };
+        continue;
+      } else {
+        // "stop" (default) or "retry" exhausted — both fail the run
         runFailed = true;
         runError = stepError;
         break;
-      } else {
-        // onError === "continue"
-        stepResults[stepKey] = { error: stepError };
-        continue;
       }
     }
 
