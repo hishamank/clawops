@@ -1,15 +1,15 @@
 export const dynamic = "force-dynamic";
 
 import { notFound } from "next/navigation";
-import { ArrowLeft, FileText, Clock } from "lucide-react";
+import { ArrowLeft, FileText, Clock, Link2, Ban, ArrowRight, Layers } from "lucide-react";
 import Link from "next/link";
-import type { Task, Agent, ProjectListItem } from "@/lib/types";
+import type { Task, Agent, ProjectListItem, TaskRelationWithTask, ResourceLink } from "@/lib/types";
 import { timeAgo } from "@/lib/time";
 import { StatusBadge } from "@/components/status-badge";
 import { PriorityBadge } from "@/components/priority-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { getTask } from "@clawops/tasks";
+import { getTask, listTaskRelations, listTaskResourceLinks, parseTaskProperties } from "@clawops/tasks";
 import { listAgents } from "@clawops/agents";
 import { listProjects } from "@clawops/projects";
 import { getDb } from "@/lib/server/runtime";
@@ -18,29 +18,37 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-async function loadTask(id: string): Promise<Task | null> {
-  return getTask(getDb(), id) as unknown as Task | null;
-}
-
-async function loadAgents(): Promise<Agent[]> {
-  return listAgents(getDb()) as unknown as Agent[];
-}
-
-async function loadProjects(): Promise<ProjectListItem[]> {
-  return listProjects(getDb()) as unknown as ProjectListItem[];
-}
-
 export default async function TaskDetailPage({ params }: PageProps): Promise<React.JSX.Element> {
   const { id } = await params;
-  const task = await loadTask(id);
-  
+  const db = getDb();
+  const task = getTask(db, id) as unknown as Task | null;
+
   if (!task) {
     notFound();
   }
 
-  const [agents, projects] = await Promise.all([loadAgents(), loadProjects()]);
+  const [agents, projects, relations, links] = await Promise.all([
+    listAgents(db) as unknown as Agent[],
+    listProjects(db) as unknown as ProjectListItem[],
+    listTaskRelations(db, id) as unknown as TaskRelationWithTask[],
+    listTaskResourceLinks(db, id) as unknown as ResourceLink[],
+  ]);
   const agentMap = new Map(agents.map((a) => [a.id, a.name]));
   const projectMap = new Map(projects.map((p) => [p.id, p.name]));
+  const properties = parseTaskProperties(task as never);
+
+  // Categorize relations
+  const blockers = relations.filter(
+    (r) =>
+      (r.relation.type === "blocks" && r.direction === "incoming") ||
+      (r.relation.type === "depends-on" && r.direction === "outgoing"),
+  );
+  const blocking = relations.filter(
+    (r) =>
+      (r.relation.type === "blocks" && r.direction === "outgoing") ||
+      (r.relation.type === "depends-on" && r.direction === "incoming"),
+  );
+  const related = relations.filter((r) => r.relation.type === "related-to");
 
   return (
     <div className="space-y-6">
@@ -65,13 +73,27 @@ export default async function TaskDetailPage({ params }: PageProps): Promise<Rea
           </Badge>
         )}
         {task.projectId && (
-          <Badge variant="secondary">
-            Project: {projectMap.get(task.projectId) ?? "Unknown"}
-          </Badge>
+          <Link href={`/projects/${task.projectId}`}>
+            <Badge variant="secondary">
+              Project: {projectMap.get(task.projectId) ?? "Unknown"}
+            </Badge>
+          </Link>
         )}
         {task.dueDate && (
           <Badge variant="outline">
             Due: {new Date(task.dueDate).toLocaleDateString()}
+          </Badge>
+        )}
+        {blockers.length > 0 && (
+          <Badge variant="outline" className="bg-rose-500/10 text-rose-400 border-rose-500/20">
+            <Ban className="h-3 w-3 mr-1" />
+            Blocked
+          </Badge>
+        )}
+        {task.stageId && (
+          <Badge variant="outline">
+            <Layers className="h-3 w-3 mr-1" />
+            Stage
           </Badge>
         )}
       </div>
@@ -84,6 +106,127 @@ export default async function TaskDetailPage({ params }: PageProps): Promise<Rea
           </CardHeader>
           <CardContent className="text-muted-foreground whitespace-pre-wrap">
             {task.description}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Blockers */}
+      {blockers.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Ban className="h-5 w-5 text-rose-400" />
+              Blocked By
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {blockers.map((r) => (
+              <Link
+                key={r.relation.id}
+                href={`/tasks/${r.task.id}`}
+                className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-accent/50 transition-colors"
+              >
+                <StatusBadge status={r.task.status} />
+                <span className="text-sm truncate flex-1">{r.task.title}</span>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Blocking others */}
+      {blocking.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <ArrowRight className="h-5 w-5 text-amber-400" />
+              Blocking
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {blocking.map((r) => (
+              <Link
+                key={r.relation.id}
+                href={`/tasks/${r.task.id}`}
+                className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-accent/50 transition-colors"
+              >
+                <StatusBadge status={r.task.status} />
+                <span className="text-sm truncate flex-1">{r.task.title}</span>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Related tasks */}
+      {related.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Related Tasks</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {related.map((r) => (
+              <Link
+                key={r.relation.id}
+                href={`/tasks/${r.task.id}`}
+                className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-accent/50 transition-colors"
+              >
+                <StatusBadge status={r.task.status} />
+                <span className="text-sm truncate flex-1">{r.task.title}</span>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Resource Links */}
+      {links.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Link2 className="h-5 w-5" />
+              Links
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {links.map((link) => (
+              <a
+                key={link.id}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-accent/50 transition-colors"
+              >
+                <Badge variant="outline" className="shrink-0">
+                  {link.provider}
+                </Badge>
+                <span className="text-sm truncate flex-1">
+                  {link.label ?? link.url}
+                </span>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  {link.resourceType}
+                </span>
+              </a>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Properties */}
+      {Object.keys(properties).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Properties</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+              {Object.entries(properties).map(([key, value]) => (
+                <div key={key}>
+                  <dt className="text-xs text-muted-foreground">{key}</dt>
+                  <dd className="text-sm">{String(value)}</dd>
+                </div>
+              ))}
+            </dl>
           </CardContent>
         </Card>
       )}
@@ -114,7 +257,7 @@ export default async function TaskDetailPage({ params }: PageProps): Promise<Rea
               <FileText className="h-10 w-10 mb-3 opacity-50" />
               <p className="text-sm">No spec yet</p>
               <p className="text-xs mt-1">
-                Use the CLI to add a spec: <code className="bg-muted px-2 py-1 rounded">clawops task spec {id} --set "..."</code>
+                Use the CLI to add a spec: <code className="bg-muted px-2 py-1 rounded">clawops task spec {id} --set &quot;...&quot;</code>
               </p>
             </div>
           )}

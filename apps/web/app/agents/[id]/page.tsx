@@ -5,6 +5,7 @@ import type { Agent, Task, Habit, HabitStreak, Artifact } from "@/lib/types";
 import { timeAgo } from "@/lib/time";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TaskList } from "@/components/tasks/task-list";
 import { cn } from "@/lib/utils";
 import { getAgent as getAgentById } from "@clawops/agents";
 import { listTasks, getTask } from "@clawops/tasks";
@@ -34,15 +35,6 @@ const statusLabels: Record<Agent["status"], string> = {
   busy: "Busy",
   idle: "Idle",
   offline: "Offline",
-};
-
-const taskStatusIcons: Record<Task["status"], string> = {
-  backlog: "text-zinc-400",
-  todo: "text-blue-400",
-  "in-progress": "text-amber-400",
-  review: "text-purple-400",
-  done: "text-emerald-400",
-  cancelled: "text-zinc-500",
 };
 
 function getInitials(name: string): string {
@@ -272,33 +264,15 @@ export default async function AgentProfile({ params }: PageProps): Promise<React
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {tasks.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No tasks assigned.</p>
-          ) : (
-            <div className="space-y-3">
-              {tasks.slice(0, 10).map((task) => (
-                <div
-                  key={task.id}
-                  className="flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <CheckCircle2
-                      className={cn("h-4 w-4 shrink-0", taskStatusIcons[task.status])}
-                    />
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-sm truncate">{task.title}</span>
-                      <span className="text-xs text-muted-foreground capitalize">
-                        {task.status}
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-xs text-muted-foreground shrink-0 ml-2">
-                    {timeAgo(task.createdAt)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+          <TaskList
+            tasks={tasks}
+            showAssignee={false}
+            showProject
+            compact
+            limit={10}
+            emptyMessage="No tasks assigned."
+            emptyDescription="Tasks will appear here when assigned to this agent."
+          />
         </CardContent>
       </Card>
 
