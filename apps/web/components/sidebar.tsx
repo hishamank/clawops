@@ -13,6 +13,7 @@ import {
   User,
   Activity as ActivityIcon,
   Radar,
+  Workflow,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +22,7 @@ const navItems = [
   { href: "/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/ideas", label: "Ideas", icon: Lightbulb },
   { href: "/projects", label: "Projects", icon: FolderKanban },
+  { href: "/workflows", label: "Workflows", icon: Workflow },
   { href: "/activity", label: "Activity", icon: ActivityIcon },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/openclaw", label: "OpenClaw", icon: Radar },
