@@ -18,6 +18,7 @@ import {
   createTask,
   createTaskRelation,
   deleteTaskRelation,
+  getPullableTasks,
   getTaskSpec,
   listTaskRelations,
   listTaskResourceLinks,
@@ -29,6 +30,7 @@ import {
   type AddTaskResourceLinkInput,
   type CreateTaskRelationInput,
   type TaskRelationWithTask,
+  type ListPullableTasksFilters,
 } from "@clawops/tasks";
 import {
   createWorkflowDefinition,
@@ -112,6 +114,16 @@ export async function taskList(filters?: {
   ensureMigrated();
   const db = getDb();
   const result = listTasks(db, filters);
+  for (const t of result) {
+    logReadEvent(db, "task", t.id);
+  }
+  return result;
+}
+
+export async function taskPullable(filters?: ListPullableTasksFilters): Promise<Task[]> {
+  ensureMigrated();
+  const db = getDb();
+  const result = getPullableTasks(db, filters);
   for (const t of result) {
     logReadEvent(db, "task", t.id);
   }

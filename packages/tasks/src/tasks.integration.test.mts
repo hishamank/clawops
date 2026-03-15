@@ -14,6 +14,7 @@ const {
   createTask,
   getTask,
   listTasks,
+  getPullableTasks,
   updateTask,
   completeTask,
   parseTaskProperties,
@@ -234,5 +235,112 @@ describe("tasks (integration)", () => {
 
     const fakeTask = { ...task, properties: "invalid{json" };
     assert.deepStrictEqual(parseTaskProperties(fakeTask), {});
+  });
+});
+
+describe("getPullableTasks", () => {
+  it("returns tasks with pullable statuses", () => {
+    const backlog = createTask(db, { title: "Backlog task", status: "backlog" });
+    const todo = createTask(db, { title: "Todo task", status: "todo" });
+    const inProgress = createTask(db, { title: "In progress task", status: "in-progress" });
+    const review = createTask(db, { title: "Review task", status: "review" });
+
+    const pullable = getPullableTasks(db);
+    const ids = pullable.map((t) => t.id);
+
+    assert.ok(ids.includes(backlog.id), "should include backlog tasks");
+    assert.ok(ids.includes(todo.id), "should include todo tasks");
+    assert.ok(ids.includes(inProgress.id), "should include in-progress tasks");
+    assert.ok(ids.includes(review.id), "should include review tasks");
+  });
+
+  it("excludes done and cancelled tasks", () => {
+    const done = createTask(db, { title: "Done task", status: "done" });
+    const cancelled = createTask(db, { title: "Cancelled task", status: "cancelled" });
+
+    const pullable = getPullableTasks(db);
+    const ids = pullable.map((t) => t.id);
+
+    assert.ok(!ids.includes(done.id), "should exclude done tasks");
+    assert.ok(!ids.includes(cancelled.id), "should exclude cancelled tasks");
+  });
+
+  it("excludes assigned tasks", () => {
+    const unassigned = createTask(db, { title: "Unassigned task", status: "todo" });
+    const assigned = createTask(db, { title: "Assigned task", status: "todo", assigneeId: "agent-1" });
+
+    const pullable = getPullableTasks(db);
+    const ids = pullable.map((t) => t.id);
+
+    assert.ok(ids.includes(unassigned.id), "should include unassigned tasks");
+    assert.ok(!ids.includes(assigned.id), "should exclude assigned tasks");
+  });
+
+  it("excludes blocked tasks", () => {
+    const blocker = createTask(db, { title: "Blocker", status: "todo" });
+    const blocked = createTask(db, { title: "Blocked task", status: "todo" });
+    const unblocked = createTask(db, { title: "Unblocked task", status: "todo" });
+
+    createTaskRelation(db, {
+      fromTaskId: blocker.id,
+      toTaskId: blocked.id,
+      type: "blocks",
+    });
+
+    const pullable = getPullableTasks(db);
+    const ids = pullable.map((t) => t.id);
+
+    assert.ok(!ids.includes(blocked.id), "should exclude blocked tasks");
+    assert.ok(ids.includes(unblocked.id), "should include unblocked tasks");
+  });
+
+  it("excludes tasks with autoPullEligible=false", () => {
+    const eligible = createTask(db, { title: "Eligible task", status: "todo" });
+    const ineligible = createTask(db, { title: "Ineligible task", status: "todo" });
+    updateTask(db, ineligible.id, { autoPullEligible: false });
+
+    const pullable = getPullableTasks(db);
+    const ids = pullable.map((t) => t.id);
+
+    assert.ok(ids.includes(eligible.id), "should include eligible tasks");
+    assert.ok(!ids.includes(ineligible.id), "should exclude ineligible tasks");
+  });
+
+  it("filters by projectId", () => {
+    const project1 = createTask(db, { title: "Project 1 task", status: "todo", projectId: "proj-1" });
+    const project2 = createTask(db, { title: "Project 2 task", status: "todo", projectId: "proj-2" });
+
+    const pullable = getPullableTasks(db, { projectId: "proj-1" });
+    const ids = pullable.map((t) => t.id);
+
+    assert.ok(ids.includes(project1.id), "should include tasks in project");
+    assert.ok(!ids.includes(project2.id), "should exclude tasks not in project");
+  });
+
+  it("filters by priority", () => {
+    const high = createTask(db, { title: "High priority", status: "todo", priority: "high" });
+    const low = createTask(db, { title: "Low priority", status: "todo", priority: "low" });
+
+    const pullable = getPullableTasks(db, { priority: "high" });
+    const ids = pullable.map((t) => t.id);
+
+    assert.ok(ids.includes(high.id), "should include high priority tasks");
+    assert.ok(!ids.includes(low.id), "should exclude low priority tasks");
+  });
+
+  it("returns tasks sorted by createdAt", () => {
+    const first = createTask(db, { title: "First task", status: "todo" });
+    const second = createTask(db, { title: "Second task", status: "todo" });
+    const third = createTask(db, { title: "Third task", status: "todo" });
+
+    const pullable = getPullableTasks(db);
+    const ids = pullable.map((t) => t.id);
+
+    const firstIdx = ids.indexOf(first.id);
+    const secondIdx = ids.indexOf(second.id);
+    const thirdIdx = ids.indexOf(third.id);
+
+    assert.ok(firstIdx < secondIdx, "first task should come before second");
+    assert.ok(secondIdx < thirdIdx, "second task should come before third");
   });
 });

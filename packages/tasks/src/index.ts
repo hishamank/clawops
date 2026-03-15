@@ -1,6 +1,6 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import type { DB, Task, Artifact, ResourceLink } from "@clawops/core";
-import { tasks, artifacts, usageLogs, resourceLinks } from "@clawops/core";
+import { tasks, artifacts, usageLogs, resourceLinks, taskRelations } from "@clawops/core";
 import { calcCost } from "@clawops/domain";
 
 // ── createTask ─────────────────────────────────────────────────────────────
@@ -113,6 +113,78 @@ export function listTasks(db: DB, filters?: ListTasksFilters): Task[] {
     .all();
 }
 
+// ── getPullableTasks ─────────────────────────────────────────────────────────
+
+const PULLABLE_STATUSES = ["backlog", "todo", "in-progress", "review"] as const;
+
+export interface ListPullableTasksFilters {
+  projectId?: string;
+  priority?: Task["priority"];
+  templateId?: string;
+  stageId?: string;
+}
+
+export function getPullableTasks(db: DB, filters?: ListPullableTasksFilters): Task[] {
+  const allTasks = db.select().from(tasks).all();
+
+  const candidateTaskIds = new Set<string>();
+  const blockedTaskIds = new Set<string>();
+
+  const blockingRelations = db
+    .select()
+    .from(taskRelations)
+    .where(
+      inArray(taskRelations.type, ["blocks", "depends-on"]),
+    )
+    .all();
+
+  for (const rel of blockingRelations) {
+    if (rel.type === "blocks") {
+      blockedTaskIds.add(rel.toTaskId);
+    } else if (rel.type === "depends-on") {
+      blockedTaskIds.add(rel.fromTaskId);
+    }
+  }
+
+  for (const task of allTasks) {
+    if (!PULLABLE_STATUSES.includes(task.status as typeof PULLABLE_STATUSES[number])) {
+      continue;
+    }
+    if (task.assigneeId !== null && task.assigneeId !== undefined) {
+      continue;
+    }
+    if (task.autoPullEligible === false) {
+      continue;
+    }
+    if (blockedTaskIds.has(task.id)) {
+      continue;
+    }
+    if (filters?.projectId && task.projectId !== filters.projectId) {
+      continue;
+    }
+    if (filters?.priority && task.priority !== filters.priority) {
+      continue;
+    }
+    if (filters?.templateId && task.templateId !== filters.templateId) {
+      continue;
+    }
+    if (filters?.stageId && task.stageId !== filters.stageId) {
+      continue;
+    }
+    candidateTaskIds.add(task.id);
+  }
+
+  const pullableTasks = allTasks
+    .filter((t) => candidateTaskIds.has(t.id))
+    .sort((a, b) => {
+      const aTime = a.createdAt?.getTime() ?? 0;
+      const bTime = b.createdAt?.getTime() ?? 0;
+      return aTime - bTime;
+    });
+
+  return pullableTasks;
+}
+
 // ── updateTask ─────────────────────────────────────────────────────────────
 
 interface UpdateTaskInput {
@@ -120,13 +192,14 @@ interface UpdateTaskInput {
   description?: string;
   status?: Task["status"];
   priority?: Task["priority"];
-  assigneeId?: string;
+  assigneeId?: string | null;
   projectId?: string;
   dueDate?: Date;
   templateId?: string | null;
   stageId?: string | null;
   properties?: Record<string, unknown> | null;
   ideaId?: string | null;
+  autoPullEligible?: boolean | null;
 }
 
 export function updateTask(db: DB, id: string, updates: UpdateTaskInput): Task {
