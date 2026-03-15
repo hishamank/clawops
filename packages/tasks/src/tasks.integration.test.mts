@@ -20,12 +20,18 @@ const {
   addTaskResourceLink,
   listTaskResourceLinks,
   removeTaskResourceLink,
+  createTaskRelation,
+  listTaskRelations,
+  deleteTaskRelation,
+  getBlockersForTask,
+  isTaskBlocked,
 } = await import("@clawops/tasks");
 
 let db: DB;
 
 before(() => {
   const sqlite = new Database(":memory:");
+  sqlite.pragma("foreign_keys = ON");
   db = drizzle(sqlite, { schema }) as DB;
   migrate(db, {
     migrationsFolder: path.resolve(__dirname, "../../core/migrations"),
@@ -68,6 +74,57 @@ describe("task resource links", () => {
     assert.strictEqual(removed, null);
     const remaining = listTaskResourceLinks(db, primary.id);
     assert.strictEqual(remaining.length, 1);
+  });
+});
+describe("task relations", () => {
+  it("creates relations and reports direction and delete behavior", () => {
+    const parent = createTask(db, { title: "Parent task" });
+    const child = createTask(db, { title: "Child task" });
+    const relation = createTaskRelation(db, {
+      fromTaskId: parent.id,
+      toTaskId: child.id,
+      type: "blocks",
+    });
+
+    const childRelations = listTaskRelations(db, child.id);
+    assert.strictEqual(childRelations.length, 1);
+    assert.strictEqual(childRelations[0].relation.id, relation.id);
+    assert.strictEqual(childRelations[0].direction, "incoming");
+
+    const parentRelations = listTaskRelations(db, parent.id);
+    assert.strictEqual(parentRelations.length, 1);
+    assert.strictEqual(parentRelations[0].direction, "outgoing");
+
+    deleteTaskRelation(db, relation.id);
+    assert.strictEqual(listTaskRelations(db, child.id).length, 0);
+  });
+
+  it("includes only active blockers", () => {
+    const blocker = createTask(db, { title: "Blocking task" });
+    const doneBlocker = createTask(db, { title: "Done blocker" });
+    const blocked = createTask(db, { title: "Blocked task" });
+
+    const blockingRelation = createTaskRelation(db, {
+      fromTaskId: blocker.id,
+      toTaskId: blocked.id,
+      type: "blocks",
+    });
+    const doneRelation = createTaskRelation(db, {
+      fromTaskId: doneBlocker.id,
+      toTaskId: blocked.id,
+      type: "blocks",
+    });
+
+    updateTask(db, doneBlocker.id, { status: "done" });
+
+    const blockers = getBlockersForTask(db, blocked.id);
+    assert.strictEqual(blockers.length, 1);
+    assert.strictEqual(blockers[0].id, blocker.id);
+    assert.strictEqual(isTaskBlocked(db, blocked.id), true);
+
+    deleteTaskRelation(db, blockingRelation.id);
+    deleteTaskRelation(db, doneRelation.id);
+    assert.strictEqual(isTaskBlocked(db, blocked.id), false);
   });
 });
 describe("tasks (integration)", () => {

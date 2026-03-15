@@ -6,12 +6,30 @@ import type {
   Project,
   Milestone,
   AgentSession,
+  ResourceLink,
   TaskRelation,
 } from "@clawops/core";
 import { events } from "@clawops/core";
 import { db as coreDb } from "@clawops/core/db";
 import { runMigrations } from "@clawops/core/migrate";
-import { createTask, listTasks, updateTask, completeTask, getTaskSpec, setTaskSpec, appendTaskSpec, createTaskRelation, deleteTaskRelation, listTaskRelations, type CreateTaskRelationInput, type TaskRelationWithTask } from "@clawops/tasks";
+import {
+  addTaskResourceLink,
+  completeTask,
+  createTask,
+  createTaskRelation,
+  deleteTaskRelation,
+  getTaskSpec,
+  listTaskRelations,
+  listTaskResourceLinks,
+  listTasks,
+  updateTask,
+  removeTaskResourceLink,
+  setTaskSpec,
+  appendTaskSpec,
+  type AddTaskResourceLinkInput,
+  type CreateTaskRelationInput,
+  type TaskRelationWithTask,
+} from "@clawops/tasks";
 import {
   createWorkflowDefinition,
   getWorkflowDefinition,
@@ -363,6 +381,21 @@ export async function taskSpecSetFile(id: string, filePath: string): Promise<Tas
 export async function taskSpecAppend(id: string, content: string): Promise<Task> {
   ensureMigrated();
   return appendTaskSpec(getDb(), id, content);
+}
+
+export async function taskLinkAdd(taskId: string, payload: AddTaskResourceLinkInput): Promise<ResourceLink> {
+  ensureMigrated();
+  return addTaskResourceLink(getDb(), taskId, payload);
+}
+
+export async function taskLinkList(taskId: string): Promise<ResourceLink[]> {
+  ensureMigrated();
+  return listTaskResourceLinks(getDb(), taskId);
+}
+
+export async function taskLinkRemove(taskId: string, linkId: string): Promise<ResourceLink | null> {
+  ensureMigrated();
+  return removeTaskResourceLink(getDb(), taskId, linkId);
 }
 
 // ── Task Relation Functions ─────────────────────────────────────────────────

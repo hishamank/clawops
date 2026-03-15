@@ -1,8 +1,44 @@
 /* eslint-disable no-console -- CLI tool uses console for output */
 
 import { Command } from "commander";
-import { taskCreate, taskList, taskUpdate, taskDone, taskSpec, taskSpecSet, taskSpecSetFile, taskSpecAppend, taskRelationsList, taskRelationCreate, taskRelationDelete } from "../lib/client.js";
+import {
+  taskLinkAdd,
+  taskLinkList,
+  taskLinkRemove,
+  taskCreate,
+  taskList,
+  taskUpdate,
+  taskDone,
+  taskSpec,
+  taskSpecSet,
+  taskSpecSetFile,
+  taskSpecAppend,
+  taskRelationsList,
+  taskRelationCreate,
+  taskRelationDelete,
+} from "../lib/client.js";
 import * as fs from "node:fs";
+
+const currentAgentId = process.env["CLAWOPS_AGENT_ID"] ?? null;
+
+async function logTaskCommandEvent(params: {
+  action: string;
+  entityType: string;
+  entityId: string;
+  meta?: Record<string, unknown> | null;
+}) {
+  const { events } = await import("@clawops/core");
+  const { db } = await import("@clawops/core/db");
+  db.insert(events)
+    .values({
+      agentId: currentAgentId,
+      action: params.action,
+      entityType: params.entityType,
+      entityId: params.entityId,
+      meta: params.meta ? JSON.stringify(params.meta) : null,
+    })
+    .run();
+}
 
 export const taskCmd = new Command("task").description("Manage tasks");
 
@@ -202,6 +238,109 @@ taskCmd
     }
   });
 
+const linkCmd = taskCmd
+  .command("link")
+  .description("Manage task resource links");
+
+linkCmd
+  .command("add")
+  .description("Attach a resource link to a task")
+  .argument("<taskId>", "Task ID")
+  .requiredOption("--provider <provider>", "Link provider")
+  .requiredOption("--resource-type <type>", "Resource type")
+  .requiredOption("--url <url>", "Resource URL")
+  .option("--label <label>", "Display label")
+  .option("--external-id <id>", "Provider resource identifier")
+  .option("--meta <json>", "Metadata as JSON object")
+  .option("--json", "Output raw JSON")
+  .action(async (taskId: string, opts) => {
+    let meta: Record<string, unknown> | undefined;
+    if (opts.meta) {
+      try {
+        const parsed = JSON.parse(opts.meta);
+        if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+          console.error("--meta must be a JSON object");
+          process.exit(1);
+        }
+        meta = parsed;
+      } catch {
+        console.error("Invalid JSON for --meta");
+        process.exit(1);
+      }
+    }
+
+    const link = await taskLinkAdd(taskId, {
+      provider: opts.provider,
+      resourceType: opts.resourceType,
+      url: opts.url,
+      label: opts.label,
+      externalId: opts.externalId,
+      meta,
+    });
+    await logTaskCommandEvent({
+      action: "task.resource_link.added",
+      entityType: "task",
+      entityId: taskId,
+      meta: { provider: opts.provider, resourceType: opts.resourceType, linkId: link.id },
+    });
+    if (opts.json) {
+      console.log(JSON.stringify(link, null, 2));
+    } else {
+      console.log(`link ${link.id} added`);
+    }
+  });
+
+linkCmd
+  .command("list")
+  .description("List resource links attached to a task")
+  .argument("<taskId>", "Task ID")
+  .option("--json", "Output raw JSON")
+  .action(async (taskId: string, opts) => {
+    const links = await taskLinkList(taskId);
+    await logTaskCommandEvent({
+      action: "task.resource_link.listed",
+      entityType: "task",
+      entityId: taskId,
+      meta: { count: links.length },
+    });
+    if (opts.json) {
+      console.log(JSON.stringify(links, null, 2));
+      return;
+    }
+    if (links.length === 0) {
+      console.log("No links found.");
+      return;
+    }
+    for (const link of links) {
+      console.log(`${link.id} ${link.provider}/${link.resourceType} ${link.url}`);
+    }
+  });
+
+linkCmd
+  .command("remove")
+  .description("Remove a resource link from a task")
+  .argument("<taskId>", "Task ID")
+  .argument("<linkId>", "Link ID")
+  .option("--json", "Output raw JSON")
+  .action(async (taskId: string, linkId: string, opts) => {
+    const removed = await taskLinkRemove(taskId, linkId);
+    if (!removed) {
+      console.error("Resource link not found.");
+      process.exit(1);
+    }
+    await logTaskCommandEvent({
+      action: "task.resource_link.removed",
+      entityType: "task",
+      entityId: taskId,
+      meta: { linkId: removed.id },
+    });
+    if (opts.json) {
+      console.log(JSON.stringify(removed, null, 2));
+    } else {
+      console.log(`link ${removed.id} removed`);
+    }
+  });
+
 taskCmd
   .command("relations")
   .description("List all relations for a task")
@@ -209,6 +348,12 @@ taskCmd
   .option("--json", "Output raw JSON")
   .action(async (id: string, opts) => {
     const relations = await taskRelationsList(id);
+    await logTaskCommandEvent({
+      action: "task.relation.listed",
+      entityType: "task",
+      entityId: id,
+      meta: { count: relations.length },
+    });
     if (opts.json) {
       console.log(JSON.stringify(relations, null, 2));
     } else if (relations.length === 0) {
@@ -233,6 +378,12 @@ taskCmd
       fromTaskId: id,
       toTaskId: targetId,
       type: "blocks",
+    });
+    await logTaskCommandEvent({
+      action: "task.relation.created",
+      entityType: "task_relation",
+      entityId: relation.id,
+      meta: { fromTaskId: id, toTaskId: targetId, type: "blocks" },
     });
     if (opts.json) {
       console.log(JSON.stringify(relation, null, 2));
@@ -264,6 +415,16 @@ taskCmd
       return;
     }
     await taskRelationDelete(id, edge.relation.id);
+    await logTaskCommandEvent({
+      action: "task.relation.deleted",
+      entityType: "task_relation",
+      entityId: edge.relation.id,
+      meta: {
+        fromTaskId: edge.relation.fromTaskId,
+        toTaskId: edge.relation.toTaskId,
+        type: edge.relation.type,
+      },
+    });
     if (opts.json) {
       console.log(JSON.stringify({ message: "Relation removed" }));
     } else {

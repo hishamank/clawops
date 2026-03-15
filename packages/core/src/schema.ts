@@ -804,10 +804,8 @@ export type NewMilestone = typeof milestones.$inferInsert;
 
 export type Task = typeof tasks.$inferSelect;
 export type NewTask = typeof tasks.$inferInsert;
-
 export type ResourceLink = typeof resourceLinks.$inferSelect;
 export type NewResourceLink = typeof resourceLinks.$inferInsert;
-
 export type Artifact = typeof artifacts.$inferSelect;
 export type NewArtifact = typeof artifacts.$inferInsert;
 
