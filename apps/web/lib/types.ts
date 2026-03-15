@@ -189,7 +189,11 @@ export interface OpenClawMapping {
   workspacePath: string | null;
   memoryPath: string | null;
   defaultModel: string | null;
+  role: string | null;
+  avatar: string | null;
   lastSeenAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface AgentDetail extends Agent {

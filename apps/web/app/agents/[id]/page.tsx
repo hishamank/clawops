@@ -116,48 +116,47 @@ async function getAgent(id: string): Promise<AgentDetailResponse | null> {
   const recentTasks = listTasks(db, { assigneeId: id }).slice(0, 10);
   const habits = listHabits(db, id).map((h) => ({
     ...h,
-    streaks: getHabitStreak(db, h.id, 7) as unknown as HabitStreak[],
+    streaks: getHabitStreak(db, h.id, 7) as HabitStreak[],
   }));
 
   // OpenClaw mapping
-  const rawMapping = getOpenClawMappingByAgentId(db, id);
-  const openclawMapping = rawMapping as unknown as OpenClawMapping | null;
+  const openclawMapping = getOpenClawMappingByAgentId(db, id) as OpenClawMapping | null;
 
   // Sessions — scoped to connection + external agent ID
   let sessions: OpenClawSession[] = [];
-  if (rawMapping) {
+  if (openclawMapping) {
     sessions = db
       .select()
       .from(openclawSessions)
       .where(
         and(
-          eq(openclawSessions.connectionId, rawMapping.connectionId),
-          eq(openclawSessions.agentId, rawMapping.externalAgentId),
+          eq(openclawSessions.connectionId, openclawMapping.connectionId),
+          eq(openclawSessions.agentId, openclawMapping.externalAgentId),
         ),
       )
       .orderBy(desc(openclawSessions.updatedAt))
       .limit(10)
-      .all() as unknown as OpenClawSession[];
+      .all() as OpenClawSession[];
   }
 
   // Cron jobs — habits of type "cron" for this agent
-  const cronJobs = (listCronJobs(db).filter((h) => h.agentId === id)) as unknown as Habit[];
+  const cronJobs = listCronJobs(db).filter((h) => h.agentId === id) as Habit[];
 
   // Messages — sent or received by this agent's external ID
   let messages: AgentMessage[] = [];
-  if (rawMapping) {
+  if (openclawMapping) {
     messages = db
       .select()
       .from(agentMessages)
       .where(
         or(
-          eq(agentMessages.fromAgentId, rawMapping.externalAgentId),
-          eq(agentMessages.toAgentId, rawMapping.externalAgentId),
+          eq(agentMessages.fromAgentId, openclawMapping.externalAgentId),
+          eq(agentMessages.toAgentId, openclawMapping.externalAgentId),
         ),
       )
       .orderBy(desc(agentMessages.sentAt))
       .limit(10)
-      .all() as unknown as AgentMessage[];
+      .all() as AgentMessage[];
   }
 
   // Activity events
@@ -167,7 +166,7 @@ async function getAgent(id: string): Promise<AgentDetailResponse | null> {
     .where(eq(activityEvents.agentId, id))
     .orderBy(desc(activityEvents.createdAt))
     .limit(15)
-    .all() as unknown as ActivityEvent[];
+    .all() as ActivityEvent[];
 
   return {
     ...agent,

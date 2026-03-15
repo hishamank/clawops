@@ -42,6 +42,13 @@ interface OpenClawIdentityLookupInput {
   externalAgentId: string;
 }
 
+/**
+ * Retrieves an OpenClaw agent mapping by connection ID and external agent ID.
+ * @param db - Database instance
+ * @param connectionId - The OpenClaw connection ID
+ * @param externalAgentId - The external agent ID from OpenClaw
+ * @returns The OpenClaw agent mapping if found, null otherwise
+ */
 export function getOpenClawAgentMapping(
   db: DB,
   connectionId: string,
@@ -60,6 +67,12 @@ export function getOpenClawAgentMapping(
     .get() ?? null;
 }
 
+/**
+ * Retrieves an OpenClaw agent mapping by the linked ClawOps agent ID.
+ * @param db - Database instance
+ * @param agentId - The internal ClawOps agent ID
+ * @returns The OpenClaw agent mapping if found, null otherwise
+ */
 export function getOpenClawMappingByAgentId(
   db: DB,
   agentId: string,
@@ -72,6 +85,12 @@ export function getOpenClawMappingByAgentId(
     .get() ?? null;
 }
 
+/**
+ * Retrieves a ClawOps agent by its OpenClaw identity (connection ID + external agent ID).
+ * @param db - Database instance
+ * @param input - OpenClaw identity lookup input
+ * @returns The ClawOps agent if found, null otherwise
+ */
 export function getAgentByOpenClawIdentity(
   db: DB,
   input: OpenClawIdentityLookupInput,
@@ -106,6 +125,14 @@ function findSingleAgentByNameAndFramework(
   return rows.length === 1 ? rows[0] ?? null : null;
 }
 
+/**
+ * Upserts an OpenClaw agent identity, linking it to a ClawOps agent.
+ * Creates or updates the mapping based on connection ID and external agent ID.
+ * @param db - Database instance (or transaction)
+ * @param input - OpenClaw identity input with linked agent ID
+ * @returns The upserted OpenClaw agent mapping
+ * @throws Error if the upsert operation fails
+ */
 export function upsertOpenClawAgentIdentity(
   db: Queryable,
   input: NonNullable<InitAgentInput["openclaw"]> & { linkedAgentId: string },
@@ -152,6 +179,13 @@ export function upsertOpenClawAgentIdentity(
   return row;
 }
 
+/**
+ * Creates a new ClawOps agent with the provided input.
+ * @param db - Database instance
+ * @param input - Agent creation input (name, model, role, framework, etc.)
+ * @returns The created agent with its API key
+ * @throws Error if agent creation fails
+ */
 export function createAgent(
   db: DB,
   input: CreateAgentInput,
@@ -182,6 +216,12 @@ export function createAgent(
   return { ...agent, apiKey: rawKey };
 }
 
+/**
+ * Retrieves an agent by its ID.
+ * @param db - Database instance
+ * @param id - The agent ID
+ * @returns The agent if found, null otherwise
+ */
 export function getAgent(db: DB, id: string): Agent | null {
   const rows = db
     .select()
@@ -192,10 +232,24 @@ export function getAgent(db: DB, id: string): Agent | null {
   return rows[0] ?? null;
 }
 
+/**
+ * Lists all agents in the database.
+ * @param db - Database instance
+ * @returns Array of all agents
+ */
 export function listAgents(db: DB): Agent[] {
   return db.select().from(agents).all();
 }
 
+/**
+ * Updates an agent's status and last active timestamp.
+ * @param db - Database instance
+ * @param id - The agent ID
+ * @param status - The new status
+ * @param _message - Optional message (unused)
+ * @returns The updated agent
+ * @throws Error if agent not found
+ */
 export function updateAgentStatus(
   db: DB,
   id: string,
@@ -221,6 +275,14 @@ export function updateAgentStatus(
   return agent;
 }
 
+/**
+ * Updates an agent's skills.
+ * @param db - Database instance
+ * @param id - The agent ID
+ * @param skills - Array of skill names
+ * @returns The updated agent
+ * @throws Error if agent not found
+ */
 export function updateAgentSkills(
   db: DB,
   id: string,
@@ -241,6 +303,12 @@ export function updateAgentSkills(
   return agent;
 }
 
+/**
+ * Retrieves an agent by its hashed API key.
+ * @param db - Database instance
+ * @param hashedKey - The hashed API key
+ * @returns The agent if found, null otherwise
+ */
 export function getAgentByApiKey(db: DB, hashedKey: string): Agent | null {
   const rows = db
     .select()

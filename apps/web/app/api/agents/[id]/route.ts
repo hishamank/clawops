@@ -11,9 +11,12 @@ import {
   or,
   desc,
   and,
+  type OpenClawSession,
+  type AgentMessage,
+  type ActivityEvent,
 } from "@clawops/core";
 import { getAgent, getOpenClawMappingByAgentId } from "@clawops/agents";
-import { getHabitStreak, listHabits } from "@clawops/habits";
+import { getHabitStreak, listHabits, type Habit } from "@clawops/habits";
 import { listCronJobs } from "@clawops/habits";
 import { getDb, jsonError } from "@/lib/server/runtime";
 
@@ -50,7 +53,7 @@ export async function GET(
     const openclawMapping = getOpenClawMappingByAgentId(db, id);
 
     // Sessions — scoped to connection + external agent ID
-    let sessions: unknown[] = [];
+    let sessions: OpenClawSession[] = [];
     if (openclawMapping) {
       sessions = db
         .select()
@@ -63,14 +66,14 @@ export async function GET(
         )
         .orderBy(desc(openclawSessions.updatedAt))
         .limit(10)
-        .all();
+        .all() as OpenClawSession[];
     }
 
     // Cron jobs — habits of type "cron" for this agent
-    const cronJobs = listCronJobs(db).filter((h) => h.agentId === id);
+    const cronJobs = listCronJobs(db).filter((h) => h.agentId === id) as Habit[];
 
     // Messages — sent or received by this agent's external ID
-    let messages: unknown[] = [];
+    let messages: AgentMessage[] = [];
     if (openclawMapping) {
       messages = db
         .select()
@@ -83,7 +86,7 @@ export async function GET(
         )
         .orderBy(desc(agentMessages.sentAt))
         .limit(10)
-        .all();
+        .all() as AgentMessage[];
     }
 
     // Activity events for this agent
@@ -93,7 +96,7 @@ export async function GET(
       .where(eq(activityEvents.agentId, id))
       .orderBy(desc(activityEvents.createdAt))
       .limit(15)
-      .all();
+      .all() as ActivityEvent[];
 
     return NextResponse.json({
       ...safeAgent,
