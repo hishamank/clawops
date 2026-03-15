@@ -333,6 +333,7 @@ export {
   listTaskRelations,
   getBlockersForTask,
   isTaskBlocked,
+  getBlockedAndBlockingIds,
   type CreateTaskRelationInput,
   type TaskRelationWithTask,
 } from "./relations.js";

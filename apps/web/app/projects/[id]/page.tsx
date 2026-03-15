@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { ArrowLeft, CheckCircle2, Circle } from "lucide-react";
+import { ArrowLeft, Ban, CheckCircle2, Circle, Link2 } from "lucide-react";
 import Link from "next/link";
 import type { ProjectDetail, Task } from "@/lib/types";
 import type { ProjectStatus } from "@clawops/domain";
@@ -7,15 +7,19 @@ import { timeAgo } from "@/lib/time";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TaskList } from "@/components/tasks/task-list";
+import { TaskBoard } from "@/components/tasks/task-board";
+import { TaskFilterBar } from "@/components/tasks/task-filter-bar";
+import { StatsCard } from "@/components/stats-card";
 import { cn } from "@/lib/utils";
 import { getProject as getProjectByIdFromPackage } from "@clawops/projects";
-import { listTasks } from "@clawops/tasks";
+import { listTasks, getBlockedAndBlockingIds } from "@clawops/tasks";
 import { getDb } from "@/lib/server/runtime";
 
 export const dynamic = "force-dynamic";
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 const projectStatusStyles: Record<ProjectStatus, string> = {
@@ -32,6 +36,10 @@ const projectStatusLabels: Record<ProjectStatus, string> = {
   done: "Done",
 };
 
+function str(v: string | string[] | undefined): string | undefined {
+  return typeof v === "string" ? v : undefined;
+}
+
 async function getProject(id: string): Promise<ProjectDetail | null> {
   const project = getProjectById(id);
   return project as unknown as ProjectDetail | null;
@@ -45,8 +53,10 @@ function getProjectById(id: string): ReturnType<typeof getProjectByIdFromPackage
   return getProjectByIdFromPackage(getDb(), id);
 }
 
-export default async function ProjectDetailPage({ params }: PageProps): Promise<React.JSX.Element> {
-  const { id } = await params;
+export default async function ProjectDetailPage({ params, searchParams }: PageProps): Promise<React.JSX.Element> {
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
+  const view = str(sp.view) ?? "list";
+
   const project = await getProject(id);
 
   if (!project) {
@@ -55,6 +65,11 @@ export default async function ProjectDetailPage({ params }: PageProps): Promise<
 
   const tasks = project.tasks ?? (await getProjectTasks(id));
   const completedTasks = tasks.filter((t) => t.status === "done").length;
+
+  // Batch-compute blocker / dependency info
+  const db = getDb();
+  const taskIds = tasks.map((t) => t.id);
+  const { blockedIds, blockingIds } = getBlockedAndBlockingIds(db, taskIds);
 
   return (
     <div className="space-y-8 max-w-4xl">
@@ -127,35 +142,56 @@ export default async function ProjectDetailPage({ params }: PageProps): Promise<
         </Card>
       )}
 
-      {/* Task progress */}
-      <Card>
-        <CardContent className="py-4">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">
-                {completedTasks} of {tasks.length} tasks complete
-              </span>
-              <span className="font-medium">
-                {tasks.length > 0
-                  ? Math.round((completedTasks / tasks.length) * 100)
-                  : 0}
-                %
-              </span>
+      {/* Task progress + dependency summary */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Card className="sm:col-span-3 py-4">
+          <CardContent>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">
+                  {completedTasks} of {tasks.length} tasks complete
+                </span>
+                <span className="font-medium">
+                  {tasks.length > 0
+                    ? Math.round((completedTasks / tasks.length) * 100)
+                    : 0}
+                  %
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-all"
+                  style={{
+                    width:
+                      tasks.length > 0
+                        ? `${Math.round((completedTasks / tasks.length) * 100)}%`
+                        : "0%",
+                  }}
+                />
+              </div>
             </div>
-            <div className="h-2 rounded-full bg-muted overflow-hidden">
-              <div
-                className="h-full rounded-full bg-emerald-500 transition-all"
-                style={{
-                  width:
-                    tasks.length > 0
-                      ? `${Math.round((completedTasks / tasks.length) * 100)}%`
-                      : "0%",
-                }}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+
+        <StatsCard
+          title="Blocked Tasks"
+          value={blockedIds.size}
+          icon={Ban}
+          description={blockedIds.size > 0 ? "Waiting on dependencies" : "No blockers"}
+        />
+        <StatsCard
+          title="Blocking Tasks"
+          value={blockingIds.size}
+          icon={Link2}
+          description={blockingIds.size > 0 ? "Other tasks depend on these" : "No dependencies"}
+        />
+        <StatsCard
+          title="Open Tasks"
+          value={tasks.length - completedTasks}
+          icon={CheckCircle2}
+          description={completedTasks > 0 ? `${completedTasks} completed` : "None completed yet"}
+        />
+      </div>
 
       {/* Milestones */}
       {project.milestones.length > 0 && (
@@ -191,23 +227,34 @@ export default async function ProjectDetailPage({ params }: PageProps): Promise<
       )}
 
       {/* Tasks */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">
-            Tasks ({tasks.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium">Tasks ({tasks.length})</h2>
+        </div>
+        <TaskFilterBar
+          basePath={`/projects/${id}`}
+          current={{ view }}
+          showPriority={false}
+          showAssignee={false}
+          showViewToggle
+        />
+        {view === "board" ? (
+          <TaskBoard
+            tasks={tasks}
+            blockedTaskIds={blockedIds}
+          />
+        ) : (
           <TaskList
             tasks={tasks}
+            blockedTaskIds={blockedIds}
             showAssignee
             showProject={false}
             compact
             emptyMessage="No tasks yet."
             emptyDescription="Tasks will appear here once created for this project."
           />
-        </CardContent>
-      </Card>
+        )}
+      </div>
     </div>
   );
 }
