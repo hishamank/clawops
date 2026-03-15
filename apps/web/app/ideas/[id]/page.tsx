@@ -1,17 +1,19 @@
 import { notFound } from "next/navigation";
-import { ArrowLeft, Lightbulb, Tags } from "lucide-react";
+import { ArrowLeft, Tags } from "lucide-react";
 import Link from "next/link";
 import type { Idea } from "@/lib/types";
 import type { IdeaStatus, Source } from "@clawops/domain";
 import { timeAgo } from "@/lib/time";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TaskList } from "@/components/tasks/task-list";
 import { cn } from "@/lib/utils";
 import { getIdeaSections, listIdeaTasks } from "@clawops/ideas";
 import { getDb } from "@/lib/server/runtime";
-import { CreateTaskDialog } from "./create-task-dialog";
 import { ideas, eq } from "@clawops/core";
+import { PromoteButton } from "../promote-button";
+import { SectionEditor } from "./section-editor";
+import { DraftPrdPanel } from "./draft-prd-panel";
+import { TaskPanel } from "./task-panel";
+import { ReadinessTracker } from "./readiness-tracker";
 
 export const dynamic = "force-dynamic";
 
@@ -40,32 +42,29 @@ const sourceStyles: Record<Source, string> = {
   script: "bg-purple-500/10 text-purple-400 border-purple-500/20",
 };
 
-const SECTION_ORDER = ["brainstorming", "research", "similarIdeas", "draftPrd", "notes"] as const;
-const SECTION_LABELS: Record<string, string> = {
-  brainstorming: "Brainstorming",
-  research: "Research",
-  similarIdeas: "Similar Ideas",
-  draftPrd: "Draft PRD",
-  notes: "Notes",
-};
+const EDITABLE_SECTIONS = [
+  { key: "brainstorming", label: "Brainstorming" },
+  { key: "research", label: "Research" },
+  { key: "similarIdeas", label: "Similar Ideas" },
+  { key: "notes", label: "Notes" },
+] as const;
 
 async function getIdeaData(id: string) {
   const db = getDb();
-  
-  // Get idea from database
+
   const [ideaRow] = db
     .select()
     .from(ideas)
     .where(eq(ideas.id, id))
     .all();
-  
+
   if (!ideaRow) {
     return null;
   }
-  
+
   const sections = getIdeaSections(db, id);
   const tasks = listIdeaTasks(db, id);
-  
+
   return { idea: ideaRow as unknown as Idea, sections, tasks };
 }
 
@@ -83,19 +82,19 @@ function parseTags(tags: string | null): string[] {
 export default async function IdeaDetailPage({ params }: PageProps): Promise<React.JSX.Element> {
   const { id } = await params;
   const result = await getIdeaData(id);
-  
+
   if (!result) {
     notFound();
   }
-  
+
   const { idea, sections, tasks } = result;
   const tags = parseTags(idea.tags);
+  const isPromoted = idea.status === "promoted";
 
   return (
-    <div className="space-y-8 max-w-5xl">
+    <div className="space-y-6 max-w-6xl">
       {/* Header */}
       <div className="space-y-4">
-        {/* Back link */}
         <Link
           href="/ideas"
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -104,7 +103,6 @@ export default async function IdeaDetailPage({ params }: PageProps): Promise<Rea
           Back to Ideas
         </Link>
 
-        {/* Title and actions */}
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-2 flex-1">
             <div className="flex items-center gap-3 flex-wrap">
@@ -133,11 +131,7 @@ export default async function IdeaDetailPage({ params }: PageProps): Promise<Rea
               <div className="flex items-center gap-2 flex-wrap">
                 <Tags className="h-4 w-4 text-muted-foreground" />
                 {tags.map((tag) => (
-                  <Badge
-                    key={tag}
-                    variant="secondary"
-                    className="text-xs"
-                  >
+                  <Badge key={tag} variant="secondary" className="text-xs">
                     {tag}
                   </Badge>
                 ))}
@@ -145,11 +139,10 @@ export default async function IdeaDetailPage({ params }: PageProps): Promise<Rea
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <CreateTaskDialog ideaId={id} />
+            {!isPromoted && <PromoteButton ideaId={id} />}
           </div>
         </div>
 
-        {/* Meta info */}
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
           <span>Created {timeAgo(idea.createdAt)}</span>
           {idea.projectId && (
@@ -163,70 +156,41 @@ export default async function IdeaDetailPage({ params }: PageProps): Promise<Rea
         </div>
       </div>
 
+      {/* Readiness tracker */}
+      <ReadinessTracker
+        sections={sections}
+        taskCount={tasks.length}
+        hasDescription={!!idea.description}
+      />
+
       {/* Main content grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column - Sections */}
         <div className="lg:col-span-2 space-y-4">
-          {SECTION_ORDER.map((sectionKey) => {
-            const content = sections[sectionKey];
-            if (!content) return null;
-            return (
-              <Card key={sectionKey}>
-                <CardHeader>
-                  <CardTitle className="text-sm font-medium">
-                    {SECTION_LABELS[sectionKey]}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <pre className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground font-sans">
-                    {content}
-                  </pre>
-                </CardContent>
-              </Card>
-            );
-          })}
-          {SECTION_ORDER.every((k) => !sections[k]) && (
-            <Card>
-              <CardContent className="py-8">
-                <div className="flex flex-col items-center justify-center text-center">
-                  <Lightbulb className="h-10 w-10 text-muted-foreground mb-3" />
-                  <p className="text-sm text-muted-foreground">
-                    No sections yet. This idea is in its early stages.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          {EDITABLE_SECTIONS.map(({ key, label }) => (
+            <SectionEditor
+              key={key}
+              ideaId={id}
+              sectionKey={key}
+              label={label}
+              initialContent={sections[key] ?? null}
+              readOnly={isPromoted}
+            />
+          ))}
+          <DraftPrdPanel
+            ideaId={id}
+            initialContent={sections.draftPrd ?? null}
+            readOnly={isPromoted}
+          />
         </div>
 
         {/* Right column - Tasks */}
         <div className="lg:col-span-1">
-          <Card className="sticky top-6">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium">
-                  Linked Tasks ({tasks.length})
-                </CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {tasks.length === 0 ? (
-                <div className="text-center py-6">
-                  <p className="text-sm text-muted-foreground mb-3">
-                    No tasks linked yet
-                  </p>
-                  <CreateTaskDialog ideaId={id} variant="ghost" size="sm" />
-                </div>
-              ) : (
-                <TaskList
-                  tasks={tasks as never[]}
-                  showAssignee={false}
-                  showProject={false}
-                  compact
-                />
-              )}
-            </CardContent>
-          </Card>
+          <TaskPanel
+            ideaId={id}
+            tasks={tasks as never[]}
+            isPromoted={isPromoted}
+          />
         </div>
       </div>
     </div>

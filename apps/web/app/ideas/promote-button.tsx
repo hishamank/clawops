@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 
 interface PromoteButtonProps {
   ideaId: string;
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
-export function PromoteButton({ ideaId }: PromoteButtonProps): React.JSX.Element {
+export function PromoteButton({ ideaId, disabled, disabledReason }: PromoteButtonProps): React.JSX.Element {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +43,8 @@ export function PromoteButton({ ideaId }: PromoteButtonProps): React.JSX.Element
         variant="outline"
         size="sm"
         onClick={handlePromote}
-        disabled={isPending}
+        disabled={isPending || disabled}
+        title={disabled ? disabledReason : undefined}
         className="h-7 text-xs"
       >
         {isPending ? (
