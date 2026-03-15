@@ -13,6 +13,27 @@ export interface TaskRelationWithTask {
   direction: "outgoing" | "incoming";
 }
 
+// Partial relation type for queries that only need fromTaskId and toTaskId
+interface TaskRelationIds {
+  fromTaskId: string;
+  toTaskId: string;
+}
+
+// SQLite has a default limit of 999 bound parameters for IN clauses.
+// We use 900 to provide a safety margin.
+const SQLITE_IN_CLAUSE_LIMIT = 900;
+
+function chunkArray<T>(items: readonly T[], chunkSize: number): T[][] {
+  if (chunkSize <= 0) {
+    throw new Error("chunkSize must be greater than 0");
+  }
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += chunkSize) {
+    chunks.push(items.slice(i, i + chunkSize));
+  }
+  return chunks;
+}
+
 export function createTaskRelation(
   db: DB,
   input: CreateTaskRelationInput,
@@ -29,7 +50,13 @@ export function listTaskRelations(
   taskId: string,
 ): TaskRelationWithTask[] {
   const relations = db
-    .select()
+    .select({
+      id: taskRelations.id,
+      fromTaskId: taskRelations.fromTaskId,
+      toTaskId: taskRelations.toTaskId,
+      type: taskRelations.type,
+      createdAt: taskRelations.createdAt,
+    })
     .from(taskRelations)
     .where(
       or(
@@ -81,7 +108,10 @@ export function listTaskRelations(
 export function getBlockersForTask(db: DB, taskId: string): Task[] {
   // Relations where type = "blocks" AND toTaskId = taskId → fromTask is the blocker
   const blockingRelations = db
-    .select()
+    .select({
+      fromTaskId: taskRelations.fromTaskId,
+      toTaskId: taskRelations.toTaskId,
+    })
     .from(taskRelations)
     .where(
       and(
@@ -89,11 +119,14 @@ export function getBlockersForTask(db: DB, taskId: string): Task[] {
         eq(taskRelations.toTaskId, taskId),
       ),
     )
-    .all();
+    .all() as TaskRelationIds[];
 
   // Relations where type = "depends-on" AND fromTaskId = taskId → toTask is the blocker
   const dependsOnRelations = db
-    .select()
+    .select({
+      fromTaskId: taskRelations.fromTaskId,
+      toTaskId: taskRelations.toTaskId,
+    })
     .from(taskRelations)
     .where(
       and(
@@ -101,7 +134,7 @@ export function getBlockersForTask(db: DB, taskId: string): Task[] {
         eq(taskRelations.fromTaskId, taskId),
       ),
     )
-    .all();
+    .all() as TaskRelationIds[];
 
   const blockers: Task[] = [];
 
@@ -132,6 +165,90 @@ export function getBlockersForTask(db: DB, taskId: string): Task[] {
 
 export function isTaskBlocked(db: DB, taskId: string): boolean {
   return getBlockersForTask(db, taskId).length > 0;
+}
+
+/**
+ * Bulk check: returns the set of task IDs (from the given list) that are
+ * actively blocked by at least one non-done/non-cancelled blocker.
+ */
+export function getBlockedTaskIds(db: DB, taskIds: string[]): Set<string> {
+  if (taskIds.length === 0) return new Set();
+
+  const blockingRelations: TaskRelationIds[] = [];
+  const dependsOnRelations: TaskRelationIds[] = [];
+
+  // Chunk taskIds to avoid exceeding SQLite's IN clause limit
+  for (const idChunk of chunkArray(taskIds, SQLITE_IN_CLAUSE_LIMIT)) {
+    const chunkBlocking = db
+      .select({
+        fromTaskId: taskRelations.fromTaskId,
+        toTaskId: taskRelations.toTaskId,
+      })
+      .from(taskRelations)
+      .where(
+        and(
+          eq(taskRelations.type, "blocks"),
+          inArray(taskRelations.toTaskId, idChunk),
+        ),
+      )
+      .all() as TaskRelationIds[];
+    blockingRelations.push(...chunkBlocking);
+
+    const chunkDependsOn = db
+      .select({
+        fromTaskId: taskRelations.fromTaskId,
+        toTaskId: taskRelations.toTaskId,
+      })
+      .from(taskRelations)
+      .where(
+        and(
+          eq(taskRelations.type, "depends-on"),
+          inArray(taskRelations.fromTaskId, idChunk),
+        ),
+      )
+      .all() as TaskRelationIds[];
+    dependsOnRelations.push(...chunkDependsOn);
+  }
+
+  // Collect all blocker task IDs we need to check status for
+  const blockerIdSet = new Set<string>();
+  for (const rel of blockingRelations) blockerIdSet.add(rel.fromTaskId);
+  for (const rel of dependsOnRelations) blockerIdSet.add(rel.toTaskId);
+
+  if (blockerIdSet.size === 0) return new Set();
+
+  // Fetch blocker tasks to check their statuses, chunked to avoid IN clause limit
+  const blockerTasks: { id: string; status: Task["status"] }[] = [];
+  const blockerIds = Array.from(blockerIdSet);
+  for (const idChunk of chunkArray(blockerIds, SQLITE_IN_CLAUSE_LIMIT)) {
+    const chunkTasks = db
+      .select({ id: tasks.id, status: tasks.status })
+      .from(tasks)
+      .where(inArray(tasks.id, idChunk))
+      .all();
+    blockerTasks.push(...chunkTasks);
+  }
+
+  const activeBlockerIds = new Set(
+    blockerTasks
+      .filter((t) => t.status !== "done" && t.status !== "cancelled")
+      .map((t) => t.id),
+  );
+
+  const blocked = new Set<string>();
+
+  for (const rel of blockingRelations) {
+    if (activeBlockerIds.has(rel.fromTaskId)) {
+      blocked.add(rel.toTaskId);
+    }
+  }
+  for (const rel of dependsOnRelations) {
+    if (activeBlockerIds.has(rel.toTaskId)) {
+      blocked.add(rel.fromTaskId);
+    }
+  }
+
+  return blocked;
 }
 
 /**

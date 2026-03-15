@@ -4,7 +4,7 @@ import { StatsCard } from "@/components/stats-card";
 import { TaskList } from "@/components/tasks/task-list";
 import { TaskBoard } from "@/components/tasks/task-board";
 import { TaskFilterBar } from "@/components/tasks/task-filter-bar";
-import { listTasks, isTaskBlocked } from "@clawops/tasks";
+import { listTasks, getBlockedTaskIds, type ListTasksFilters } from "@clawops/tasks";
 import { listAgents } from "@clawops/agents";
 import { listProjects } from "@clawops/projects";
 import { getDb } from "@/lib/server/runtime";
@@ -33,9 +33,9 @@ export default async function TasksPage({ searchParams }: PageProps): Promise<Re
   const view = str(sp.view) ?? "list";
 
   const db = getDb();
-  const filters: Record<string, string> = {};
-  if (status && status !== "all") filters.status = status;
-  if (priority && priority !== "all") filters.priority = priority;
+  const filters: ListTasksFilters = {};
+  if (status && status !== "all") filters.status = status as Task["status"];
+  if (priority && priority !== "all") filters.priority = priority as Task["priority"];
   if (assigneeId && assigneeId !== "all") filters.assigneeId = assigneeId;
 
   const [tasks, agents, projects] = await Promise.all([
@@ -47,13 +47,8 @@ export default async function TasksPage({ searchParams }: PageProps): Promise<Re
   const agentMap = new Map(agents.map((a) => [a.id, a.name]));
   const projectMap = new Map(projects.map((p) => [p.id, p.name]));
 
-  // Compute blocked status for each task
-  const blockedTaskIds = new Set<string>();
-  for (const task of tasks) {
-    if (isTaskBlocked(db, task.id)) {
-      blockedTaskIds.add(task.id);
-    }
-  }
+  // Compute blocked status for all tasks in bulk
+  const blockedTaskIds = getBlockedTaskIds(db, tasks.map((t) => t.id));
 
   const inProgress = tasks.filter((t) => t.status === "in-progress").length;
   const completedToday = tasks.filter((t) => t.status === "done" && withinLast24h(t.completedAt)).length;
@@ -95,7 +90,6 @@ export default async function TasksPage({ searchParams }: PageProps): Promise<Re
         basePath="/tasks"
         current={{ status, priority, assigneeId, view }}
         agents={agents.map((a) => ({ id: a.id, name: a.name }))}
-        projects={projects.map((p) => ({ id: p.id, name: p.name }))}
         showViewToggle
       />
 

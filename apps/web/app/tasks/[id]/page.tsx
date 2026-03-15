@@ -35,7 +35,7 @@ export default async function TaskDetailPage({ params }: PageProps): Promise<Rea
   ]);
   const agentMap = new Map(agents.map((a) => [a.id, a.name]));
   const projectMap = new Map(projects.map((p) => [p.id, p.name]));
-  const properties = parseTaskProperties(task as never);
+  const properties = parseTaskProperties(task);
 
   // Categorize relations
   const blockers = relations.filter(

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { ArrowLeft, Tags } from "lucide-react";
 import Link from "next/link";
-import type { Idea, Task } from "@/lib/types";
+import type { Idea } from "@/lib/types";
 import type { IdeaStatus, Source } from "@clawops/domain";
 import { timeAgo } from "@/lib/time";
 import { Badge } from "@/components/ui/badge";
@@ -70,9 +70,23 @@ async function getIdeaData(id: string) {
   }
 
   const sections = getIdeaSections(db, id);
-  const tasks = listIdeaTasks(db, id) as unknown as Task[];
+  const rawTasks = listIdeaTasks(db, id);
 
-  return { idea: ideaRow as unknown as Idea, sections, tasks };
+  // Convert Date fields to strings to match the web app's types
+  const idea: Idea = {
+    ...ideaRow,
+    createdAt: ideaRow.createdAt.toISOString(),
+  };
+
+  const tasks = rawTasks.map((task) => ({
+    ...task,
+    createdAt: task.createdAt.toISOString(),
+    dueDate: task.dueDate ? task.dueDate.toISOString() : null,
+    completedAt: task.completedAt ? task.completedAt.toISOString() : null,
+    specUpdatedAt: task.specUpdatedAt ? task.specUpdatedAt.toISOString() : null,
+  }));
+
+  return { idea, sections, tasks };
 }
 
 function parseTags(tags: string | null): string[] {
@@ -209,11 +223,40 @@ export default async function IdeaDetailPage({ params }: PageProps): Promise<Rea
 
         {/* Right column - Tasks */}
         <div className="lg:col-span-1">
+<<<<<<< HEAD
           <TaskPanel
             ideaId={id}
             tasks={tasks}
             isPromoted={isPromoted}
           />
+=======
+          <Card className="sticky top-6">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium">
+                  Linked Tasks ({tasks.length})
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {tasks.length === 0 ? (
+                <div className="text-center py-6">
+                  <p className="text-sm text-muted-foreground mb-3">
+                    No tasks linked yet
+                  </p>
+                  <CreateTaskDialog ideaId={id} variant="ghost" size="sm" />
+                </div>
+              ) : (
+                <TaskList
+                  tasks={tasks as unknown as Task[]}
+                  showAssignee={false}
+                  showProject={false}
+                  compact
+                />
+              )}
+            </CardContent>
+          </Card>
+>>>>>>> d85a10d (fix: address Copilot review comments from PR #178 and PR #177)
         </div>
       </div>
     </div>

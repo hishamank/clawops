@@ -1,7 +1,8 @@
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, isNull, asc } from "drizzle-orm";
 import type { DB, Task, Artifact, ResourceLink } from "@clawops/core";
-import { tasks, artifacts, usageLogs, resourceLinks, taskRelations } from "@clawops/core";
+import { tasks, artifacts, usageLogs, resourceLinks } from "@clawops/core";
 import { calcCost } from "@clawops/domain";
+import { getBlockedTaskIds } from "./relations.js";
 
 // ── createTask ─────────────────────────────────────────────────────────────
 
@@ -66,7 +67,7 @@ export function getTask(
 
 // ── listTasks ──────────────────────────────────────────────────────────────
 
-interface ListTasksFilters {
+export interface ListTasksFilters {
   status?: Task["status"];
   assigneeId?: string;
   projectId?: string;
@@ -125,64 +126,30 @@ export interface ListPullableTasksFilters {
 }
 
 export function getPullableTasks(db: DB, filters?: ListPullableTasksFilters): Task[] {
-  const allTasks = db.select().from(tasks).all();
+  const conditions = [
+    inArray(tasks.status, [...PULLABLE_STATUSES]),
+    isNull(tasks.assigneeId),
+    eq(tasks.autoPullEligible, true),
+  ];
 
-  const candidateTaskIds = new Set<string>();
-  const blockedTaskIds = new Set<string>();
+  if (filters?.projectId) conditions.push(eq(tasks.projectId, filters.projectId));
+  if (filters?.priority) conditions.push(eq(tasks.priority, filters.priority));
+  if (filters?.templateId) conditions.push(eq(tasks.templateId, filters.templateId));
+  if (filters?.stageId) conditions.push(eq(tasks.stageId, filters.stageId));
 
-  const blockingRelations = db
+  const candidates = db
     .select()
-    .from(taskRelations)
-    .where(
-      inArray(taskRelations.type, ["blocks", "depends-on"]),
-    )
+    .from(tasks)
+    .where(and(...conditions))
+    .orderBy(asc(tasks.createdAt), asc(tasks.id))
     .all();
 
-  for (const rel of blockingRelations) {
-    if (rel.type === "blocks") {
-      blockedTaskIds.add(rel.toTaskId);
-    } else if (rel.type === "depends-on") {
-      blockedTaskIds.add(rel.fromTaskId);
-    }
-  }
+  if (candidates.length === 0) return [];
 
-  for (const task of allTasks) {
-    if (!PULLABLE_STATUSES.includes(task.status as typeof PULLABLE_STATUSES[number])) {
-      continue;
-    }
-    if (task.assigneeId !== null && task.assigneeId !== undefined) {
-      continue;
-    }
-    if (task.autoPullEligible === false) {
-      continue;
-    }
-    if (blockedTaskIds.has(task.id)) {
-      continue;
-    }
-    if (filters?.projectId && task.projectId !== filters.projectId) {
-      continue;
-    }
-    if (filters?.priority && task.priority !== filters.priority) {
-      continue;
-    }
-    if (filters?.templateId && task.templateId !== filters.templateId) {
-      continue;
-    }
-    if (filters?.stageId && task.stageId !== filters.stageId) {
-      continue;
-    }
-    candidateTaskIds.add(task.id);
-  }
+  // Exclude tasks that are actively blocked (blocker not done/cancelled)
+  const blockedIds = getBlockedTaskIds(db, candidates.map((t) => t.id));
 
-  const pullableTasks = allTasks
-    .filter((t) => candidateTaskIds.has(t.id))
-    .sort((a, b) => {
-      const aTime = a.createdAt?.getTime() ?? 0;
-      const bTime = b.createdAt?.getTime() ?? 0;
-      return aTime - bTime;
-    });
-
-  return pullableTasks;
+  return candidates.filter((t) => !blockedIds.has(t.id));
 }
 
 // ── updateTask ─────────────────────────────────────────────────────────────
@@ -333,6 +300,7 @@ export {
   listTaskRelations,
   getBlockersForTask,
   isTaskBlocked,
+  getBlockedTaskIds,
   getBlockedAndBlockingIds,
   type CreateTaskRelationInput,
   type TaskRelationWithTask,
@@ -340,7 +308,7 @@ export {
 
 // ── parseTaskProperties ───────────────────────────────────────────────────
 
-export function parseTaskProperties(task: Task): Record<string, unknown> {
+export function parseTaskProperties(task: { properties: string | null }): Record<string, unknown> {
   if (!task.properties) return {};
   try {
     const parsed: unknown = JSON.parse(task.properties);

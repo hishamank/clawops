@@ -26,6 +26,7 @@ const {
   deleteTaskRelation,
   getBlockersForTask,
   isTaskBlocked,
+  getBlockedTaskIds,
 } = await import("@clawops/tasks");
 
 let db: DB;
@@ -342,5 +343,96 @@ describe("getPullableTasks", () => {
 
     assert.ok(firstIdx < secondIdx, "first task should come before second");
     assert.ok(secondIdx < thirdIdx, "second task should come before third");
+  });
+
+  it("includes tasks whose blocker is done", () => {
+    const blocker = createTask(db, { title: "Blocker (done)", status: "todo" });
+    const blocked = createTask(db, { title: "Was blocked", status: "todo" });
+
+    const rel = createTaskRelation(db, {
+      fromTaskId: blocker.id,
+      toTaskId: blocked.id,
+      type: "blocks",
+    });
+
+    // While blocker is active, blocked task should not be pullable
+    let pullable = getPullableTasks(db);
+    assert.ok(!pullable.map((t) => t.id).includes(blocked.id), "should exclude actively blocked task");
+
+    // Complete the blocker → blocked task should now be pullable
+    updateTask(db, blocker.id, { status: "done" });
+    pullable = getPullableTasks(db);
+    assert.ok(pullable.map((t) => t.id).includes(blocked.id), "should include task whose blocker is done");
+
+    deleteTaskRelation(db, rel.id);
+  });
+});
+
+describe("listTasks filter fields", () => {
+  it("filters by ideaId", () => {
+    const withIdea = createTask(db, { title: "Idea task", ideaId: "idea-filter-1" });
+    const without = createTask(db, { title: "No idea task" });
+
+    const results = listTasks(db, { ideaId: "idea-filter-1" });
+    const ids = results.map((t) => t.id);
+
+    assert.ok(ids.includes(withIdea.id), "should include task with matching ideaId");
+    assert.ok(!ids.includes(without.id), "should exclude task without matching ideaId");
+  });
+
+  it("filters by templateId", () => {
+    const withTemplate = createTask(db, { title: "Template task", templateId: "tmpl-filter-1" });
+    const without = createTask(db, { title: "No template task" });
+
+    const results = listTasks(db, { templateId: "tmpl-filter-1" });
+    const ids = results.map((t) => t.id);
+
+    assert.ok(ids.includes(withTemplate.id), "should include task with matching templateId");
+    assert.ok(!ids.includes(without.id), "should exclude task without matching templateId");
+  });
+
+  it("filters by stageId", () => {
+    const withStage = createTask(db, { title: "Stage task", stageId: "stage-filter-1" });
+    const without = createTask(db, { title: "No stage task" });
+
+    const results = listTasks(db, { stageId: "stage-filter-1" });
+    const ids = results.map((t) => t.id);
+
+    assert.ok(ids.includes(withStage.id), "should include task with matching stageId");
+    assert.ok(!ids.includes(without.id), "should exclude task without matching stageId");
+  });
+});
+
+describe("getBlockedTaskIds", () => {
+  it("returns blocked task IDs for active blockers only", () => {
+    const blocker = createTask(db, { title: "Active blocker", status: "todo" });
+    const doneBlocker = createTask(db, { title: "Done blocker", status: "todo" });
+    const blocked1 = createTask(db, { title: "Blocked by active" });
+    const blocked2 = createTask(db, { title: "Blocked by done" });
+
+    const rel1 = createTaskRelation(db, {
+      fromTaskId: blocker.id,
+      toTaskId: blocked1.id,
+      type: "blocks",
+    });
+    const rel2 = createTaskRelation(db, {
+      fromTaskId: doneBlocker.id,
+      toTaskId: blocked2.id,
+      type: "blocks",
+    });
+
+    updateTask(db, doneBlocker.id, { status: "done" });
+
+    const result = getBlockedTaskIds(db, [blocked1.id, blocked2.id]);
+    assert.ok(result.has(blocked1.id), "should include task blocked by active blocker");
+    assert.ok(!result.has(blocked2.id), "should exclude task blocked by done blocker");
+
+    deleteTaskRelation(db, rel1.id);
+    deleteTaskRelation(db, rel2.id);
+  });
+
+  it("returns empty set for empty input", () => {
+    const result = getBlockedTaskIds(db, []);
+    assert.strictEqual(result.size, 0);
   });
 });

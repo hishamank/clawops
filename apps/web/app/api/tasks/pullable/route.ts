@@ -3,8 +3,8 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { TaskPriority } from "@clawops/domain";
-import { getPullableTasks, type ListPullableTasksFilters } from "@clawops/tasks";
-import { getDb, jsonError, parseSearch } from "@/lib/server/runtime";
+import { getPullableTasks } from "@clawops/tasks";
+import { getDb, jsonError, parseSearch, requireAgentId } from "@/lib/server/runtime";
 
 const taskPriorityEnum = z.nativeEnum(TaskPriority);
 
@@ -16,8 +16,11 @@ const listPullableTasksQuery = z.object({
 });
 
 export async function GET(req: Request): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   try {
-    const filters = parseSearch(req, listPullableTasksQuery) as ListPullableTasksFilters | undefined;
+    const filters = parseSearch(req, listPullableTasksQuery);
     return NextResponse.json(getPullableTasks(getDb(), filters));
   } catch (err) {
     if (err instanceof z.ZodError) return jsonError(400, err.message, "VALIDATION_ERROR");

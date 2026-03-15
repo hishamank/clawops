@@ -124,8 +124,14 @@ export async function taskPullable(filters?: ListPullableTasksFilters): Promise<
   ensureMigrated();
   const db = getDb();
   const result = getPullableTasks(db, filters);
-  for (const t of result) {
-    logReadEvent(db, "task", t.id);
+  if (result.length > 0) {
+    db.transaction((tx) => {
+      for (const t of result) {
+        tx.insert(events)
+          .values({ action: "read", entityType: "task", entityId: t.id })
+          .run();
+      }
+    });
   }
   return result;
 }
