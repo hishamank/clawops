@@ -60,6 +60,18 @@ export function getOpenClawAgentMapping(
     .get() ?? null;
 }
 
+export function getOpenClawMappingByAgentId(
+  db: DB,
+  agentId: string,
+): OpenClawAgent | null {
+  return db
+    .select()
+    .from(openclawAgents)
+    .where(eq(openclawAgents.linkedAgentId, agentId))
+    .limit(1)
+    .get() ?? null;
+}
+
 export function getAgentByOpenClawIdentity(
   db: DB,
   input: OpenClawIdentityLookupInput,

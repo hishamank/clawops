@@ -19,8 +19,11 @@ export default function AgentLoading(): React.JSX.Element {
         </div>
       </div>
 
-      {/* Content panels */}
-      {Array.from({ length: 4 }).map((_, i) => (
+      {/* Integration bar */}
+      <Skeleton className="h-12 rounded-lg" />
+
+      {/* Content panels (Knowledge, Skills, Habits, Sessions, Cron Jobs, Tasks, Messages, Activity) */}
+      {Array.from({ length: 8 }).map((_, i) => (
         <Skeleton key={i} className="h-40 rounded-xl" />
       ))}
 

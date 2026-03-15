@@ -153,10 +153,54 @@ export interface ProjectDetail extends ProjectListItem {
   tasks?: Task[];
 }
 
+export interface OpenClawSession {
+  id: string;
+  connectionId: string;
+  sessionKey: string;
+  agentId: string | null;
+  model: string | null;
+  status: "active" | "ended";
+  startedAt: string;
+  endedAt: string | null;
+  metadata: string | null;
+  createdAt: string;
+}
+
+export interface AgentMessage {
+  id: string;
+  connectionId: string;
+  fromAgentId: string | null;
+  toAgentId: string | null;
+  sessionId: string | null;
+  channel: string | null;
+  messageType: string | null;
+  summary: string | null;
+  content: string | null;
+  sentAt: string;
+  createdAt: string;
+}
+
+export interface OpenClawMapping {
+  id: string;
+  connectionId: string;
+  linkedAgentId: string;
+  externalAgentId: string;
+  externalAgentName: string;
+  workspacePath: string | null;
+  memoryPath: string | null;
+  defaultModel: string | null;
+  lastSeenAt: string | null;
+}
+
 export interface AgentDetail extends Agent {
   recentTasks?: Task[];
   habits?: Habit[];
   streaks?: Record<string, HabitStreak[]>;
+  sessions?: OpenClawSession[];
+  cronJobs?: Habit[];
+  messages?: AgentMessage[];
+  activity?: ActivityEvent[];
+  openclawMapping?: OpenClawMapping | null;
 }
 
 export interface ActivityEvent {

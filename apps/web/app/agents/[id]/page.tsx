@@ -1,15 +1,49 @@
 import { notFound } from "next/navigation";
-import { ArrowLeft, Clock, CheckCircle2, Zap } from "lucide-react";
+import {
+  ArrowLeft,
+  Clock,
+  CheckCircle2,
+  Zap,
+  Radio,
+  Timer,
+  MessageSquare,
+  Activity,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Link2,
+  AlertCircle,
+  AlertTriangle,
+  Info,
+} from "lucide-react";
 import Link from "next/link";
-import type { Agent, Task, Habit, HabitStreak, Artifact } from "@/lib/types";
+import type {
+  Agent,
+  Task,
+  Habit,
+  HabitStreak,
+  Artifact,
+  OpenClawSession,
+  AgentMessage,
+  ActivityEvent,
+  OpenClawMapping,
+} from "@/lib/types";
 import { timeAgo } from "@/lib/time";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TaskList } from "@/components/tasks/task-list";
 import { cn } from "@/lib/utils";
-import { getAgent as getAgentById } from "@clawops/agents";
+import { getAgent as getAgentById, getOpenClawMappingByAgentId } from "@clawops/agents";
 import { listTasks, getTask } from "@clawops/tasks";
-import { listHabits, getHabitStreak } from "@clawops/habits";
+import { listHabits, getHabitStreak, listCronJobs } from "@clawops/habits";
+import {
+  openclawSessions,
+  agentMessages,
+  activityEvents,
+  eq,
+  or,
+  and,
+  desc,
+} from "@clawops/core";
 import { getDb } from "@/lib/server/runtime";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +51,11 @@ export const dynamic = "force-dynamic";
 interface AgentDetailResponse extends Agent {
   recentTasks?: Task[];
   habits?: (Habit & { streaks?: HabitStreak[] })[];
+  sessions?: OpenClawSession[];
+  cronJobs?: Habit[];
+  messages?: AgentMessage[];
+  activity?: ActivityEvent[];
+  openclawMapping?: OpenClawMapping | null;
 }
 
 interface PageProps {
@@ -57,16 +96,89 @@ function parseSkills(skills: string | null): string[] {
   }
 }
 
+function formatDuration(startedAt: string, endedAt: string | null): string {
+  if (!endedAt) return "active";
+  const ms = new Date(endedAt).getTime() - new Date(startedAt).getTime();
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return `${hours}h ${remainingMinutes}m`;
+}
+
 async function getAgent(id: string): Promise<AgentDetailResponse | null> {
   const db = getDb();
   const agent = getAgentById(db, id);
   if (!agent) return null;
+
   const recentTasks = listTasks(db, { assigneeId: id }).slice(0, 10);
   const habits = listHabits(db, id).map((h) => ({
     ...h,
     streaks: getHabitStreak(db, h.id, 7) as unknown as HabitStreak[],
   }));
-  return { ...agent, recentTasks, habits } as unknown as AgentDetailResponse;
+
+  // OpenClaw mapping
+  const rawMapping = getOpenClawMappingByAgentId(db, id);
+  const openclawMapping = rawMapping as unknown as OpenClawMapping | null;
+
+  // Sessions — scoped to connection + external agent ID
+  let sessions: OpenClawSession[] = [];
+  if (rawMapping) {
+    sessions = db
+      .select()
+      .from(openclawSessions)
+      .where(
+        and(
+          eq(openclawSessions.connectionId, rawMapping.connectionId),
+          eq(openclawSessions.agentId, rawMapping.externalAgentId),
+        ),
+      )
+      .orderBy(desc(openclawSessions.updatedAt))
+      .limit(10)
+      .all() as unknown as OpenClawSession[];
+  }
+
+  // Cron jobs — habits of type "cron" for this agent
+  const cronJobs = (listCronJobs(db).filter((h) => h.agentId === id)) as unknown as Habit[];
+
+  // Messages — sent or received by this agent's external ID
+  let messages: AgentMessage[] = [];
+  if (rawMapping) {
+    messages = db
+      .select()
+      .from(agentMessages)
+      .where(
+        or(
+          eq(agentMessages.fromAgentId, rawMapping.externalAgentId),
+          eq(agentMessages.toAgentId, rawMapping.externalAgentId),
+        ),
+      )
+      .orderBy(desc(agentMessages.sentAt))
+      .limit(10)
+      .all() as unknown as AgentMessage[];
+  }
+
+  // Activity events
+  const activity = db
+    .select()
+    .from(activityEvents)
+    .where(eq(activityEvents.agentId, id))
+    .orderBy(desc(activityEvents.createdAt))
+    .limit(15)
+    .all() as unknown as ActivityEvent[];
+
+  return {
+    ...agent,
+    recentTasks,
+    habits,
+    sessions,
+    cronJobs,
+    messages,
+    activity,
+    openclawMapping,
+  } as unknown as AgentDetailResponse;
 }
 
 async function getAgentTasks(id: string): Promise<Task[]> {
@@ -110,6 +222,13 @@ function StreakDots({ streaks }: { streaks?: HabitStreak[] }): React.JSX.Element
   );
 }
 
+const severityIcons = {
+  info: Info,
+  warning: AlertTriangle,
+  error: AlertCircle,
+  critical: AlertCircle,
+} as const;
+
 export default async function AgentProfile({ params }: PageProps): Promise<React.JSX.Element> {
   const { id } = await params;
   const agent = await getAgent(id);
@@ -122,6 +241,11 @@ export default async function AgentProfile({ params }: PageProps): Promise<React
   const habits = agent.habits ?? [];
   const skills = parseSkills(agent.skills);
   const artifacts = await getAgentArtifacts(tasks);
+  const sessions = agent.sessions ?? [];
+  const cronJobs = agent.cronJobs ?? [];
+  const messages = agent.messages ?? [];
+  const activity = agent.activity ?? [];
+  const openclawMapping = agent.openclawMapping ?? null;
 
   const completedTasks = tasks.filter((t) => t.status === "done");
   const completionRate =
@@ -172,6 +296,37 @@ export default async function AgentProfile({ params }: PageProps): Promise<React
           </div>
         </div>
       </div>
+
+      {/* OpenClaw Integration Bar */}
+      {openclawMapping && (
+        <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/50 px-4 py-3">
+          <Link2 className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div className="flex items-center gap-3 flex-wrap text-sm">
+            <span className="text-muted-foreground">
+              Linked to{" "}
+              <span className="font-medium text-foreground">
+                {openclawMapping.externalAgentName}
+              </span>
+            </span>
+            {openclawMapping.workspacePath && (
+              <>
+                <span className="text-muted-foreground">·</span>
+                <code className="text-xs text-muted-foreground">
+                  {openclawMapping.workspacePath}
+                </code>
+              </>
+            )}
+            {openclawMapping.lastSeenAt && (
+              <>
+                <span className="text-muted-foreground">·</span>
+                <span className="text-xs text-muted-foreground">
+                  Last seen {timeAgo(openclawMapping.lastSeenAt)}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Knowledge Panel */}
       <Card>
@@ -256,6 +411,99 @@ export default async function AgentProfile({ params }: PageProps): Promise<React
         </CardContent>
       </Card>
 
+      {/* Sessions Panel */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-sm font-medium">
+            <Radio className="h-4 w-4" />
+            Sessions ({sessions.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {sessions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No sessions recorded.</p>
+          ) : (
+            <div className="space-y-3">
+              {sessions.map((session) => (
+                <div
+                  key={session.id}
+                  className="flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className={cn(
+                        "h-2.5 w-2.5 rounded-full shrink-0",
+                        session.status === "active" ? "bg-emerald-500" : "bg-zinc-500",
+                      )}
+                    />
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-mono truncate">
+                        {session.sessionKey}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {session.model && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                            {session.model}
+                          </Badge>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          {formatDuration(session.startedAt, session.endedAt)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-xs text-muted-foreground shrink-0 ml-2">
+                    {timeAgo(session.startedAt)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Cron Jobs Panel */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-sm font-medium">
+            <Timer className="h-4 w-4" />
+            Cron Jobs ({cronJobs.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {cronJobs.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No cron jobs configured.</p>
+          ) : (
+            <div className="space-y-3">
+              {cronJobs.map((job) => (
+                <div
+                  key={job.id}
+                  className="flex items-center justify-between"
+                >
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{job.name}</span>
+                      <Badge
+                        variant={job.status === "active" ? "secondary" : "outline"}
+                        className="text-[10px] px-1.5 py-0"
+                      >
+                        {job.status}
+                      </Badge>
+                    </div>
+                    <code className="text-xs text-muted-foreground">
+                      {job.cronExpr ?? job.schedule ?? "—"}
+                    </code>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {job.nextRun ? `next ${timeAgo(job.nextRun)}` : job.lastRun ? timeAgo(job.lastRun) : "—"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Active Tasks Panel */}
       <Card>
         <CardHeader>
@@ -273,6 +521,109 @@ export default async function AgentProfile({ params }: PageProps): Promise<React
             emptyMessage="No tasks assigned."
             emptyDescription="Tasks will appear here when assigned to this agent."
           />
+        </CardContent>
+      </Card>
+
+      {/* Recent Messages Panel */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-sm font-medium">
+            <MessageSquare className="h-4 w-4" />
+            Recent Messages ({messages.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {messages.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No messages yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {messages.map((msg) => {
+                const isSent = openclawMapping
+                  ? msg.fromAgentId === openclawMapping.externalAgentId
+                  : true;
+                return (
+                  <div
+                    key={msg.id}
+                    className="flex items-start gap-3"
+                  >
+                    {isSent ? (
+                      <ArrowUpRight className="h-4 w-4 text-blue-400 shrink-0 mt-0.5" />
+                    ) : (
+                      <ArrowDownLeft className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+                    )}
+                    <div className="flex flex-col gap-1 min-w-0 flex-1">
+                      <span className="text-sm truncate">
+                        {msg.summary ?? msg.content ?? "—"}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {msg.channel && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                            {msg.channel}
+                          </Badge>
+                        )}
+                        {msg.messageType && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                            {msg.messageType}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {timeAgo(msg.sentAt)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Activity Panel */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-sm font-medium">
+            <Activity className="h-4 w-4" />
+            Recent Activity ({activity.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {activity.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No recent activity.</p>
+          ) : (
+            <div className="space-y-3">
+              {activity.map((event) => {
+                const SeverityIcon = severityIcons[event.severity] ?? Info;
+                return (
+                  <div
+                    key={event.id}
+                    className="flex items-center gap-3"
+                  >
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted">
+                      <SeverityIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                    </div>
+                    <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                      <span className="text-sm truncate">{event.title}</span>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                          {event.type}
+                        </Badge>
+                        <Badge
+                          variant={event.severity === "error" || event.severity === "critical" ? "destructive" : "secondary"}
+                          className="text-[10px] px-1.5 py-0"
+                        >
+                          {event.severity}
+                        </Badge>
+                      </div>
+                    </div>
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {timeAgo(event.createdAt)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
 
