@@ -39,7 +39,7 @@ export function TimelineChart({
     const innerHeight = height - CHART_PADDING.top - CHART_PADDING.bottom;
 
     const points = data.map((d, i) => {
-      const x = CHART_PADDING.left + (i / (data.length - 1)) * innerWidth;
+      const x = data.length > 1 ? CHART_PADDING.left + (i / (data.length - 1)) * innerWidth : CHART_PADDING.left + innerWidth / 2;
       const y =
         CHART_PADDING.top +
         innerHeight -

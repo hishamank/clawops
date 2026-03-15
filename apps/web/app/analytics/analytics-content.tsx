@@ -158,8 +158,8 @@ export function AnalyticsContent(): React.JSX.Element {
           fetch(`/api/analytics/tokens/timeline?from=${appliedFilters.from}&to=${appliedFilters.to}&granularity=${appliedFilters.granularity}`),
           fetch(`/api/analytics/costs/timeline?from=${appliedFilters.from}&to=${appliedFilters.to}&granularity=${appliedFilters.granularity}`),
         ]);
-        setTokenTimeline(await tokenTimelineRes.json());
-        setCostTimeline(await costTimelineRes.json());
+        if (tokenTimelineRes.ok) setTokenTimeline(await tokenTimelineRes.json());
+        if (costTimelineRes.ok) setCostTimeline(await costTimelineRes.json());
       }
     } catch (error) {
       console.error("Failed to fetch analytics:", error);
