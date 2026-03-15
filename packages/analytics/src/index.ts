@@ -1,6 +1,6 @@
 import { eq, and, gte, lte, sum, count, sql, type SQL } from "drizzle-orm";
 import type { DB } from "@clawops/core";
-import { usageLogs, tasks } from "@clawops/core";
+import { usageLogs, tasks, taskTemplates } from "@clawops/core";
 
 // ── Token aggregation ──────────────────────────────────────────────────────
 
@@ -339,4 +339,45 @@ export function getCostTimeline(
     tokensOut: Number(r.tokensOut ?? 0),
     count: r.count ?? 0,
   }));
+}
+
+// ── Template breakdown ─────────────────────────────────────────────────────
+
+interface CostByTemplate {
+  templateId: string;
+  templateName: string | null;
+  totalCost: number;
+  totalIn: number;
+  totalOut: number;
+  count: number;
+}
+
+export function getCostsByTemplate(db: DB): CostByTemplate[] {
+  const rows = db
+    .select({
+      templateId: tasks.templateId,
+      templateName: taskTemplates.name,
+      totalCost: sum(usageLogs.cost),
+      totalIn: sum(usageLogs.tokensIn),
+      totalOut: sum(usageLogs.tokensOut),
+      count: count(),
+    })
+    .from(usageLogs)
+    .innerJoin(tasks, eq(usageLogs.taskId, tasks.id))
+    .leftJoin(taskTemplates, eq(tasks.templateId, taskTemplates.id))
+    .groupBy(tasks.templateId, taskTemplates.name)
+    .all();
+
+  return rows.map((r) => ({
+    templateId: r.templateId ?? "untagged",
+    templateName: r.templateName,
+    totalCost: Number(r.totalCost ?? 0),
+    totalIn: Number(r.totalIn ?? 0),
+    totalOut: Number(r.totalOut ?? 0),
+    count: r.count,
+  }));
+}
+
+export function getTokensByTemplate(db: DB): CostByTemplate[] {
+  return getCostsByTemplate(db);
 }
