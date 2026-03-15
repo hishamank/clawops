@@ -1,7 +1,7 @@
 /* eslint-disable no-console -- CLI tool uses console for output */
 
 import { Command } from "commander";
-import { ideaAdd, ideaList, ideaGetSections, ideaGetSection, ideaUpdateSection, ideaUpdateSections, ideaGetDraftPrd, ideaSetDraftPrd } from "../lib/client.js";
+import { ideaAdd, ideaList, ideaGetSections, ideaGetSection, ideaUpdateSection, ideaUpdateSections, ideaGetDraftPrd, ideaSetDraftPrd, ideaListTasks, ideaCreateTask } from "../lib/client.js";
 import { IDEA_SECTION_KEYS, type IdeaSectionKey, type IdeaSections } from "@clawops/ideas";
 
 export const ideaCmd = new Command("idea").description("Manage ideas");
@@ -155,5 +155,49 @@ ideaCmd
       } else {
         console.log(content);
       }
+    }
+  });
+
+ideaCmd
+  .command("tasks")
+  .description("List tasks linked to an idea")
+  .argument("<id>", "Idea ID")
+  .option("--status <status>", "Filter by status")
+  .option("--json", "Output raw JSON")
+  .action(async (id, opts) => {
+    const tasks = await ideaListTasks(id, {
+      status: opts.status,
+    });
+    if (opts.json) {
+      console.log(JSON.stringify(tasks, null, 2));
+    } else if (tasks.length === 0) {
+      console.log("No tasks linked to this idea.");
+    } else {
+      for (const t of tasks) {
+        console.log(`[${t.status}] ${t.id}  ${t.title}`);
+      }
+    }
+  });
+
+ideaCmd
+  .command("create-task")
+  .description("Create a task linked to an idea")
+  .argument("<id>", "Idea ID")
+  .requiredOption("--title <title>", "Task title")
+  .option("--desc <description>", "Task description")
+  .option("--priority <priority>", "Priority (low, medium, high, urgent)")
+  .option("--assignee <id>", "Assignee agent ID")
+  .option("--json", "Output raw JSON")
+  .action(async (id, opts) => {
+    const task = await ideaCreateTask(id, {
+      title: opts.title,
+      description: opts.desc,
+      priority: opts.priority,
+      assigneeId: opts.assignee,
+    });
+    if (opts.json) {
+      console.log(JSON.stringify(task, null, 2));
+    } else {
+      console.log(`Created task ${task.id}: ${task.title} linked to idea ${id}`);
     }
   });

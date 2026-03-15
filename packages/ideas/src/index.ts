@@ -1,7 +1,7 @@
-import { eq } from "drizzle-orm";
-import type { DB, Idea, NewIdea, Project } from "@clawops/core";
-import { ideas, projects, parseJsonArray, toJsonArray, parseJsonObject, toJsonObject } from "@clawops/core";
-import type { IdeaStatus } from "@clawops/domain";
+import { eq, and } from "drizzle-orm";
+import type { DB, Idea, NewIdea, Project, Task, NewTask } from "@clawops/core";
+import { ideas, projects, tasks, parseJsonArray, toJsonArray, parseJsonObject, toJsonObject } from "@clawops/core";
+import type { IdeaStatus, TaskStatus, TaskPriority, Source } from "@clawops/domain";
 import { NotFoundError, ConflictError } from "@clawops/domain";
 
 export const IDEA_SECTION_KEYS = [
@@ -186,6 +186,70 @@ export function setIdeaDraftPrd(db: DB, id: string, content: string): Idea {
   return updateIdeaSection(db, id, "draftPrd", content);
 }
 
+/**
+ * List all tasks linked to an idea
+ */
+export function listIdeaTasks(
+  db: DB,
+  ideaId: string,
+  filters?: { status?: TaskStatus },
+): Task[] {
+  const conditions = [eq(tasks.ideaId, ideaId)];
+
+  if (filters?.status) {
+    conditions.push(eq(tasks.status, filters.status));
+  }
+
+  return db
+    .select()
+    .from(tasks)
+    .where(and(...conditions))
+    .all();
+}
+
+/**
+ * Create a task linked to an idea
+ */
+export function createIdeaTask(
+  db: DB,
+  ideaId: string,
+  input: {
+    title: string;
+    description?: string;
+    priority?: TaskPriority;
+    assigneeId?: string;
+    source?: Source;
+    dueDate?: Date;
+  },
+): Task {
+  // Verify idea exists
+  const [idea] = db
+    .select({ id: ideas.id })
+    .from(ideas)
+    .where(eq(ideas.id, ideaId))
+    .all();
+
+  if (!idea) {
+    throw new NotFoundError(`Idea not found: ${ideaId}`);
+  }
+
+  const [task] = db
+    .insert(tasks)
+    .values({
+      title: input.title,
+      description: input.description ?? null,
+      priority: input.priority ?? "medium",
+      assigneeId: input.assigneeId ?? null,
+      source: input.source ?? "human",
+      dueDate: input.dueDate ?? null,
+      ideaId,
+    })
+    .returning()
+    .all();
+
+  return task;
+}
+
 export function promoteIdeaToProject(
   db: DB,
   ideaId: string,
@@ -226,6 +290,13 @@ export function promoteIdeaToProject(
       .where(eq(ideas.id, ideaId))
       .returning()
       .all();
+
+    // Migrate any existing idea-linked tasks to the new project
+    tx
+      .update(tasks)
+      .set({ projectId: project.id })
+      .where(eq(tasks.ideaId, ideaId))
+      .run();
 
     return { idea, project };
   });

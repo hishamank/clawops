@@ -28,7 +28,7 @@ import {
   type ListWorkflowsFilters,
   type WorkflowStepDefinition,
 } from "@clawops/workflows";
-import { createIdea, listIdeas, getIdeaSections, getIdeaSection, updateIdeaSection, updateIdeaSections, getIdeaDraftPrd, setIdeaDraftPrd, type IdeaSectionKey, type IdeaSections } from "@clawops/ideas";
+import { createIdea, listIdeas, getIdeaSections, getIdeaSection, updateIdeaSection, updateIdeaSections, getIdeaDraftPrd, setIdeaDraftPrd, listIdeaTasks, createIdeaTask, type IdeaSectionKey, type IdeaSections } from "@clawops/ideas";
 import {
   createProject,
   getProject,
@@ -196,6 +196,39 @@ export async function ideaSetDraftPrd(id: string, content: string): Promise<Idea
   ensureMigrated();
   const db = getDb();
   return setIdeaDraftPrd(db, id, content);
+}
+
+export async function ideaListTasks(
+  ideaId: string,
+  filters?: { status?: Task["status"] },
+): Promise<Task[]> {
+  ensureMigrated();
+  const db = getDb();
+  const result = listIdeaTasks(db, ideaId, filters);
+  for (const t of result) {
+    logReadEvent(db, "task", t.id);
+  }
+  return result;
+}
+
+export async function ideaCreateTask(
+  ideaId: string,
+  input: {
+    title: string;
+    description?: string;
+    priority?: Task["priority"];
+    assigneeId?: string;
+  },
+): Promise<Task> {
+  ensureMigrated();
+  const db = getDb();
+  return createIdeaTask(db, ideaId, {
+    title: input.title,
+    description: input.description,
+    priority: input.priority,
+    assigneeId: input.assigneeId,
+    source: "cli",
+  });
 }
 
 export async function projectCreate(input: {

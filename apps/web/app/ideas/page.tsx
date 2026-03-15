@@ -1,4 +1,4 @@
-import { Lightbulb, Sparkles, ArrowUpRight } from "lucide-react";
+import { Lightbulb, Sparkles, ArrowUpRight, ListTodo } from "lucide-react";
 import type { Idea } from "@/lib/types";
 import type { IdeaStatus, Source } from "@clawops/domain";
 import { timeAgo } from "@/lib/time";
@@ -8,8 +8,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { IdeaFilterTabs } from "./filter-tabs";
 import { PromoteButton } from "./promote-button";
-import { listIdeas } from "@clawops/ideas";
+import { listIdeas, listIdeaTasks } from "@clawops/ideas";
 import { getDb } from "@/lib/server/runtime";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -49,11 +50,24 @@ function parseTags(tags: string | null): string[] {
   }
 }
 
-async function getIdeas(status?: string): Promise<Idea[]> {
-  return listIdeas(
-    getDb(),
+interface IdeaWithTaskCount extends Idea {
+  taskCount: number;
+}
+
+async function getIdeas(status?: string): Promise<IdeaWithTaskCount[]> {
+  const db = getDb();
+  const ideas = listIdeas(
+    db,
     status && status !== "all" ? { status: status as IdeaStatus } : undefined,
   ) as unknown as Idea[];
+  
+  // Get task counts for each idea
+  const ideasWithCounts: IdeaWithTaskCount[] = ideas.map((idea) => ({
+    ...idea,
+    taskCount: listIdeaTasks(db, idea.id).length,
+  }));
+  
+  return ideasWithCounts;
 }
 
 export default async function IdeasPage({ searchParams }: PageProps): Promise<React.JSX.Element> {
@@ -115,53 +129,64 @@ export default async function IdeasPage({ searchParams }: PageProps): Promise<Re
             return (
               <Card key={idea.id} className="transition-colors hover:bg-accent/50">
                 <CardContent className="py-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1 space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium truncate">
-                          {idea.title}
-                        </span>
-                        <Badge
-                          variant="outline"
-                          className={cn(ideaStatusStyles[idea.status], "shrink-0")}
-                        >
-                          {ideaStatusLabels[idea.status]}
-                        </Badge>
-                        <Badge
-                          variant="outline"
-                          className={cn(sourceStyles[idea.source], "shrink-0")}
-                        >
-                          {idea.source}
-                        </Badge>
-                      </div>
-                      {idea.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-2">
-                          {idea.description}
-                        </p>
-                      )}
-                      {tags.length > 0 && (
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {tags.map((tag) => (
+                  <Link href={`/ideas/${idea.id}`} className="block">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium truncate">
+                            {idea.title}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className={cn(ideaStatusStyles[idea.status], "shrink-0")}
+                          >
+                            {ideaStatusLabels[idea.status]}
+                          </Badge>
+                          <Badge
+                            variant="outline"
+                            className={cn(sourceStyles[idea.source], "shrink-0")}
+                          >
+                            {idea.source}
+                          </Badge>
+                          {idea.taskCount > 0 && (
                             <Badge
-                              key={tag}
-                              variant="secondary"
-                              className="text-[10px] px-1.5 py-0"
+                              variant="outline"
+                              className="bg-zinc-500/10 text-zinc-400 border-zinc-500/20 shrink-0"
                             >
-                              {tag}
+                              <ListTodo className="h-3 w-3 mr-1" />
+                              {idea.taskCount} task{idea.taskCount !== 1 ? "s" : ""}
                             </Badge>
-                          ))}
+                          )}
                         </div>
-                      )}
+                        {idea.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-2">
+                            {idea.description}
+                          </p>
+                        )}
+                        {tags.length > 0 && (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {tags.map((tag) => (
+                              <Badge
+                                key={tag}
+                                variant="secondary"
+                                className="text-[10px] px-1.5 py-0"
+                              >
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-xs text-muted-foreground">
+                          {timeAgo(idea.createdAt)}
+                        </span>
+                        {(idea.status === "raw" || idea.status === "reviewed") && (
+                          <PromoteButton ideaId={idea.id} />
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="text-xs text-muted-foreground">
-                        {timeAgo(idea.createdAt)}
-                      </span>
-                      {(idea.status === "raw" || idea.status === "reviewed") && (
-                        <PromoteButton ideaId={idea.id} />
-                      )}
-                    </div>
-                  </div>
+                  </Link>
                 </CardContent>
               </Card>
             );
