@@ -6,8 +6,7 @@ import type { ProjectStatus } from "@clawops/domain";
 import { timeAgo } from "@/lib/time";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatusBadge } from "@/components/status-badge";
-import { PriorityBadge } from "@/components/priority-badge";
+import { TaskList } from "@/components/tasks/task-list";
 import { cn } from "@/lib/utils";
 import { getProject as getProjectByIdFromPackage } from "@clawops/projects";
 import { listTasks } from "@clawops/tasks";
@@ -199,27 +198,14 @@ export default async function ProjectDetailPage({ params }: PageProps): Promise<
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {tasks.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No tasks yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {tasks.map((task) => (
-                <div
-                  key={task.id}
-                  className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-accent/50 transition-colors"
-                >
-                  <PriorityBadge priority={task.priority} />
-                  <span className="text-sm truncate min-w-0 flex-1">
-                    {task.title}
-                  </span>
-                  <StatusBadge status={task.status} />
-                  <span className="text-xs text-muted-foreground shrink-0">
-                    {timeAgo(task.createdAt)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+          <TaskList
+            tasks={tasks}
+            showAssignee
+            showProject={false}
+            compact
+            emptyMessage="No tasks yet."
+            emptyDescription="Tasks will appear here once created for this project."
+          />
         </CardContent>
       </Card>
     </div>

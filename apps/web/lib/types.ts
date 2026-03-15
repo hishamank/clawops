@@ -39,6 +39,35 @@ export interface Task {
   summary: string | null;
   specContent: string | null;
   specUpdatedAt: string | null;
+  templateId: string | null;
+  stageId: string | null;
+  properties: string | null;
+  ideaId: string | null;
+  createdAt: string;
+}
+
+export interface TaskRelationWithTask {
+  relation: {
+    id: string;
+    fromTaskId: string;
+    toTaskId: string;
+    type: "blocks" | "depends-on" | "related-to";
+    createdAt: string;
+  };
+  task: Task;
+  direction: "outgoing" | "incoming";
+}
+
+export interface ResourceLink {
+  id: string;
+  entityType: string;
+  entityId: string;
+  provider: string;
+  resourceType: string;
+  label: string | null;
+  url: string;
+  externalId: string | null;
+  meta: string | null;
   createdAt: string;
 }
 

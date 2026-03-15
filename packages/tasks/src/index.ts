@@ -72,6 +72,9 @@ interface ListTasksFilters {
   projectId?: string;
   priority?: Task["priority"];
   withSpecs?: boolean;
+  ideaId?: string;
+  templateId?: string;
+  stageId?: string;
 }
 
 export function listTasks(db: DB, filters?: ListTasksFilters): Task[] {
@@ -88,6 +91,15 @@ export function listTasks(db: DB, filters?: ListTasksFilters): Task[] {
   }
   if (filters?.priority) {
     conditions.push(eq(tasks.priority, filters.priority));
+  }
+  if (filters?.ideaId) {
+    conditions.push(eq(tasks.ideaId, filters.ideaId));
+  }
+  if (filters?.templateId) {
+    conditions.push(eq(tasks.templateId, filters.templateId));
+  }
+  if (filters?.stageId) {
+    conditions.push(eq(tasks.stageId, filters.stageId));
   }
 
   if (conditions.length === 0) {

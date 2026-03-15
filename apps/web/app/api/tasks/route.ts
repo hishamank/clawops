@@ -33,6 +33,9 @@ const listTasksQuery = z.object({
   projectId: z.string().optional(),
   priority: taskPriorityEnum.optional(),
   withSpecs: z.string().transform((v) => v === "true").optional(),
+  ideaId: z.string().optional(),
+  templateId: z.string().optional(),
+  stageId: z.string().optional(),
 });
 
 export async function GET(req: Request): Promise<NextResponse> {

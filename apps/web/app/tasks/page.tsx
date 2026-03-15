@@ -1,16 +1,13 @@
-import { CheckSquare, FileText, ListTodo, Clock } from "lucide-react";
+import { CheckSquare, ListTodo, Clock } from "lucide-react";
 import type { Task, Agent, ProjectListItem } from "@/lib/types";
-import { timeAgo } from "@/lib/time";
 import { StatsCard } from "@/components/stats-card";
-import { StatusBadge } from "@/components/status-badge";
-import { PriorityBadge } from "@/components/priority-badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { TaskFilterTabs } from "./filter-tabs";
-import { listTasks } from "@clawops/tasks";
+import { TaskList } from "@/components/tasks/task-list";
+import { TaskBoard } from "@/components/tasks/task-board";
+import { TaskFilterBar } from "@/components/tasks/task-filter-bar";
+import { listTasks, isTaskBlocked } from "@clawops/tasks";
 import { listAgents } from "@clawops/agents";
 import { listProjects } from "@clawops/projects";
 import { getDb } from "@/lib/server/runtime";
-import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -18,19 +15,8 @@ interface PageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-async function getTasks(status?: string): Promise<Task[]> {
-  return listTasks(
-    getDb(),
-    status && status !== "all" ? { status: status as Task["status"] } : undefined,
-  ) as unknown as Task[];
-}
-
-async function getAgents(): Promise<Agent[]> {
-  return listAgents(getDb()) as unknown as Agent[];
-}
-
-async function getProjects(): Promise<ProjectListItem[]> {
-  return listProjects(getDb()) as unknown as ProjectListItem[];
+function str(v: string | string[] | undefined): string | undefined {
+  return typeof v === "string" ? v : undefined;
 }
 
 function withinLast24h(dateStr: string | null): boolean {
@@ -40,16 +26,34 @@ function withinLast24h(dateStr: string | null): boolean {
 }
 
 export default async function TasksPage({ searchParams }: PageProps): Promise<React.JSX.Element> {
-  const resolvedParams = await searchParams;
-  const status = typeof resolvedParams?.status === "string" ? resolvedParams.status : undefined;
+  const sp = await searchParams;
+  const status = str(sp.status);
+  const priority = str(sp.priority);
+  const assigneeId = str(sp.assigneeId);
+  const view = str(sp.view) ?? "list";
+
+  const db = getDb();
+  const filters: Record<string, string> = {};
+  if (status && status !== "all") filters.status = status;
+  if (priority && priority !== "all") filters.priority = priority;
+  if (assigneeId && assigneeId !== "all") filters.assigneeId = assigneeId;
+
   const [tasks, agents, projects] = await Promise.all([
-    getTasks(status),
-    getAgents(),
-    getProjects(),
+    listTasks(db, Object.keys(filters).length > 0 ? filters : undefined) as unknown as Task[],
+    listAgents(db) as unknown as Agent[],
+    listProjects(db) as unknown as ProjectListItem[],
   ]);
 
   const agentMap = new Map(agents.map((a) => [a.id, a.name]));
   const projectMap = new Map(projects.map((p) => [p.id, p.name]));
+
+  // Compute blocked status for each task
+  const blockedTaskIds = new Set<string>();
+  for (const task of tasks) {
+    if (isTaskBlocked(db, task.id)) {
+      blockedTaskIds.add(task.id);
+    }
+  }
 
   const inProgress = tasks.filter((t) => t.status === "in-progress").length;
   const completedToday = tasks.filter((t) => t.status === "done" && withinLast24h(t.completedAt)).length;
@@ -86,46 +90,30 @@ export default async function TasksPage({ searchParams }: PageProps): Promise<Re
         />
       </div>
 
-      {/* Filter tabs */}
-      <TaskFilterTabs current={status ?? "all"} />
+      {/* Filter bar */}
+      <TaskFilterBar
+        basePath="/tasks"
+        current={{ status, priority, assigneeId, view }}
+        agents={agents.map((a) => ({ id: a.id, name: a.name }))}
+        projects={projects.map((p) => ({ id: p.id, name: p.name }))}
+        showViewToggle
+      />
 
-      {/* Task list */}
-      {tasks.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-16 text-center">
-          <ListTodo className="h-10 w-10 text-muted-foreground mb-3" />
-          <p className="text-sm text-muted-foreground">No tasks yet</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Tasks will appear here as your agents create them.
-          </p>
-        </div>
+      {/* Task view */}
+      {view === "board" ? (
+        <TaskBoard
+          tasks={tasks}
+          agentMap={agentMap}
+          projectMap={projectMap}
+          blockedTaskIds={blockedTaskIds}
+        />
       ) : (
-        <div className="space-y-2">
-          {tasks.map((task) => (
-            <Link key={task.id} href={`/tasks/${task.id}`}>
-              <Card className="transition-colors hover:bg-accent/50 cursor-pointer">
-                <CardContent className="flex items-center gap-4 py-3">
-                  <PriorityBadge priority={task.priority} />
-                  <span className="text-sm font-medium truncate min-w-0 flex-1">
-                    {task.title}
-                  </span>
-                  <StatusBadge status={task.status} />
-                  {task.specContent && (
-                    <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                  )}
-                  <span className="text-xs text-muted-foreground shrink-0 w-24 text-right">
-                    {task.assigneeId ? agentMap.get(task.assigneeId) ?? "Unknown" : "Unassigned"}
-                  </span>
-                  <span className="text-xs text-muted-foreground shrink-0 w-20 text-right">
-                    {task.projectId ? projectMap.get(task.projectId) ?? "—" : "—"}
-                  </span>
-                  <span className="text-xs text-muted-foreground shrink-0 w-16 text-right">
-                    {timeAgo(task.createdAt)}
-                  </span>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
+        <TaskList
+          tasks={tasks}
+          agentMap={agentMap}
+          projectMap={projectMap}
+          blockedTaskIds={blockedTaskIds}
+        />
       )}
     </div>
   );

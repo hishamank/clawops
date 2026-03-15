@@ -6,8 +6,7 @@ import type { IdeaStatus, Source } from "@clawops/domain";
 import { timeAgo } from "@/lib/time";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatusBadge } from "@/components/status-badge";
-import { PriorityBadge } from "@/components/priority-badge";
+import { TaskList } from "@/components/tasks/task-list";
 import { cn } from "@/lib/utils";
 import { getIdeaSections, listIdeaTasks } from "@clawops/ideas";
 import { getDb } from "@/lib/server/runtime";
@@ -219,28 +218,12 @@ export default async function IdeaDetailPage({ params }: PageProps): Promise<Rea
                   <CreateTaskDialog ideaId={id} variant="ghost" size="sm" />
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {tasks.map((task) => (
-                    <Link
-                      key={task.id}
-                      href={`/tasks/${task.id}`}
-                      className="block p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="text-sm font-medium truncate flex-1">
-                          {task.title}
-                        </span>
-                        <PriorityBadge priority={task.priority} />
-                      </div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <StatusBadge status={task.status} />
-                        <span className="text-xs text-muted-foreground">
-                          {timeAgo(task.createdAt.toString())}
-                        </span>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+                <TaskList
+                  tasks={tasks as never[]}
+                  showAssignee={false}
+                  showProject={false}
+                  compact
+                />
               )}
             </CardContent>
           </Card>
