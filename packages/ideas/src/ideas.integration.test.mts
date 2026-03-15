@@ -31,8 +31,14 @@ interface ProjectRow {
   createdAt: Date;
 }
 
-type TableName = "ideas" | "projects";
-type Row = IdeaRow | ProjectRow;
+interface TaskRow {
+  id: string;
+  projectId: string | null;
+  ideaId: string | null;
+}
+
+type TableName = "ideas" | "projects" | "tasks";
+type Row = IdeaRow | ProjectRow | TaskRow;
 
 interface ColumnRef<T extends TableName> {
   field: string;
@@ -59,6 +65,7 @@ interface Condition {
 interface StoreState {
   ideas: IdeaRow[];
   projects: ProjectRow[];
+  tasks: TaskRow[];
 }
 
 interface RuntimeDb {
@@ -83,6 +90,7 @@ interface RuntimeDb {
         returning: () => {
           all: () => unknown[];
         };
+        run: () => void;
       };
     };
   };
@@ -157,6 +165,7 @@ function createDbFromState(state: StoreState): RuntimeDb {
                     },
                   };
                 },
+                run() {},
               };
             },
           };
@@ -171,6 +180,7 @@ function createDbFromState(state: StoreState): RuntimeDb {
         const result = callback(transactionDb);
         state.ideas = transactionState.ideas;
         state.projects = transactionState.projects;
+        state.tasks = transactionState.tasks;
         return result;
       } catch (error: unknown) {
         return (() => {
@@ -214,6 +224,12 @@ const projectTable = makeTable("projects", [
   "ideaId",
 ] as const);
 
+const tasksTable = makeTable("tasks", [
+  "id",
+  "projectId",
+  "ideaId",
+] as const);
+
 class MockNotFoundError extends Error {}
 class MockConflictError extends Error {}
 
@@ -237,6 +253,7 @@ mock.module("@clawops/core", {
   namedExports: {
     ideas: ideaTable,
     projects: projectTable,
+    tasks: tasksTable,
     parseJsonArray,
     parseJsonObject,
     toJsonArray,
@@ -279,6 +296,7 @@ function cloneState(state: StoreState): StoreState {
   return {
     ideas: state.ideas.map((idea) => ({ ...idea })),
     projects: state.projects.map((project) => ({ ...project })),
+    tasks: state.tasks.map((task) => ({ ...task })),
   };
 }
 
@@ -335,7 +353,9 @@ function makeIdea(values: Partial<IdeaRow> & Pick<IdeaRow, "id" | "title">): Ide
 }
 
 function getRows(state: StoreState, table: TableRef<TableName>): Row[] {
-  return table.__table === "ideas" ? state.ideas : state.projects;
+  if (table.__table === "ideas") return state.ideas;
+  if (table.__table === "tasks") return state.tasks;
+  return state.projects;
 }
 
 function matchesCondition(row: Row, condition: Condition | null): boolean {
@@ -364,6 +384,7 @@ function createDb(initialState: Partial<StoreState> = {}): RuntimeDb {
   const state: StoreState = {
     ideas: initialState.ideas ? initialState.ideas.map((idea) => ({ ...idea })) : [],
     projects: initialState.projects ? initialState.projects.map((project) => ({ ...project })) : [],
+    tasks: initialState.tasks ? initialState.tasks.map((task) => ({ ...task })) : [],
   };
   return createDbFromState(state);
 }
