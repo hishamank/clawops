@@ -130,8 +130,10 @@ export function AnalyticsContent(): React.JSX.Element {
   const fetchData = useCallback(async (appliedFilters?: AnalyticsFilters) => {
     setIsLoading(true);
     try {
-      // Fetch summary
       const summaryRes = await fetch("/api/analytics/tokens");
+      if (!summaryRes.ok) {
+        throw new Error(`Failed to fetch token summary: ${summaryRes.status}`);
+      }
       const summary = await summaryRes.json();
       setTokenSummary({
         totalTokensIn: summary.totalTokensIn,
@@ -139,7 +141,6 @@ export function AnalyticsContent(): React.JSX.Element {
         totalCost: summary.totalCost,
       });
 
-      // Fetch breakdowns
       const [agentRes, modelRes, projectRes, templateRes] = await Promise.all([
         fetch("/api/analytics/costs?groupBy=agent"),
         fetch("/api/analytics/costs?groupBy=model"),
@@ -147,12 +148,16 @@ export function AnalyticsContent(): React.JSX.Element {
         fetch("/api/analytics/costs/by-template"),
       ]);
 
+      if (!agentRes.ok) throw new Error(`Failed to fetch agent costs: ${agentRes.status}`);
+      if (!modelRes.ok) throw new Error(`Failed to fetch model costs: ${modelRes.status}`);
+      if (!projectRes.ok) throw new Error(`Failed to fetch project costs: ${projectRes.status}`);
+      if (!templateRes.ok) throw new Error(`Failed to fetch template costs: ${templateRes.status}`);
+
       setByAgent(await agentRes.json());
       setByModel(await modelRes.json());
       setByProject(await projectRes.json());
       setByTemplate(await templateRes.json());
 
-      // Fetch timelines if filters are provided
       if (appliedFilters) {
         const [tokenTimelineRes, costTimelineRes] = await Promise.all([
           fetch(`/api/analytics/tokens/timeline?from=${appliedFilters.from}&to=${appliedFilters.to}&granularity=${appliedFilters.granularity}`),
