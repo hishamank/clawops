@@ -5,6 +5,7 @@ import type { Idea } from "@/lib/types";
 import type { IdeaStatus, Source } from "@clawops/domain";
 import { timeAgo } from "@/lib/time";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { IDEA_SECTION_KEYS, getIdeaSections, listIdeaTasks } from "@clawops/ideas";
 import type { IdeaSectionKey } from "@clawops/ideas";
@@ -13,8 +14,9 @@ import { ideas, eq } from "@clawops/core";
 import { PromoteButton } from "../promote-button";
 import { SectionEditor } from "./section-editor";
 import { DraftPrdPanel } from "./draft-prd-panel";
-import { TaskPanel } from "./task-panel";
 import { ReadinessTracker } from "./readiness-tracker";
+import { TaskList } from "@/components/tasks/task-list";
+import { CreateTaskDialog } from "./create-task-dialog";
 
 export const dynamic = "force-dynamic";
 
@@ -223,13 +225,6 @@ export default async function IdeaDetailPage({ params }: PageProps): Promise<Rea
 
         {/* Right column - Tasks */}
         <div className="lg:col-span-1">
-<<<<<<< HEAD
-          <TaskPanel
-            ideaId={id}
-            tasks={tasks}
-            isPromoted={isPromoted}
-          />
-=======
           <Card className="sticky top-6">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -248,7 +243,7 @@ export default async function IdeaDetailPage({ params }: PageProps): Promise<Rea
                 </div>
               ) : (
                 <TaskList
-                  tasks={tasks as unknown as Task[]}
+                  tasks={tasks}
                   showAssignee={false}
                   showProject={false}
                   compact
@@ -256,7 +251,6 @@ export default async function IdeaDetailPage({ params }: PageProps): Promise<Rea
               )}
             </CardContent>
           </Card>
->>>>>>> d85a10d (fix: address Copilot review comments from PR #178 and PR #177)
         </div>
       </div>
     </div>

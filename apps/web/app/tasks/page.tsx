@@ -33,9 +33,16 @@ export default async function TasksPage({ searchParams }: PageProps): Promise<Re
   const view = str(sp.view) ?? "list";
 
   const db = getDb();
+  const VALID_STATUSES: Task["status"][] = ["backlog", "todo", "in-progress", "review", "done", "cancelled"];
+  const VALID_PRIORITIES: Task["priority"][] = ["low", "medium", "high", "urgent"];
+
   const filters: ListTasksFilters = {};
-  if (status && status !== "all") filters.status = status as Task["status"];
-  if (priority && priority !== "all") filters.priority = priority as Task["priority"];
+  if (status && status !== "all" && VALID_STATUSES.includes(status as Task["status"])) {
+    filters.status = status as Task["status"];
+  }
+  if (priority && priority !== "all" && VALID_PRIORITIES.includes(priority as Task["priority"])) {
+    filters.priority = priority as Task["priority"];
+  }
   if (assigneeId && assigneeId !== "all") filters.assigneeId = assigneeId;
 
   const [tasks, agents, projects] = await Promise.all([
