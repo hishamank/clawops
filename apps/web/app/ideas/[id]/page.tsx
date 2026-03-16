@@ -51,7 +51,10 @@ const SECTION_LABELS: Record<IdeaSectionKey, string> = {
   notes: "Notes",
 };
 
-const EDITABLE_SECTIONS = IDEA_SECTION_KEYS.filter((k) => k !== "draftPrd");
+const EDITABLE_SECTIONS = IDEA_SECTION_KEYS.filter((k) => k !== "draftPrd").map((key) => ({
+  key,
+  label: SECTION_LABELS[key],
+}));
 
 async function getIdeaData(id: string) {
   const db = getDb();
@@ -98,6 +101,12 @@ export default async function IdeaDetailPage({ params }: PageProps): Promise<Rea
   const hasDraftPrd = !!sections.draftPrd;
   const hasAtLeastOneTask = tasks.length >= 1;
   const promoteReady = hasDraftPrd && hasAtLeastOneTask;
+  const readinessWarnings: string[] = [];
+  if (!hasDraftPrd) readinessWarnings.push("add a Draft PRD");
+  if (!hasAtLeastOneTask) readinessWarnings.push("link at least one task");
+  const promoteDisabledReason = readinessWarnings.length
+    ? `Please ${readinessWarnings.join(" and ")} before promoting`
+    : undefined;
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -151,7 +160,7 @@ export default async function IdeaDetailPage({ params }: PageProps): Promise<Rea
               <PromoteButton
                 ideaId={id}
                 disabled={!promoteReady}
-                disabledReason="Add a Draft PRD and at least one task before promoting"
+                disabledReason={promoteDisabledReason}
               />
             )}
           </div>
@@ -181,12 +190,12 @@ export default async function IdeaDetailPage({ params }: PageProps): Promise<Rea
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column - Sections */}
         <div className="lg:col-span-2 space-y-4">
-          {EDITABLE_SECTIONS.map((key) => (
+          {EDITABLE_SECTIONS.map(({ key, label }) => (
             <SectionEditor
               key={key}
               ideaId={id}
               sectionKey={key}
-              label={SECTION_LABELS[key]}
+              label={label}
               initialContent={sections[key] ?? null}
               readOnly={isPromoted}
             />

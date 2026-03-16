@@ -34,18 +34,19 @@ export function PromoteButton({ ideaId, disabled, disabledReason }: PromoteButto
     }
   }
 
+  const reasonId = disabled && disabledReason ? `${ideaId}-promote-reason` : undefined;
+
   return (
-    <div className="flex items-center gap-2">
-      {error && (
-        <span className="text-xs text-rose-400">{error}</span>
-      )}
-      <span title={disabled ? disabledReason : undefined}>
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2">
+        {error && <span className="text-xs text-rose-400">{error}</span>}
         <Button
           variant="outline"
           size="sm"
           onClick={handlePromote}
           disabled={isPending || disabled}
           className="h-7 text-xs"
+          aria-describedby={reasonId}
         >
           {isPending ? (
             <Loader2 className="h-3 w-3 animate-spin" />
@@ -54,7 +55,12 @@ export function PromoteButton({ ideaId, disabled, disabledReason }: PromoteButto
           )}
           Promote
         </Button>
-      </span>
+      </div>
+      {reasonId && (
+        <p id={reasonId} className="text-xs text-muted-foreground">
+          {disabledReason}
+        </p>
+      )}
     </div>
   );
 }
