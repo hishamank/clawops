@@ -5,7 +5,7 @@ import { revalidateTag } from "next/cache";
 import { events, type DB } from "@clawops/core";
 import { getIdeaDraftPrd, setIdeaDraftPrd } from "@clawops/ideas";
 import { NotFoundError } from "@clawops/domain";
-import { getDb, jsonError } from "@/lib/server/runtime";
+import { getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
 import { z } from "zod";
 
 const updateDraftPrdBody = z.object({
@@ -13,9 +13,12 @@ const updateDraftPrdBody = z.object({
 });
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  const auth = requireAgentId(request);
+  if (auth instanceof NextResponse) return auth;
+
   const { id } = await params;
   try {
     const db = getDb();
@@ -31,6 +34,9 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  const auth = requireAgentId(request);
+  if (auth instanceof NextResponse) return auth;
+
   const { id } = await params;
   try {
     const body = updateDraftPrdBody.parse(await request.json());

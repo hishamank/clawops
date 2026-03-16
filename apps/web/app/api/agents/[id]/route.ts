@@ -19,14 +19,17 @@ import {
 import { getAgent, getOpenClawMappingByAgentId } from "@clawops/agents";
 import { getHabitStreak, listHabits } from "@clawops/habits";
 import { listCronJobs } from "@clawops/habits";
-import { getDb, jsonError } from "@/lib/server/runtime";
+import { getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
 
 const idParams = z.object({ id: z.string().min(1) });
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { id } = idParams.parse(await params);
     const db = getDb();

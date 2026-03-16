@@ -5,7 +5,7 @@ import { z } from "zod";
 import { events, createActivityEvent, type DB } from "@clawops/core";
 import { ProjectStatus } from "@clawops/domain";
 import { getProject, updateProject } from "@clawops/projects";
-import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
+import { getAgentIdFromApiKey, getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
 
 const idParams = z.object({ id: z.string().min(1) });
 const updateProjectBody = z.object({
@@ -16,9 +16,12 @@ const updateProjectBody = z.object({
 });
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   const { id } = idParams.parse(await params);
   const project = getProject(getDb(), id);
   if (!project) return jsonError(404, "Not found", "NOT_FOUND");
@@ -29,6 +32,9 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { id } = idParams.parse(await params);
     const body = updateProjectBody.parse(await req.json());

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { events, createActivityEvent, type DB } from "@clawops/core";
 import { TaskPriority, TaskStatus, Source } from "@clawops/domain";
 import { createTask, listTasks } from "@clawops/tasks";
-import { getAgentIdFromApiKey, getDb, jsonError, parseSearch } from "@/lib/server/runtime";
+import { getAgentIdFromApiKey, getDb, jsonError, parseSearch, requireAgentId } from "@/lib/server/runtime";
 
 const taskStatusEnum = z.nativeEnum(TaskStatus);
 const taskPriorityEnum = z.nativeEnum(TaskPriority);
@@ -39,6 +39,9 @@ const listTasksQuery = z.object({
 });
 
 export async function GET(req: Request): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const filters = parseSearch(req, listTasksQuery);
     return NextResponse.json(listTasks(getDb(), filters));
@@ -49,6 +52,9 @@ export async function GET(req: Request): Promise<NextResponse> {
 }
 
 export async function POST(req: Request): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const body = createTaskBody.parse(await req.json());
     const db = getDb();

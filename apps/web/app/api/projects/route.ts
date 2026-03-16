@@ -5,7 +5,7 @@ import { z } from "zod";
 import { events, createActivityEvent, type DB } from "@clawops/core";
 import { ProjectStatus } from "@clawops/domain";
 import { createProject, listProjects } from "@clawops/projects";
-import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
+import { getAgentIdFromApiKey, getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
 
 const createProjectBody = z.object({
   name: z.string().min(1),
@@ -15,11 +15,17 @@ const createProjectBody = z.object({
   ideaId: z.string().optional(),
 });
 
-export async function GET(): Promise<NextResponse> {
+export async function GET(req: Request): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   return NextResponse.json(listProjects(getDb()));
 }
 
 export async function POST(req: Request): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const body = createProjectBody.parse(await req.json());
     const db = getDb();

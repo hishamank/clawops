@@ -5,7 +5,7 @@ import { z } from "zod";
 import { events, createActivityEvent, type DB } from "@clawops/core";
 import { ConflictError, IdeaStatus, NotFoundError, Source } from "@clawops/domain";
 import { createIdea, listIdeas } from "@clawops/ideas";
-import { getAgentIdFromApiKey, getDb, jsonError, parseSearch } from "@/lib/server/runtime";
+import { getAgentIdFromApiKey, getDb, jsonError, parseSearch, requireAgentId } from "@/lib/server/runtime";
 
 const sectionSchema = z.object({
   brainstorming: z.string().optional(),
@@ -29,6 +29,9 @@ const listIdeasQuery = z.object({
 });
 
 export async function GET(req: Request): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const filters = parseSearch(req, listIdeasQuery);
     return NextResponse.json(listIdeas(getDb(), filters));
@@ -39,6 +42,9 @@ export async function GET(req: Request): Promise<NextResponse> {
 }
 
 export async function POST(req: Request): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const body = createIdeaBody.parse(await req.json());
     const db = getDb();

@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { events, createActivityEvent, type DB } from "@clawops/core";
 import { getProject, getProjectSpec, setProjectSpec, appendProjectSpec } from "@clawops/projects";
-import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
+import { getAgentIdFromApiKey, getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
 
 const idParams = z.object({ id: z.string().min(1) });
 const setSpecBody = z.object({
@@ -16,9 +16,12 @@ const appendSpecBody = z.object({
 
 // GET /api/projects/:id/spec - Get project spec
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { id } = idParams.parse(await params);
     const db = getDb();
@@ -41,6 +44,9 @@ export async function PUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { id } = idParams.parse(await params);
     const body = setSpecBody.parse(await req.json());
@@ -89,6 +95,9 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { id } = idParams.parse(await params);
     const body = appendSpecBody.parse(await req.json());

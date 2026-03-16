@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { events, createActivityEvent, type DB } from "@clawops/core";
 import { createWorkflowRun, getWorkflowDefinition } from "@clawops/workflows";
-import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
+import { getAgentIdFromApiKey, getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
 
 const triggerSourceValues = ["human", "agent", "schedule", "event"] as const;
 
@@ -18,6 +18,9 @@ interface RouteParams {
 }
 
 export async function POST(req: Request, { params }: RouteParams): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { id } = await params;
     const body = triggerWorkflowBody.parse(await req.json());

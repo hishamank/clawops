@@ -5,12 +5,15 @@ import { revalidateTag } from "next/cache";
 import { events, createActivityEvent, type DB } from "@clawops/core";
 import { promoteIdeaToProject } from "@clawops/ideas";
 import { ConflictError, NotFoundError } from "@clawops/domain";
-import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
+import { getAgentIdFromApiKey, getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   const { id } = await params;
   const db = getDb();
   const agentId = getAgentIdFromApiKey(req) ?? undefined;
