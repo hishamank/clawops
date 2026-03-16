@@ -1,5 +1,3 @@
-"use client";
-
 import type { TaskStatus } from "@clawops/domain";
 import type { Task } from "@/lib/types";
 import { TaskCard } from "./task-card";

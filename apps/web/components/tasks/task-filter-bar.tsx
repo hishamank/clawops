@@ -22,7 +22,6 @@ export interface TaskFilterBarProps {
     view?: string;
   };
   agents?: Array<{ id: string; name: string }>;
-  projects?: Array<{ id: string; name: string }>;
   showPriority?: boolean;
   showAssignee?: boolean;
   showViewToggle?: boolean;
@@ -77,6 +76,7 @@ export function TaskFilterBar({
       {/* Priority filter */}
       {showPriority && (
         <select
+          aria-label="Filter by priority"
           value={current.priority ?? "all"}
           onChange={(e) =>
             router.push(buildHref(basePath, current, { priority: e.target.value }))
@@ -94,6 +94,7 @@ export function TaskFilterBar({
       {/* Assignee filter */}
       {showAssignee && agents && agents.length > 0 && (
         <select
+          aria-label="Filter by assignee"
           value={current.assigneeId ?? "all"}
           onChange={(e) =>
             router.push(buildHref(basePath, current, { assigneeId: e.target.value }))
