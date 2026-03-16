@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events, createActivityEvent, type DB } from "@clawops/core";
+import { events, createActivityEvent } from "@clawops/core";
 import {
   createWorkflowDefinition,
   listWorkflowDefinitions,
@@ -77,7 +77,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     }
 
     const workflow = db.transaction((tx) => {
-      const w = createWorkflowDefinition(tx as unknown as DB, {
+      const w = createWorkflowDefinition(tx, {
         name: body.name,
         description: body.description,
         version: body.version,
@@ -96,7 +96,7 @@ export async function POST(req: Request): Promise<NextResponse> {
           meta: JSON.stringify({ name: w.name }),
         })
         .run();
-      createActivityEvent(tx as unknown as DB, {
+      createActivityEvent(tx, {
         source: "agent",
         type: "workflow.created",
         title: `Workflow created: ${w.name}`,

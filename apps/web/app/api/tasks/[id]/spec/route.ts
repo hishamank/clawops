@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { eq, events, tasks, createActivityEvent, type DB } from "@clawops/core";
+import { eq, events, tasks, createActivityEvent } from "@clawops/core";
 import { getTaskSpec, setTaskSpec } from "@clawops/tasks";
 import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
 
@@ -42,7 +42,7 @@ export async function PUT(
     const db = getDb();
     const agentId = getAgentIdFromApiKey(req) ?? undefined;
     const task = db.transaction((tx) => {
-      const t = setTaskSpec(tx as unknown as DB, id, body.specContent);
+      const t = setTaskSpec(tx, id, body.specContent);
       tx.insert(events)
         .values({
           action: "task.spec_updated",
@@ -52,7 +52,7 @@ export async function PUT(
           meta: JSON.stringify({ specLength: body.specContent.length }),
         })
         .run();
-      createActivityEvent(tx as unknown as DB, {
+      createActivityEvent(tx, {
         source: agentId ? "agent" : "user",
         type: "task.spec_updated",
         title: `Task spec updated: ${t.title}`,

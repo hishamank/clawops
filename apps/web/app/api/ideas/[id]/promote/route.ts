@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { events, createActivityEvent, type DB } from "@clawops/core";
+import { events, createActivityEvent } from "@clawops/core";
 import { promoteIdeaToProject } from "@clawops/ideas";
 import { ConflictError, NotFoundError } from "@clawops/domain";
 import { getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
@@ -18,7 +18,7 @@ export async function POST(
   const db = getDb();
   try {
     const result = db.transaction((tx) => {
-      const r = promoteIdeaToProject(tx as unknown as DB, id);
+      const r = promoteIdeaToProject(tx, id);
       tx.insert(events)
         .values({
           action: "idea.promoted",
@@ -37,7 +37,7 @@ export async function POST(
           meta: JSON.stringify({ name: r.project.name, ideaId: r.idea.id }),
         })
         .run();
-      createActivityEvent(tx as unknown as DB, {
+      createActivityEvent(tx, {
         source: "agent",
         type: "idea.promoted",
         title: `Idea promoted to project: ${r.idea.title}`,
@@ -47,7 +47,7 @@ export async function POST(
         agentId,
         metadata: JSON.stringify({ ideaTitle: r.idea.title, projectId: r.project.id, projectName: r.project.name }),
       });
-      createActivityEvent(tx as unknown as DB, {
+      createActivityEvent(tx, {
         source: "agent",
         type: "project.created",
         title: `Project created from idea: ${r.project.name}`,

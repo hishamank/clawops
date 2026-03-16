@@ -1,5 +1,5 @@
 import { eq, and, count } from "drizzle-orm";
-import type { DB } from "@clawops/core";
+import type { DBOrTx } from "@clawops/core";
 import {
   projects,
   milestones,
@@ -13,13 +13,13 @@ import type { ProjectStatus, MilestoneStatus } from "@clawops/domain";
 
 // ── Project Spec ──────────────────────────────────────────────────────────────
 
-export function getProjectSpec(db: DB, id: string): string | null {
+export function getProjectSpec(db: DBOrTx, id: string): string | null {
   const project = db.select().from(projects).where(eq(projects.id, id)).get();
   return project?.specContent ?? null;
 }
 
 export function setProjectSpec(
-  db: DB,
+  db: DBOrTx,
   id: string,
   specContent: string,
 ): Project {
@@ -36,7 +36,7 @@ export function setProjectSpec(
 }
 
 export function appendProjectSpec(
-  db: DB,
+  db: DBOrTx,
   id: string,
   content: string,
 ): Project {
@@ -61,7 +61,7 @@ export function appendProjectSpec(
 }
 
 export function createProject(
-  db: DB,
+  db: DBOrTx,
   input: { name: string; description?: string; status?: ProjectStatus; prd?: string; ideaId?: string },
 ): Project {
   const project = db
@@ -80,7 +80,7 @@ export function createProject(
 }
 
 export function getProject(
-  db: DB,
+  db: DBOrTx,
   id: string,
 ): (Project & { milestones: Milestone[]; taskCount: number }) | null {
   const project = db.select().from(projects).where(eq(projects.id, id)).get();
@@ -106,12 +106,12 @@ export function getProject(
   };
 }
 
-export function listProjects(db: DB): Project[] {
+export function listProjects(db: DBOrTx): Project[] {
   return db.select().from(projects).all();
 }
 
 export function updateProject(
-  db: DB,
+  db: DBOrTx,
   id: string,
   updates: Partial<{ name: string; description: string; status: ProjectStatus; prd: string }>,
 ): Project {
@@ -132,7 +132,7 @@ export function updateProject(
 // ── Milestones ───────────────────────────────────────────────────────────────
 
 export function createMilestone(
-  db: DB,
+  db: DBOrTx,
   projectId: string,
   input: { title: string; order?: number },
 ): Milestone {
@@ -157,7 +157,7 @@ export function createMilestone(
 }
 
 export function updateMilestone(
-  db: DB,
+  db: DBOrTx,
   id: string,
   updates: Partial<{ title: string; status: MilestoneStatus; order: number }>,
 ): Milestone {
@@ -171,7 +171,7 @@ export function updateMilestone(
 }
 
 export function reorderMilestones(
-  db: DB,
+  db: DBOrTx,
   projectId: string,
   orderedIds: string[],
 ): Milestone[] {
@@ -191,7 +191,7 @@ export function reorderMilestones(
 // ── Progress ─────────────────────────────────────────────────────────────────
 
 export function getProjectProgress(
-  db: DB,
+  db: DBOrTx,
   id: string,
 ): { total: number; completed: number; percent: number } {
   const totalResult = db
@@ -245,7 +245,7 @@ export interface ProjectContext {
 }
 
 export function getProjectContext(
-  db: DB,
+  db: DBOrTx,
   projectId: string,
   options?: { minimal?: boolean },
 ): ProjectContext | null {
@@ -370,7 +370,7 @@ export function getProjectContext(
 // ── Session Management ───────────────────────────────────────────────────────
 
 export function activateProject(
-  db: DB,
+  db: DBOrTx,
   agentId: string,
   projectId: string,
 ): AgentSession {
@@ -411,7 +411,7 @@ export function activateProject(
 }
 
 export function deactivateProject(
-  db: DB,
+  db: DBOrTx,
   agentId: string,
   summary: string,
 ): AgentSession | null {
@@ -443,7 +443,7 @@ export function deactivateProject(
 }
 
 export function getActiveSession(
-  db: DB,
+  db: DBOrTx,
   agentId: string,
 ): AgentSession | null {
   const session = db

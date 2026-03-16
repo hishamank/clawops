@@ -1,5 +1,5 @@
 import { eq, and, gte, desc } from "drizzle-orm";
-import type { DB } from "@clawops/core";
+import type { DBOrTx } from "@clawops/core";
 import { habits, habitRuns } from "@clawops/core";
 import type { Habit, HabitRun } from "@clawops/core";
 import { HabitType, HabitStatus } from "@clawops/domain";
@@ -18,7 +18,7 @@ interface CreateHabitInput {
 }
 
 export function createHabit(
-  db: DB,
+  db: DBOrTx,
   agentId: string,
   input: CreateHabitInput,
 ): Habit {
@@ -41,7 +41,7 @@ export function createHabit(
 
 // ── listHabits ─────────────────────────────────────────────────────────────
 
-export function listHabits(db: DB, agentId?: string): Habit[] {
+export function listHabits(db: DBOrTx, agentId?: string): Habit[] {
   if (agentId) {
     return db.select().from(habits).where(eq(habits.agentId, agentId)).all();
   }
@@ -59,7 +59,7 @@ interface UpdateHabitInput {
 }
 
 export function updateHabit(
-  db: DB,
+  db: DBOrTx,
   id: string,
   updates: UpdateHabitInput,
 ): Habit {
@@ -86,7 +86,7 @@ interface LogHabitRunInput {
 }
 
 export function logHabitRun(
-  db: DB,
+  db: DBOrTx,
   habitId: string,
   agentId: string,
   input: LogHabitRunInput,
@@ -138,7 +138,7 @@ interface StreakEntry {
 }
 
 export function getHabitStreak(
-  db: DB,
+  db: DBOrTx,
   habitId: string,
   days: number = 7,
 ): StreakEntry[] {
@@ -190,7 +190,7 @@ export function getHabitStreak(
 
 // ── logHeartbeat ───────────────────────────────────────────────────────────
 
-export function logHeartbeat(db: DB, agentId: string): HabitRun {
+export function logHeartbeat(db: DBOrTx, agentId: string): HabitRun {
   return db.transaction((tx) => {
     // Find existing heartbeat habit for this agent
     let habit = tx

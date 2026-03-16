@@ -3,7 +3,7 @@ import {
   parseJsonObject,
   workspaceFileRevisions,
   workspaceFiles,
-  type DB,
+  type DBOrTx,
   type OpenClawConnection,
 } from "@clawops/core";
 import {
@@ -176,7 +176,7 @@ async function requestGatewayAction(
   return { status: response.status, body: responseBody };
 }
 
-function requireConnection(db: DB, connectionId: string): OpenClawConnection {
+function requireConnection(db: DBOrTx, connectionId: string): OpenClawConnection {
   const connection = getOpenClawConnection(db, connectionId);
   if (!connection) {
     throw createActionError(`OpenClaw connection "${connectionId}" not found`, {
@@ -311,7 +311,7 @@ export async function writeTrackedFile(
 }
 
 export async function updateOpenClawCronAction(
-  db: DB,
+  db: DBOrTx,
   input: UpdateOpenClawCronActionInput,
 ): Promise<Awaited<ReturnType<typeof updateConnectionCronJob>>> {
   const job = getCronJob(db, input.cronJobId);
@@ -346,7 +346,7 @@ export async function updateOpenClawCronAction(
 }
 
 export async function writeTrackedOpenClawFile(
-  db: DB,
+  db: DBOrTx,
   input: WriteTrackedOpenClawFileInput,
 ): Promise<WriteTrackedFileResult | null> {
   const connection = requireConnection(db, input.connectionId);
@@ -370,7 +370,7 @@ export interface RevertTrackedOpenClawFileResult {
 }
 
 export async function revertTrackedOpenClawFile(
-  db: DB,
+  db: DBOrTx,
   input: RevertTrackedOpenClawFileInput,
 ): Promise<RevertTrackedOpenClawFileResult> {
   const revision = db
@@ -430,7 +430,7 @@ export async function revertTrackedOpenClawFile(
 }
 
 export async function triggerSupportedOpenClawEndpoint(
-  db: DB,
+  db: DBOrTx,
   input: TriggerSupportedOpenClawEndpointInput,
 ): Promise<TriggerSupportedOpenClawEndpointResult> {
   const connection = requireConnection(db, input.connectionId);

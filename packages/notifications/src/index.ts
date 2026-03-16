@@ -1,5 +1,5 @@
 import { eq, desc, count } from "drizzle-orm";
-import type { DB, Notification } from "@clawops/core";
+import type { DBOrTx, Notification } from "@clawops/core";
 import { notifications } from "@clawops/core";
 import { generateId } from "@clawops/domain";
 
@@ -16,7 +16,7 @@ interface ListNotificationFilters {
 }
 
 export function createNotification(
-  db: DB,
+  db: DBOrTx,
   input: CreateNotificationInput,
 ): Notification {
   const [notification] = db
@@ -35,7 +35,7 @@ export function createNotification(
 }
 
 export function listNotifications(
-  db: DB,
+  db: DBOrTx,
   filters?: ListNotificationFilters,
 ): Notification[] {
   const query = db.select().from(notifications);
@@ -50,7 +50,7 @@ export function listNotifications(
   return query.orderBy(desc(notifications.createdAt)).all();
 }
 
-export function markRead(db: DB, id: string): Notification {
+export function markRead(db: DBOrTx, id: string): Notification {
   const [notification] = db
     .update(notifications)
     .set({ read: true })
@@ -60,14 +60,14 @@ export function markRead(db: DB, id: string): Notification {
   return notification;
 }
 
-export function markAllRead(db: DB): void {
+export function markAllRead(db: DBOrTx): void {
   db.update(notifications)
     .set({ read: true })
     .where(eq(notifications.read, false))
     .run();
 }
 
-export function getUnreadCount(db: DB): number {
+export function getUnreadCount(db: DBOrTx): number {
   const [result] = db
     .select({ value: count() })
     .from(notifications)

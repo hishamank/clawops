@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events, createActivityEvent, type DB } from "@clawops/core";
+import { events, createActivityEvent } from "@clawops/core";
 import { ProjectStatus } from "@clawops/domain";
 import { getProject, updateProject } from "@clawops/projects";
 import { getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
@@ -43,7 +43,7 @@ export async function PATCH(
     if (!existing) return jsonError(404, "Not found", "NOT_FOUND");
 
     const project = db.transaction((tx) => {
-      const p = updateProject(tx as unknown as DB, id, body);
+      const p = updateProject(tx, id, body);
       tx.insert(events)
         .values({
           action: "project.updated",
@@ -53,7 +53,7 @@ export async function PATCH(
           meta: JSON.stringify({ fields: Object.keys(body) }),
         })
         .run();
-      createActivityEvent(tx as unknown as DB, {
+      createActivityEvent(tx, {
         source: "agent",
         type: "project.updated",
         title: `Project updated: ${p.name}`,

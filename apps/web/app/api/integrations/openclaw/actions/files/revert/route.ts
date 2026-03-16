@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { revertTrackedOpenClawFile, OpenClawActionError } from "@clawops/sync/openclaw";
-import { events, createActivityEvent, type DB } from "@clawops/core";
+import { events, createActivityEvent } from "@clawops/core";
 import { getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
 
 const revertFileBodySchema = z.object({
@@ -49,7 +49,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         })
         .run();
 
-      createActivityEvent(tx as unknown as DB, {
+      createActivityEvent(tx, {
         source: "agent",
         severity: "info",
         type: "file.reverted",

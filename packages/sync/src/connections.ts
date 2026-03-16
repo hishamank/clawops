@@ -3,11 +3,9 @@ import {
   eq,
   openclawConnections,
   toJsonObject,
-  type DB,
+  type DBOrTx,
   type OpenClawConnection,
 } from "@clawops/core";
-
-type TransactionDb = Parameters<DB["transaction"]>[0] extends (tx: infer T) => unknown ? T : DB;
 
 export type OpenClawConnectionStatus = "active" | "disconnected" | "error";
 export type OpenClawConnectionSyncMode = "manual" | "hybrid";
@@ -56,7 +54,7 @@ function buildConnectionUpdateValues(
   };
 }
 
-export function listOpenClawConnections(db: DB): OpenClawConnection[] {
+export function listOpenClawConnections(db: DBOrTx): OpenClawConnection[] {
   return db
     .select()
     .from(openclawConnections)
@@ -65,7 +63,7 @@ export function listOpenClawConnections(db: DB): OpenClawConnection[] {
 }
 
 export function getOpenClawConnection(
-  db: DB,
+  db: DBOrTx,
   id: string,
 ): OpenClawConnection | null {
   return db
@@ -76,7 +74,7 @@ export function getOpenClawConnection(
 }
 
 export function getOpenClawConnectionByRootPath(
-  db: DB,
+  db: DBOrTx,
   rootPath: string,
 ): OpenClawConnection | null {
   return db
@@ -87,12 +85,12 @@ export function getOpenClawConnectionByRootPath(
 }
 
 export function upsertOpenClawConnection(
-  db: DB,
+  db: DBOrTx,
   input: UpsertOpenClawConnectionInput,
 ): { connection: OpenClawConnection; created: boolean } {
   // Use a transaction + INSERT with ON CONFLICT to avoid the read-then-insert race condition.
   // SQLite's unique constraint on rootPath ensures atomicity.
-  return db.transaction((tx: TransactionDb) => {
+  return db.transaction((tx) => {
     const now = new Date();
 
     // Attempt insert; conflict means the row already exists.
@@ -143,7 +141,7 @@ export function upsertOpenClawConnection(
 }
 
 export function updateOpenClawConnection(
-  db: DB,
+  db: DBOrTx,
   id: string,
   updates: UpdateOpenClawConnectionInput,
 ): OpenClawConnection | null {

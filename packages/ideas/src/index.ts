@@ -1,5 +1,5 @@
 import { eq, and } from "drizzle-orm";
-import type { DB, Idea, NewIdea, Project, Task } from "@clawops/core";
+import type { DBOrTx, Idea, NewIdea, Project, Task } from "@clawops/core";
 import { ideas, projects, tasks, parseJsonArray, toJsonArray, parseJsonObject, toJsonObject } from "@clawops/core";
 import type { IdeaStatus, TaskStatus, TaskPriority, Source } from "@clawops/domain";
 import { NotFoundError, ConflictError } from "@clawops/domain";
@@ -19,7 +19,7 @@ export type IdeaSectionKey = (typeof IDEA_SECTION_KEYS)[number];
  */
 export type IdeaSections = Partial<Record<IdeaSectionKey, string>>;
 
-function getIdeaSectionsRow(db: DB, id: string): { sections: string | null } {
+function getIdeaSectionsRow(db: DBOrTx, id: string): { sections: string | null } {
   const [idea] = db
     .select({ sections: ideas.sections })
     .from(ideas)
@@ -34,7 +34,7 @@ function getIdeaSectionsRow(db: DB, id: string): { sections: string | null } {
 }
 
 export function createIdea(
-  db: DB,
+  db: DBOrTx,
   input: { title: string; description?: string; tags?: string[]; sections?: IdeaSections; source?: NewIdea["source"] },
 ): Idea {
   const [idea] = db
@@ -52,7 +52,7 @@ export function createIdea(
 }
 
 export function listIdeas(
-  db: DB,
+  db: DBOrTx,
   filters?: { status?: IdeaStatus; tag?: string },
 ): Idea[] {
   let result: Idea[];
@@ -76,7 +76,7 @@ export function listIdeas(
 }
 
 export function updateIdea(
-  db: DB,
+  db: DBOrTx,
   id: string,
   updates: Partial<{
     title: string;
@@ -105,7 +105,7 @@ export function updateIdea(
 /**
  * Get all sections for an idea
  */
-export function getIdeaSections(db: DB, id: string): IdeaSections {
+export function getIdeaSections(db: DBOrTx, id: string): IdeaSections {
   const idea = getIdeaSectionsRow(db, id);
   if (!idea.sections) {
     return {};
@@ -116,7 +116,7 @@ export function getIdeaSections(db: DB, id: string): IdeaSections {
 /**
  * Get a specific section from an idea
  */
-export function getIdeaSection(db: DB, id: string, section: IdeaSectionKey): string | null {
+export function getIdeaSection(db: DBOrTx, id: string, section: IdeaSectionKey): string | null {
   const sections = getIdeaSections(db, id);
   return sections[section] ?? null;
 }
@@ -125,7 +125,7 @@ export function getIdeaSection(db: DB, id: string, section: IdeaSectionKey): str
  * Update a specific section of an idea
  */
 export function updateIdeaSection(
-  db: DB,
+  db: DBOrTx,
   id: string,
   section: IdeaSectionKey,
   content: string,
@@ -151,7 +151,7 @@ export function updateIdeaSection(
  * Update multiple sections of an idea at once
  */
 export function updateIdeaSections(
-  db: DB,
+  db: DBOrTx,
   id: string,
   sections: Partial<IdeaSections>,
 ): Idea {
@@ -175,14 +175,14 @@ export function updateIdeaSections(
 /**
  * Get the draft PRD content from an idea
  */
-export function getIdeaDraftPrd(db: DB, id: string): string | null {
+export function getIdeaDraftPrd(db: DBOrTx, id: string): string | null {
   return getIdeaSection(db, id, "draftPrd");
 }
 
 /**
  * Set the draft PRD content for an idea
  */
-export function setIdeaDraftPrd(db: DB, id: string, content: string): Idea {
+export function setIdeaDraftPrd(db: DBOrTx, id: string, content: string): Idea {
   return updateIdeaSection(db, id, "draftPrd", content);
 }
 
@@ -190,7 +190,7 @@ export function setIdeaDraftPrd(db: DB, id: string, content: string): Idea {
  * List all tasks linked to an idea
  */
 export function listIdeaTasks(
-  db: DB,
+  db: DBOrTx,
   ideaId: string,
   filters?: { status?: TaskStatus },
 ): Task[] {
@@ -211,7 +211,7 @@ export function listIdeaTasks(
  * Create a task linked to an idea
  */
 export function createIdeaTask(
-  db: DB,
+  db: DBOrTx,
   ideaId: string,
   input: {
     title: string;
@@ -251,7 +251,7 @@ export function createIdeaTask(
 }
 
 export function promoteIdeaToProject(
-  db: DB,
+  db: DBOrTx,
   ideaId: string,
 ): { idea: Idea; project: Project } {
   const [existing] = db

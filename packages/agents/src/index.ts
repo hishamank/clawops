@@ -1,10 +1,7 @@
 import { and, eq } from "drizzle-orm";
-import type { Agent, DB, OpenClawAgent } from "@clawops/core";
+import type { DBOrTx, Agent, OpenClawAgent } from "@clawops/core";
 import { agents, openclawAgents, toJsonArray } from "@clawops/core";
 import { generateId, hashApiKey, type AgentStatus } from "@clawops/domain";
-
-/** Subset of DB that both the root connection and a transaction satisfy. */
-type Queryable = Pick<DB, "insert" | "update" | "select" | "delete">;
 
 interface CreateAgentInput {
   name: string;
@@ -50,7 +47,7 @@ interface OpenClawIdentityLookupInput {
  * @returns The OpenClaw agent mapping if found, null otherwise
  */
 export function getOpenClawAgentMapping(
-  db: DB,
+  db: DBOrTx,
   connectionId: string,
   externalAgentId: string,
 ): OpenClawAgent | null {
@@ -74,7 +71,7 @@ export function getOpenClawAgentMapping(
  * @returns The OpenClaw agent mapping if found, null otherwise
  */
 export function getOpenClawMappingByAgentId(
-  db: DB,
+  db: DBOrTx,
   agentId: string,
 ): OpenClawAgent | null {
   return db
@@ -92,7 +89,7 @@ export function getOpenClawMappingByAgentId(
  * @returns The ClawOps agent if found, null otherwise
  */
 export function getAgentByOpenClawIdentity(
-  db: DB,
+  db: DBOrTx,
   input: OpenClawIdentityLookupInput,
 ): Agent | null {
   const rows = db
@@ -112,7 +109,7 @@ export function getAgentByOpenClawIdentity(
 }
 
 function findSingleAgentByNameAndFramework(
-  db: DB,
+  db: DBOrTx,
   input: InitAgentInput,
 ): Agent | null {
   const rows = db
@@ -134,7 +131,7 @@ function findSingleAgentByNameAndFramework(
  * @throws Error if the upsert operation fails
  */
 export function upsertOpenClawAgentIdentity(
-  db: Queryable,
+  db: DBOrTx,
   input: NonNullable<InitAgentInput["openclaw"]> & { linkedAgentId: string },
 ): OpenClawAgent {
   const now = new Date();
@@ -187,7 +184,7 @@ export function upsertOpenClawAgentIdentity(
  * @throws Error if agent creation fails
  */
 export function createAgent(
-  db: DB,
+  db: DBOrTx,
   input: CreateAgentInput,
 ): Agent & { apiKey: string } {
   const rawKey = generateId();
@@ -222,7 +219,7 @@ export function createAgent(
  * @param id - The agent ID
  * @returns The agent if found, null otherwise
  */
-export function getAgent(db: DB, id: string): Agent | null {
+export function getAgent(db: DBOrTx, id: string): Agent | null {
   const rows = db
     .select()
     .from(agents)
@@ -237,7 +234,7 @@ export function getAgent(db: DB, id: string): Agent | null {
  * @param db - Database instance
  * @returns Array of all agents
  */
-export function listAgents(db: DB): Agent[] {
+export function listAgents(db: DBOrTx): Agent[] {
   return db.select().from(agents).all();
 }
 
@@ -251,7 +248,7 @@ export function listAgents(db: DB): Agent[] {
  * @throws Error if agent not found
  */
 export function updateAgentStatus(
-  db: DB,
+  db: DBOrTx,
   id: string,
   status: AgentStatus,
   _message?: string,
@@ -284,7 +281,7 @@ export function updateAgentStatus(
  * @throws Error if agent not found
  */
 export function updateAgentSkills(
-  db: DB,
+  db: DBOrTx,
   id: string,
   skills: string[],
 ): Agent {
@@ -309,7 +306,7 @@ export function updateAgentSkills(
  * @param hashedKey - The hashed API key
  * @returns The agent if found, null otherwise
  */
-export function getAgentByApiKey(db: DB, hashedKey: string): Agent | null {
+export function getAgentByApiKey(db: DBOrTx, hashedKey: string): Agent | null {
   const rows = db
     .select()
     .from(agents)
@@ -330,7 +327,7 @@ export function getAgentByApiKey(db: DB, hashedKey: string): Agent | null {
  * Callers that omit `input.openclaw` still fall back to name/framework matching.
  */
 export function initAgent(
-  db: DB,
+  db: DBOrTx,
   input: InitAgentInput,
 ): { agent: Agent; apiKey?: string; created: boolean } {
   const existing =
@@ -364,7 +361,7 @@ export function initAgent(
       }
 
       if (input.openclaw) {
-        upsertOpenClawAgentIdentity(tx as unknown as DB, {
+        upsertOpenClawAgentIdentity(tx, {
           ...input.openclaw,
           linkedAgentId: updated.id,
           memoryPath:
@@ -407,7 +404,7 @@ export function initAgent(
     }
 
     if (input.openclaw) {
-      upsertOpenClawAgentIdentity(tx as unknown as DB, {
+      upsertOpenClawAgentIdentity(tx, {
         ...input.openclaw,
         linkedAgentId: created.id,
         memoryPath:

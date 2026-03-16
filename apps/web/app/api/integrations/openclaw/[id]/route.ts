@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events, type DB } from "@clawops/core";
+import { events } from "@clawops/core";
 import {
   getOpenClawConnection,
   updateOpenClawConnection,
@@ -71,7 +71,7 @@ export async function PATCH(
     const db = getDb();
 
     const updated = db.transaction((tx) => {
-      const connection = updateOpenClawConnection(tx as unknown as DB, id, {
+      const connection = updateOpenClawConnection(tx, id, {
         name: body.name,
         gatewayUrl: body.gatewayUrl,
         status: body.status,

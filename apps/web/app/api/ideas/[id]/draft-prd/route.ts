@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { events, type DB } from "@clawops/core";
+import { events } from "@clawops/core";
 import { getIdeaDraftPrd, setIdeaDraftPrd } from "@clawops/ideas";
 import { NotFoundError } from "@clawops/domain";
 import { getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
@@ -43,7 +43,7 @@ export async function PUT(
     const db = getDb();
 
     const idea = db.transaction((tx) => {
-      const result = setIdeaDraftPrd(tx as unknown as DB, id, body.content);
+      const result = setIdeaDraftPrd(tx, id, body.content);
       tx.insert(events)
         .values({
           action: "idea.draft_prd_updated",

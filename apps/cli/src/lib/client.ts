@@ -1,6 +1,7 @@
 /* eslint-disable no-console -- CLI tool uses console for output */
 import type {
   DB,
+  DBOrTx,
   Task,
   Idea,
   Project,
@@ -75,7 +76,7 @@ function getDb(): DB {
   return coreDb;
 }
 
-function logReadEvent(db: DB, entityType: string, entityId: string): void {
+function logReadEvent(db: DBOrTx, entityType: string, entityId: string): void {
   db.insert(events)
     .values({ action: "read", entityType, entityId })
     .run();

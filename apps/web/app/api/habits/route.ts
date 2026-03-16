@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events, type DB } from "@clawops/core";
+import { events } from "@clawops/core";
 import { getAgent } from "@clawops/agents";
 import { createHabit, listHabits } from "@clawops/habits";
 import { HabitStatus, HabitType } from "@clawops/domain";
@@ -42,7 +42,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     if (!agent) return jsonError(404, "Agent not found", "NOT_FOUND");
 
     const habit = db.transaction((tx) => {
-      const h = createHabit(tx as unknown as DB, auth, body);
+      const h = createHabit(tx, auth, body);
       tx.insert(events)
         .values({
           id: crypto.randomUUID(),

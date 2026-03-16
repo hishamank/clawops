@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import path from "node:path";
 import { z } from "zod";
-import { events, type DB } from "@clawops/core";
+import { events } from "@clawops/core";
 import {
   listOpenClawConnections,
   upsertOpenClawConnection,
@@ -63,7 +63,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     const body = upsertConnectionBody.parse(await req.json());
     const db = getDb();
     const result = db.transaction((tx) => {
-      const upserted = upsertOpenClawConnection(tx as unknown as DB, {
+      const upserted = upsertOpenClawConnection(tx, {
         name: body.name ?? defaultConnectionName(body.rootPath),
         rootPath: body.rootPath,
         gatewayUrl: body.gatewayUrl,

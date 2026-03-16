@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { TaskPriority, TaskStatus } from "@clawops/domain";
-import { events, createActivityEvent, type DB } from "@clawops/core";
+import { events, createActivityEvent } from "@clawops/core";
 import { getTask, updateTask } from "@clawops/tasks";
 import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
 
@@ -45,7 +45,7 @@ export async function PATCH(
     const db = getDb();
     const agentId = getAgentIdFromApiKey(req) ?? undefined;
     const task = db.transaction((tx) => {
-      const t = updateTask(tx as unknown as DB, id, {
+      const t = updateTask(tx, id, {
         ...body,
         dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
       });
@@ -59,7 +59,7 @@ export async function PATCH(
           meta: JSON.stringify({ fields: Object.keys(body) }),
         })
         .run();
-      createActivityEvent(tx as unknown as DB, {
+      createActivityEvent(tx, {
         source: agentId ? "agent" : "user",
         type: "task.updated",
         title: `Task updated: ${t.title}`,

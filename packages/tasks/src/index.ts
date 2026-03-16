@@ -1,5 +1,5 @@
 import { eq, and, inArray, isNull, asc } from "drizzle-orm";
-import type { DB, Task, Artifact, ResourceLink } from "@clawops/core";
+import type { DBOrTx, Task, Artifact, ResourceLink } from "@clawops/core";
 import { tasks, artifacts, usageLogs, resourceLinks } from "@clawops/core";
 import { calcCost } from "@clawops/domain";
 import { getBlockedTaskIds } from "./relations.js";
@@ -23,7 +23,7 @@ interface CreateTaskInput {
   ideaId?: string;
 }
 
-export function createTask(db: DB, input: CreateTaskInput): Task {
+export function createTask(db: DBOrTx, input: CreateTaskInput): Task {
   const rows = db
     .insert(tasks)
     .values({
@@ -50,7 +50,7 @@ export function createTask(db: DB, input: CreateTaskInput): Task {
 // ── getTask ────────────────────────────────────────────────────────────────
 
 export function getTask(
-  db: DB,
+  db: DBOrTx,
   id: string,
 ): (Task & { artifacts: Artifact[] }) | null {
   const task = db.select().from(tasks).where(eq(tasks.id, id)).get();
@@ -78,7 +78,7 @@ export interface ListTasksFilters {
   stageId?: string;
 }
 
-export function listTasks(db: DB, filters?: ListTasksFilters): Task[] {
+export function listTasks(db: DBOrTx, filters?: ListTasksFilters): Task[] {
   const conditions = [];
 
   if (filters?.status) {
@@ -125,7 +125,7 @@ export interface ListPullableTasksFilters {
   stageId?: string;
 }
 
-export function getPullableTasks(db: DB, filters?: ListPullableTasksFilters): Task[] {
+export function getPullableTasks(db: DBOrTx, filters?: ListPullableTasksFilters): Task[] {
   const conditions = [
     inArray(tasks.status, [...PULLABLE_STATUSES]),
     isNull(tasks.assigneeId),
@@ -169,7 +169,7 @@ interface UpdateTaskInput {
   autoPullEligible?: boolean | null;
 }
 
-export function updateTask(db: DB, id: string, updates: UpdateTaskInput): Task {
+export function updateTask(db: DBOrTx, id: string, updates: UpdateTaskInput): Task {
   const { properties, ...rest } = updates;
   const setClause: Record<string, unknown> = { ...rest };
   if (properties !== undefined) {
@@ -195,7 +195,7 @@ interface CompleteTaskInput {
 }
 
 export function completeTask(
-  db: DB,
+  db: DBOrTx,
   id: string,
   input: CompleteTaskInput,
 ): Task {
@@ -247,14 +247,14 @@ export function completeTask(
 
 // ── getTaskSpec ────────────────────────────────────────────────────────────
 
-export function getTaskSpec(db: DB, id: string): string | null {
+export function getTaskSpec(db: DBOrTx, id: string): string | null {
   const task = db.select().from(tasks).where(eq(tasks.id, id)).get();
   return task?.specContent ?? null;
 }
 
 // ── setTaskSpec ────────────────────────────────────────────────────────────
 
-export function setTaskSpec(db: DB, id: string, specContent: string): Task {
+export function setTaskSpec(db: DBOrTx, id: string, specContent: string): Task {
   const rows = db
     .update(tasks)
     .set({
@@ -270,7 +270,7 @@ export function setTaskSpec(db: DB, id: string, specContent: string): Task {
 // ── appendTaskSpec ─────────────────────────────────────────────────────────
 
 export function appendTaskSpec(
-  db: DB,
+  db: DBOrTx,
   id: string,
   content: string,
 ): Task {
@@ -331,7 +331,7 @@ export interface AddTaskResourceLinkInput {
 }
 
 export function addTaskResourceLink(
-  db: DB,
+  db: DBOrTx,
   taskId: string,
   input: AddTaskResourceLinkInput,
 ): ResourceLink {
@@ -352,7 +352,7 @@ export function addTaskResourceLink(
   return row;
 }
 
-export function listTaskResourceLinks(db: DB, taskId: string): ResourceLink[] {
+export function listTaskResourceLinks(db: DBOrTx, taskId: string): ResourceLink[] {
   return db
     .select()
     .from(resourceLinks)
@@ -362,7 +362,7 @@ export function listTaskResourceLinks(db: DB, taskId: string): ResourceLink[] {
 }
 
 export function removeTaskResourceLink(
-  db: DB,
+  db: DBOrTx,
   taskId: string,
   linkId: string,
 ): ResourceLink | null {

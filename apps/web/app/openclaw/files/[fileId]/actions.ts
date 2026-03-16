@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { revertTrackedOpenClawFile, OpenClawActionError } from "@clawops/sync/openclaw";
-import { events, createActivityEvent, type DB } from "@clawops/core";
+import { events, createActivityEvent } from "@clawops/core";
 import { getDb } from "@/lib/server/runtime";
 
 export async function revertFileRevisionAction(
@@ -27,7 +27,7 @@ export async function revertFileRevisionAction(
         })
         .run();
 
-      createActivityEvent(tx as unknown as DB, {
+      createActivityEvent(tx, {
         source: "user",
         severity: "info",
         type: "file.reverted",

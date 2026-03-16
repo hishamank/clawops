@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events, createActivityEvent, type DB } from "@clawops/core";
+import { events, createActivityEvent } from "@clawops/core";
 import { ConflictError, IdeaStatus, NotFoundError, Source } from "@clawops/domain";
 import { createIdea, listIdeas } from "@clawops/ideas";
 import { getDb, jsonError, parseSearch, requireAgentId } from "@/lib/server/runtime";
@@ -49,7 +49,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     const body = createIdeaBody.parse(await req.json());
     const db = getDb();
     const idea = db.transaction((tx) => {
-      const i = createIdea(tx as unknown as DB, body);
+      const i = createIdea(tx, body);
       tx.insert(events)
         .values({
           action: "idea.created",
@@ -59,7 +59,7 @@ export async function POST(req: Request): Promise<NextResponse> {
           meta: JSON.stringify({ title: i.title }),
         })
         .run();
-      createActivityEvent(tx as unknown as DB, {
+      createActivityEvent(tx, {
         source: "agent",
         type: "idea.created",
         title: `Idea created: ${i.title}`,

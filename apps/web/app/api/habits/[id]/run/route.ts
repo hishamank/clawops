@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events, type DB } from "@clawops/core";
+import { events } from "@clawops/core";
 import { logHabitRun } from "@clawops/habits";
 import { getDb, jsonError, isNotFoundError, requireAgentId } from "@/lib/server/runtime";
 
@@ -25,7 +25,7 @@ export async function POST(
     const body = habitRunSchema.parse(await req.json());
     const db = getDb();
     const run = db.transaction((tx) => {
-      const r = logHabitRun(tx as unknown as DB, id, auth, body);
+      const r = logHabitRun(tx, id, auth, body);
       tx.insert(events)
         .values({
           id: crypto.randomUUID(),

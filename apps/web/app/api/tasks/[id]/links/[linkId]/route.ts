@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events, createActivityEvent, type DB } from "@clawops/core";
+import { events, createActivityEvent } from "@clawops/core";
 import { removeTaskResourceLink, getTask } from "@clawops/tasks";
 import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
 import { serializeLink } from "../utils";
@@ -23,7 +23,7 @@ export async function DELETE(
     if (!task) return jsonError(404, "Task not found", "TASK_NOT_FOUND");
     const agentId = getAgentIdFromApiKey(req) ?? undefined;
     const removed = db.transaction((tx) => {
-      const link = removeTaskResourceLink(tx as unknown as DB, id, linkId);
+      const link = removeTaskResourceLink(tx, id, linkId);
       if (!link) return null;
       const metadata = {
         linkId: link.id,
@@ -40,7 +40,7 @@ export async function DELETE(
           meta: JSON.stringify(metadata),
         })
         .run();
-      createActivityEvent(tx as unknown as DB, {
+      createActivityEvent(tx, {
         source: agentId ? "agent" : "user",
         type: "task.link.removed",
         title: `Link removed from task: ${task.title}`,

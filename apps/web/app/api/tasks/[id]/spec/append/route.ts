@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events, createActivityEvent, type DB } from "@clawops/core";
+import { events, createActivityEvent } from "@clawops/core";
 import { appendTaskSpec } from "@clawops/tasks";
 import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
 
@@ -22,7 +22,7 @@ export async function POST(
     const db = getDb();
     const agentId = getAgentIdFromApiKey(req) ?? undefined;
     const task = db.transaction((tx) => {
-      const t = appendTaskSpec(tx as unknown as DB, id, body.content);
+      const t = appendTaskSpec(tx, id, body.content);
       tx.insert(events)
         .values({
           action: "task.spec_appended",
@@ -32,7 +32,7 @@ export async function POST(
           meta: JSON.stringify({ contentLength: body.content.length }),
         })
         .run();
-      createActivityEvent(tx as unknown as DB, {
+      createActivityEvent(tx, {
         source: agentId ? "agent" : "user",
         type: "task.spec_appended",
         title: `Task spec appended: ${t.title}`,

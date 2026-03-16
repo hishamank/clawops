@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events, createActivityEvent, type DB } from "@clawops/core";
+import { events, createActivityEvent } from "@clawops/core";
 import { completeTask } from "@clawops/tasks";
 import { createNotification } from "@clawops/notifications";
 import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
@@ -27,9 +27,9 @@ export async function POST(
     const db = getDb();
     const agentId = getAgentIdFromApiKey(req) ?? undefined;
     const task = db.transaction((tx) => {
-      const t = completeTask(tx as unknown as DB, id, body);
+      const t = completeTask(tx, id, body);
       if (!t) return null;
-      createNotification(tx as unknown as DB, {
+      createNotification(tx, {
         type: "task.completed",
         title: "Task completed",
         body: `Task "${t.title}" has been completed.`,
@@ -45,7 +45,7 @@ export async function POST(
           meta: JSON.stringify({ summary: body.summary }),
         })
         .run();
-      createActivityEvent(tx as unknown as DB, {
+      createActivityEvent(tx, {
         source: agentId ? "agent" : "user",
         type: "task.completed",
         title: `Task completed: ${t.title}`,

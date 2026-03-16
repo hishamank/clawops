@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events, createActivityEvent, type DB } from "@clawops/core";
+import { events, createActivityEvent } from "@clawops/core";
 import { ProjectStatus } from "@clawops/domain";
 import { createProject, listProjects } from "@clawops/projects";
 import { getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
@@ -30,7 +30,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     const body = createProjectBody.parse(await req.json());
     const db = getDb();
     const project = db.transaction((tx) => {
-      const p = createProject(tx as unknown as DB, body);
+      const p = createProject(tx, body);
       tx.insert(events)
         .values({
           action: "project.created",
@@ -40,7 +40,7 @@ export async function POST(req: Request): Promise<NextResponse> {
           meta: JSON.stringify({ name: p.name }),
         })
         .run();
-      createActivityEvent(tx as unknown as DB, {
+      createActivityEvent(tx, {
         source: "agent",
         type: "project.created",
         title: `Project created: ${p.name}`,

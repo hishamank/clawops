@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events, createActivityEvent, type DB } from "@clawops/core";
+import { events, createActivityEvent } from "@clawops/core";
 import {
   listCronJobs,
   syncCronJobs,
@@ -46,7 +46,7 @@ export async function GET(req: Request): Promise<NextResponse> {
       }
 
       // syncCronJobs is async (fetches from gateway) — must run outside the transaction
-      await syncCronJobs(db as DB, connection, getGatewayToken(req));
+      await syncCronJobs(db, connection, getGatewayToken(req));
 
       db.transaction((tx) => {
         tx.insert(events)
@@ -62,7 +62,7 @@ export async function GET(req: Request): Promise<NextResponse> {
           .run();
 
         try {
-          createActivityEvent(tx as unknown as DB, {
+          createActivityEvent(tx, {
             source: "sync",
             type: "cron.synced",
             title: `Cron jobs synced for connection: ${connection.name}`,
@@ -78,7 +78,7 @@ export async function GET(req: Request): Promise<NextResponse> {
     }
 
     return NextResponse.json(
-      listCronJobs(db as DB, connectionId ? { connectionId } : {}),
+      listCronJobs(db, connectionId ? { connectionId } : {}),
     );
   } catch (err) {
     if (err instanceof z.ZodError) {
