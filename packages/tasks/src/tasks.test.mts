@@ -48,6 +48,8 @@ mock.module("@clawops/core", {
     tasks: Symbol("tasks"),
     artifacts: Symbol("artifacts"),
     usageLogs: Symbol("usageLogs"),
+    taskRelations: Symbol("taskRelations"),
+    resourceLinks: Symbol("resourceLinks"),
     eq: () => ({}),
     and: () => ({}),
   },
@@ -67,10 +69,11 @@ mock.module("drizzle-orm", {
     eq: () => ({}),
     and: () => ({}),
     or: () => ({}),
+    inArray: () => ({}),
   },
 });
 
-const { createTask, getTask, listTasks, updateTask, parseTaskProperties } = await import("../dist/index.js");
+const { createTask, getTask, listTasks, updateTask, parseTaskProperties, getBlockedAndBlockingIds } = await import("../dist/index.js");
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
@@ -152,5 +155,110 @@ describe("parseTaskProperties", () => {
       properties: JSON.stringify([1, 2, 3]),
     });
     assert.deepStrictEqual(result, {});
+  });
+});
+
+describe("getBlockedAndBlockingIds", () => {
+  it("returns empty sets for empty task list", () => {
+    const result = getBlockedAndBlockingIds(makeDb(null, []), []);
+    assert.equal(result.blockedIds.size, 0);
+    assert.equal(result.blockingIds.size, 0);
+  });
+
+  it("returns empty sets when no blocking relations exist", () => {
+    // DB returns no relations from taskRelations query
+    const db = makeDb(null, []);
+    const result = getBlockedAndBlockingIds(db, ["task-1", "task-2"]);
+    assert.equal(result.blockedIds.size, 0);
+    assert.equal(result.blockingIds.size, 0);
+  });
+
+  it("identifies blocked and blocking tasks from blocks relations", () => {
+    const relations = [
+      { type: "blocks", fromTaskId: "task-a", toTaskId: "task-b" },
+    ];
+    const blockerTask = { ...FAKE_TASK, id: "task-a", status: "todo" };
+
+    let selectCallCount = 0;
+    const selectChain: any = {
+      all: () => {
+        selectCallCount++;
+        // First call returns relations, second returns blocker tasks
+        return selectCallCount === 1 ? relations : [blockerTask];
+      },
+      get: () => null,
+      where: () => selectChain,
+      from: () => selectChain,
+    };
+    const db: any = {
+      insert: () => selectChain,
+      select: () => selectChain,
+      update: () => selectChain,
+      delete: () => selectChain,
+    };
+
+    const result = getBlockedAndBlockingIds(db, ["task-a", "task-b"]);
+    assert.ok(result.blockedIds.has("task-b"));
+    assert.ok(result.blockingIds.has("task-a"));
+  });
+
+  it("identifies blocked and blocking tasks from depends-on relations", () => {
+    // task-x depends-on task-y → task-y blocks task-x
+    const relations = [
+      { type: "depends-on", fromTaskId: "task-x", toTaskId: "task-y" },
+    ];
+    const blockerTask = { ...FAKE_TASK, id: "task-y", status: "in-progress" };
+
+    let selectCallCount = 0;
+    const selectChain: any = {
+      all: () => {
+        selectCallCount++;
+        return selectCallCount === 1 ? relations : [blockerTask];
+      },
+      get: () => null,
+      where: () => selectChain,
+      from: () => selectChain,
+    };
+    const db: any = {
+      insert: () => selectChain,
+      select: () => selectChain,
+      update: () => selectChain,
+      delete: () => selectChain,
+    };
+
+    const result = getBlockedAndBlockingIds(db, ["task-x", "task-y"]);
+    // task-x should be blocked (it depends on task-y which is not done)
+    assert.ok(result.blockedIds.has("task-x"));
+    assert.equal(result.blockedIds.has("task-y"), false);
+    // task-y should be blocking (other tasks depend on it)
+    assert.ok(result.blockingIds.has("task-y"));
+    assert.equal(result.blockingIds.has("task-x"), false);
+  });
+
+  it("does not mark task as blocked when blocker is done", () => {
+    const relations = [
+      { type: "blocks", fromTaskId: "task-a", toTaskId: "task-b" },
+    ];
+    const doneBlocker = { ...FAKE_TASK, id: "task-a", status: "done" };
+
+    let selectCallCount = 0;
+    const selectChain: any = {
+      all: () => {
+        selectCallCount++;
+        return selectCallCount === 1 ? relations : [doneBlocker];
+      },
+      get: () => null,
+      where: () => selectChain,
+      from: () => selectChain,
+    };
+    const db: any = {
+      insert: () => selectChain,
+      select: () => selectChain,
+      update: () => selectChain,
+      delete: () => selectChain,
+    };
+
+    const result = getBlockedAndBlockingIds(db, ["task-a", "task-b"]);
+    assert.equal(result.blockedIds.has("task-b"), false);
   });
 });

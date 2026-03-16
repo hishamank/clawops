@@ -133,3 +133,88 @@ export function getBlockersForTask(db: DB, taskId: string): Task[] {
 export function isTaskBlocked(db: DB, taskId: string): boolean {
   return getBlockersForTask(db, taskId).length > 0;
 }
+
+/**
+ * Batch-compute which task IDs are blocked and which block others.
+ * Scopes the relations query to rows involving the provided taskIds,
+ * then fetches blocker completion status in a single follow-up query.
+ */
+export function getBlockedAndBlockingIds(
+  db: DB,
+  taskIds: string[],
+): { blockedIds: Set<string>; blockingIds: Set<string> } {
+  const blockedIds = new Set<string>();
+  const blockingIds = new Set<string>();
+
+  if (taskIds.length === 0) return { blockedIds, blockingIds };
+
+  const taskIdSet = new Set(taskIds);
+
+  const relations = db
+    .select()
+    .from(taskRelations)
+    .where(
+      and(
+        inArray(taskRelations.type, ["blocks", "depends-on"]),
+        or(
+          inArray(taskRelations.fromTaskId, taskIds),
+          inArray(taskRelations.toTaskId, taskIds),
+        ),
+      ),
+    )
+    .all();
+
+  // Collect IDs of tasks referenced by blocking relations that we need to
+  // check completion status for.
+  const blockerCandidateIds = new Set<string>();
+
+  type PendingCheck = { blockedId: string; blockerId: string };
+  const pending: PendingCheck[] = [];
+
+  for (const rel of relations) {
+    if (rel.type === "blocks") {
+      // fromTask blocks toTask
+      if (taskIdSet.has(rel.toTaskId)) {
+        pending.push({ blockedId: rel.toTaskId, blockerId: rel.fromTaskId });
+        blockerCandidateIds.add(rel.fromTaskId);
+      }
+      if (taskIdSet.has(rel.fromTaskId)) {
+        // fromTask is a blocker of something
+        blockingIds.add(rel.fromTaskId);
+      }
+    } else if (rel.type === "depends-on") {
+      // fromTask depends on toTask → toTask blocks fromTask
+      if (taskIdSet.has(rel.fromTaskId)) {
+        pending.push({ blockedId: rel.fromTaskId, blockerId: rel.toTaskId });
+        blockerCandidateIds.add(rel.toTaskId);
+      }
+      if (taskIdSet.has(rel.toTaskId)) {
+        blockingIds.add(rel.toTaskId);
+      }
+    }
+  }
+
+  if (pending.length === 0) return { blockedIds, blockingIds };
+
+  // Fetch completion status of blocker candidates
+  const candidateIds = Array.from(blockerCandidateIds);
+  const blockerTasks: Task[] = db
+    .select()
+    .from(tasks)
+    .where(inArray(tasks.id, candidateIds))
+    .all();
+
+  const completedOrCancelled = new Set(
+    blockerTasks
+      .filter((t: Task) => t.status === "done" || t.status === "cancelled")
+      .map((t: Task) => t.id),
+  );
+
+  for (const { blockedId, blockerId } of pending) {
+    if (!completedOrCancelled.has(blockerId)) {
+      blockedIds.add(blockedId);
+    }
+  }
+
+  return { blockedIds, blockingIds };
+}
