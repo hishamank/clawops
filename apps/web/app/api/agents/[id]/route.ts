@@ -2,9 +2,23 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { tasks, eq, desc } from "@clawops/core";
-import { getAgent } from "@clawops/agents";
+import {
+  tasks,
+  activityEvents,
+  openclawSessions,
+  agentMessages,
+  eq,
+  or,
+  desc,
+  and,
+  type OpenClawSession,
+  type AgentMessage,
+  type ActivityEvent,
+  type Habit,
+} from "@clawops/core";
+import { getAgent, getOpenClawMappingByAgentId } from "@clawops/agents";
 import { getHabitStreak, listHabits } from "@clawops/habits";
+import { listCronJobs } from "@clawops/habits";
 import { getDb, jsonError } from "@/lib/server/runtime";
 
 const idParams = z.object({ id: z.string().min(1) });
@@ -36,10 +50,64 @@ export async function GET(
       streaks: getHabitStreak(db, h.id, 7),
     }));
 
+    // OpenClaw mapping
+    const openclawMapping = getOpenClawMappingByAgentId(db, id);
+
+    // Sessions — scoped to connection + external agent ID
+    let sessions: OpenClawSession[] = [];
+    if (openclawMapping) {
+      sessions = db
+        .select()
+        .from(openclawSessions)
+        .where(
+          and(
+            eq(openclawSessions.connectionId, openclawMapping.connectionId),
+            eq(openclawSessions.agentId, openclawMapping.externalAgentId),
+          ),
+        )
+        .orderBy(desc(openclawSessions.updatedAt))
+        .limit(10)
+        .all() as OpenClawSession[];
+    }
+
+    // Cron jobs — habits of type "cron" for this agent
+    const cronJobs = listCronJobs(db).filter((h) => h.agentId === id) as Habit[];
+
+    // Messages — sent or received by this agent's external ID
+    let messages: AgentMessage[] = [];
+    if (openclawMapping) {
+      messages = db
+        .select()
+        .from(agentMessages)
+        .where(
+          or(
+            eq(agentMessages.fromAgentId, openclawMapping.externalAgentId),
+            eq(agentMessages.toAgentId, openclawMapping.externalAgentId),
+          ),
+        )
+        .orderBy(desc(agentMessages.sentAt))
+        .limit(10)
+        .all() as AgentMessage[];
+    }
+
+    // Activity events for this agent
+    const activity = db
+      .select()
+      .from(activityEvents)
+      .where(eq(activityEvents.agentId, id))
+      .orderBy(desc(activityEvents.createdAt))
+      .limit(15)
+      .all() as ActivityEvent[];
+
     return NextResponse.json({
       ...safeAgent,
       recentTasks,
       habits: habitsWithStreaks,
+      sessions,
+      cronJobs,
+      messages,
+      activity,
+      openclawMapping,
     });
   } catch (err) {
     if (err instanceof z.ZodError) {

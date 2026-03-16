@@ -310,6 +310,45 @@ describe("OpenClaw durable identity mapping", () => {
     assert.equal(agentModule.listAgents(db as never).length, 1);
   });
 
+  it("getOpenClawMappingByAgentId returns mapping for a linked agent", () => {
+    const db = createFakeDb();
+    const connectionId = "conn-1";
+
+    const result = agentModule.initAgent(db as never, {
+      name: "Gamma",
+      model: "claude-opus",
+      role: "builder",
+      framework: "openclaw",
+      openclaw: {
+        connectionId,
+        externalAgentId: "gamma-ext",
+        externalAgentName: "Gamma External",
+        workspacePath: "/tmp/gamma",
+      },
+    });
+
+    const mapping = agentModule.getOpenClawMappingByAgentId(db as never, result.agent.id);
+    assert.ok(mapping, "mapping should exist");
+    assert.equal(mapping.linkedAgentId, result.agent.id);
+    assert.equal(mapping.externalAgentId, "gamma-ext");
+    assert.equal(mapping.externalAgentName, "Gamma External");
+    assert.equal(mapping.workspacePath, "/tmp/gamma");
+  });
+
+  it("getOpenClawMappingByAgentId returns null for agent without mapping", () => {
+    const db = createFakeDb();
+
+    const result = agentModule.initAgent(db as never, {
+      name: "Delta",
+      model: "claude-opus",
+      role: "builder",
+      framework: "native",
+    });
+
+    const mapping = agentModule.getOpenClawMappingByAgentId(db as never, result.agent.id);
+    assert.equal(mapping, null);
+  });
+
   it("links a legacy agent by name once, then uses the durable mapping after rename", () => {
     const db = createFakeDb();
     const connectionId = "conn-1";

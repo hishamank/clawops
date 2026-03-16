@@ -80,9 +80,9 @@ export interface Habit {
   cronExpr: string | null;
   trigger: string | null;
   status: HabitStatus;
-  lastRun: string | null;
-  nextRun: string | null;
-  createdAt: string;
+  lastRun: string | Date | null;
+  nextRun: string | Date | null;
+  createdAt: string | Date;
 }
 
 export interface HabitStreak {
@@ -153,10 +153,59 @@ export interface ProjectDetail extends ProjectListItem {
   tasks?: Task[];
 }
 
+export interface OpenClawSession {
+  id: string;
+  connectionId: string;
+  sessionKey: string;
+  agentId: string | null;
+  model: string | null;
+  status: "active" | "ended";
+  startedAt: string | Date;
+  endedAt: string | Date | null;
+  metadata: string | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+export interface AgentMessage {
+  id: string;
+  connectionId: string;
+  fromAgentId: string | null;
+  toAgentId: string | null;
+  sessionId: string | null;
+  channel: string | null;
+  messageType: string | null;
+  summary: string | null;
+  content: string | null;
+  sentAt: string | Date;
+  createdAt: string | Date;
+}
+
+export interface OpenClawMapping {
+  id: string;
+  connectionId: string;
+  linkedAgentId: string;
+  externalAgentId: string;
+  externalAgentName: string;
+  workspacePath: string | null;
+  memoryPath: string | null;
+  defaultModel: string | null;
+  role: string | null;
+  avatar: string | null;
+  lastSeenAt: string | Date | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
 export interface AgentDetail extends Agent {
   recentTasks?: Task[];
   habits?: Habit[];
   streaks?: Record<string, HabitStreak[]>;
+  sessions?: OpenClawSession[];
+  cronJobs?: Habit[];
+  messages?: AgentMessage[];
+  activity?: ActivityEvent[];
+  openclawMapping?: OpenClawMapping | null;
 }
 
 export interface ActivityEvent {
@@ -172,5 +221,5 @@ export interface ActivityEvent {
   projectId: string | null;
   taskId: string | null;
   metadata: string | null;
-  createdAt: string;
+  createdAt: string | Date;
 }
