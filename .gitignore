@@ -13,3 +13,5 @@ coverage/
 *.tsbuildinfo
 self-notes
 .rick/
+logs/*.log
+.clawops-web.pid

@@ -240,6 +240,60 @@ GET  /api/sync/openclaw
 POST /api/sync/openclaw/install-skill
 ```
 
+## Production Deployment
+
+### Using PM2 (Recommended)
+
+PM2 provides process management with auto-restart, log rotation, and easy deployment commands.
+
+```bash
+# Install PM2 globally
+npm install -g pm2
+
+# Deploy and start the web app
+./scripts/deploy-web.sh
+
+# View status
+pm2 status clawops-web
+
+# View logs
+pm2 logs clawops-web
+
+# Stop
+pm2 stop clawops-web
+
+# Restart after code changes
+./scripts/deploy-web.sh
+```
+
+### Using systemd
+
+For systems with systemd, use the provided service template:
+
+1. Copy `scripts/clawops-web.service` to `/etc/systemd/system/`
+2. Edit the file and replace placeholders:
+   - `%USER%` → your username
+   - `%PROJECT_ROOT%` → absolute path to project root
+3. Enable and start:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable clawops-web
+sudo systemctl start clawops-web
+sudo systemctl status clawops-web
+```
+
+### Manual Start
+
+```bash
+# Build
+pnpm build --filter @clawops/web
+
+# Start standalone server
+cd apps/web/.next/standalone
+node server.js
+```
+
 ## Development
 
 ### Run Tests

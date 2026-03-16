@@ -1,0 +1,20 @@
+[Unit]
+Description=ClawOps Web Dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=%USER%
+WorkingDirectory=%PROJECT_ROOT%
+Environment="NODE_ENV=production"
+Environment="PORT=3333"
+Environment="CLAWOPS_MODE=local"
+Environment="CLAWOPS_DB_PATH=%PROJECT_ROOT%/clawops.db"
+ExecStart=/usr/bin/node %PROJECT_ROOT%/apps/web/.next/standalone/server.js
+Restart=always
+RestartSec=10
+StandardOutput=append:%PROJECT_ROOT%/logs/clawops-web-out.log
+StandardError=append:%PROJECT_ROOT%/logs/clawops-web-error.log
+
+[Install]
+WantedBy=multi-user.target
