@@ -86,7 +86,7 @@ export function TaskPanel({
           </div>
         ) : (
           <TaskList
-            tasks={filtered as never[]}
+            tasks={filtered}
             showAssignee={false}
             showProject={false}
             compact

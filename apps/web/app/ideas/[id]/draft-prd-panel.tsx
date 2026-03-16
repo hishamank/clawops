@@ -21,27 +21,42 @@ export function DraftPrdPanel({
   const [editing, setEditing] = useState(false);
   const [content, setContent] = useState(initialContent ?? "");
   const [isPending, startTransition] = useTransition();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
 
   async function handleSave(): Promise<void> {
-    const res = await fetch(`/api/ideas/${ideaId}/draft-prd`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content }),
-    });
-    if (res.ok) {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/ideas/${ideaId}/draft-prd`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      if (!res.ok) {
+        setError("Failed to save");
+        return;
+      }
       setEditing(false);
       startTransition(() => {
         router.refresh();
       });
+    } catch {
+      setError("Failed to save");
+    } finally {
+      setSaving(false);
     }
   }
 
   function handleCancel(): void {
     setContent(initialContent ?? "");
     setEditing(false);
+    setError(null);
   }
+
+  const busy = saving || isPending;
 
   return (
     <Card className="border-indigo-500/20">
@@ -62,13 +77,16 @@ export function DraftPrdPanel({
           )}
           {editing && (
             <div className="flex items-center gap-1">
+              {error && (
+                <span className="text-xs text-rose-400 mr-1">{error}</span>
+              )}
               <Button
                 variant="ghost"
                 size="icon-xs"
                 onClick={handleSave}
-                disabled={isPending}
+                disabled={busy}
               >
-                {isPending ? (
+                {busy ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
                 ) : (
                   <Save className="h-3 w-3" />
@@ -78,7 +96,7 @@ export function DraftPrdPanel({
                 variant="ghost"
                 size="icon-xs"
                 onClick={handleCancel}
-                disabled={isPending}
+                disabled={busy}
               >
                 <X className="h-3 w-3" />
               </Button>

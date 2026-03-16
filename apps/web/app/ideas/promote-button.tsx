@@ -39,21 +39,22 @@ export function PromoteButton({ ideaId, disabled, disabledReason }: PromoteButto
       {error && (
         <span className="text-xs text-rose-400">{error}</span>
       )}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handlePromote}
-        disabled={isPending || disabled}
-        title={disabled ? disabledReason : undefined}
-        className="h-7 text-xs"
-      >
-        {isPending ? (
-          <Loader2 className="h-3 w-3 animate-spin" />
-        ) : (
-          <ArrowUpRight className="h-3 w-3" />
-        )}
-        Promote
-      </Button>
+      <span title={disabled ? disabledReason : undefined}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handlePromote}
+          disabled={isPending || disabled}
+          className="h-7 text-xs"
+        >
+          {isPending ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <ArrowUpRight className="h-3 w-3" />
+          )}
+          Promote
+        </Button>
+      </span>
     </div>
   );
 }

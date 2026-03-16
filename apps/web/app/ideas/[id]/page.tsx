@@ -1,12 +1,13 @@
 import { notFound } from "next/navigation";
 import { ArrowLeft, Tags } from "lucide-react";
 import Link from "next/link";
-import type { Idea } from "@/lib/types";
+import type { Idea, Task } from "@/lib/types";
 import type { IdeaStatus, Source } from "@clawops/domain";
 import { timeAgo } from "@/lib/time";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { getIdeaSections, listIdeaTasks } from "@clawops/ideas";
+import { IDEA_SECTION_KEYS, getIdeaSections, listIdeaTasks } from "@clawops/ideas";
+import type { IdeaSectionKey } from "@clawops/ideas";
 import { getDb } from "@/lib/server/runtime";
 import { ideas, eq } from "@clawops/core";
 import { PromoteButton } from "../promote-button";
@@ -42,12 +43,15 @@ const sourceStyles: Record<Source, string> = {
   script: "bg-purple-500/10 text-purple-400 border-purple-500/20",
 };
 
-const EDITABLE_SECTIONS = [
-  { key: "brainstorming", label: "Brainstorming" },
-  { key: "research", label: "Research" },
-  { key: "similarIdeas", label: "Similar Ideas" },
-  { key: "notes", label: "Notes" },
-] as const;
+const SECTION_LABELS: Record<IdeaSectionKey, string> = {
+  brainstorming: "Brainstorming",
+  research: "Research",
+  similarIdeas: "Similar Ideas",
+  draftPrd: "Draft PRD",
+  notes: "Notes",
+};
+
+const EDITABLE_SECTIONS = IDEA_SECTION_KEYS.filter((k) => k !== "draftPrd");
 
 async function getIdeaData(id: string) {
   const db = getDb();
@@ -63,7 +67,7 @@ async function getIdeaData(id: string) {
   }
 
   const sections = getIdeaSections(db, id);
-  const tasks = listIdeaTasks(db, id);
+  const tasks = listIdeaTasks(db, id) as unknown as Task[];
 
   return { idea: ideaRow as unknown as Idea, sections, tasks };
 }
@@ -90,6 +94,10 @@ export default async function IdeaDetailPage({ params }: PageProps): Promise<Rea
   const { idea, sections, tasks } = result;
   const tags = parseTags(idea.tags);
   const isPromoted = idea.status === "promoted";
+
+  const hasDraftPrd = !!sections.draftPrd;
+  const hasAtLeastOneTask = tasks.length >= 1;
+  const promoteReady = hasDraftPrd && hasAtLeastOneTask;
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -139,7 +147,13 @@ export default async function IdeaDetailPage({ params }: PageProps): Promise<Rea
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {!isPromoted && <PromoteButton ideaId={id} />}
+            {!isPromoted && (
+              <PromoteButton
+                ideaId={id}
+                disabled={!promoteReady}
+                disabledReason="Add a Draft PRD and at least one task before promoting"
+              />
+            )}
           </div>
         </div>
 
@@ -167,12 +181,12 @@ export default async function IdeaDetailPage({ params }: PageProps): Promise<Rea
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column - Sections */}
         <div className="lg:col-span-2 space-y-4">
-          {EDITABLE_SECTIONS.map(({ key, label }) => (
+          {EDITABLE_SECTIONS.map((key) => (
             <SectionEditor
               key={key}
               ideaId={id}
               sectionKey={key}
-              label={label}
+              label={SECTION_LABELS[key]}
               initialContent={sections[key] ?? null}
               readOnly={isPromoted}
             />
@@ -188,7 +202,7 @@ export default async function IdeaDetailPage({ params }: PageProps): Promise<Rea
         <div className="lg:col-span-1">
           <TaskPanel
             ideaId={id}
-            tasks={tasks as never[]}
+            tasks={tasks}
             isPromoted={isPromoted}
           />
         </div>
