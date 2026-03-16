@@ -14,9 +14,10 @@ import {
   type OpenClawSession,
   type AgentMessage,
   type ActivityEvent,
+  type Habit,
 } from "@clawops/core";
 import { getAgent, getOpenClawMappingByAgentId } from "@clawops/agents";
-import { getHabitStreak, listHabits, type Habit } from "@clawops/habits";
+import { getHabitStreak, listHabits } from "@clawops/habits";
 import { listCronJobs } from "@clawops/habits";
 import { getDb, jsonError } from "@/lib/server/runtime";
 

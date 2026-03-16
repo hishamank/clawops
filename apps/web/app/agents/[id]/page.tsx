@@ -96,7 +96,10 @@ function parseSkills(skills: string | null): string[] {
   }
 }
 
-function formatDuration(startedAt: string, endedAt: string | null): string {
+function formatDuration(
+  startedAt: string | Date,
+  endedAt: string | Date | null,
+): string {
   if (!endedAt) return "active";
   const ms = new Date(endedAt).getTime() - new Date(startedAt).getTime();
   const seconds = Math.floor(ms / 1000);

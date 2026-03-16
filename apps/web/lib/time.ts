@@ -1,7 +1,7 @@
-export function timeAgo(dateStr: string | null): string {
+export function timeAgo(dateStr: string | Date | null): string {
   if (!dateStr) return "never";
 
-  const date = new Date(dateStr);
+  const date = dateStr instanceof Date ? dateStr : new Date(dateStr);
   if (!Number.isFinite(date.getTime())) return "unknown";
   const now = new Date();
   const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);

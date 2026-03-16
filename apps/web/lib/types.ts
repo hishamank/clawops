@@ -80,9 +80,9 @@ export interface Habit {
   cronExpr: string | null;
   trigger: string | null;
   status: HabitStatus;
-  lastRun: string | null;
-  nextRun: string | null;
-  createdAt: string;
+  lastRun: string | Date | null;
+  nextRun: string | Date | null;
+  createdAt: string | Date;
 }
 
 export interface HabitStreak {
@@ -160,10 +160,11 @@ export interface OpenClawSession {
   agentId: string | null;
   model: string | null;
   status: "active" | "ended";
-  startedAt: string;
-  endedAt: string | null;
+  startedAt: string | Date;
+  endedAt: string | Date | null;
   metadata: string | null;
-  createdAt: string;
+  createdAt: string | Date;
+  updatedAt: string | Date;
 }
 
 export interface AgentMessage {
@@ -176,8 +177,8 @@ export interface AgentMessage {
   messageType: string | null;
   summary: string | null;
   content: string | null;
-  sentAt: string;
-  createdAt: string;
+  sentAt: string | Date;
+  createdAt: string | Date;
 }
 
 export interface OpenClawMapping {
@@ -191,9 +192,9 @@ export interface OpenClawMapping {
   defaultModel: string | null;
   role: string | null;
   avatar: string | null;
-  lastSeenAt: string | null;
-  createdAt: string;
-  updatedAt: string;
+  lastSeenAt: string | Date | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
 }
 
 export interface AgentDetail extends Agent {
@@ -220,5 +221,5 @@ export interface ActivityEvent {
   projectId: string | null;
   taskId: string | null;
   metadata: string | null;
-  createdAt: string;
+  createdAt: string | Date;
 }
