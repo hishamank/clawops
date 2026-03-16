@@ -289,10 +289,15 @@ sudo systemctl status clawops-web
 # Build
 pnpm build --filter @clawops/web
 
-# Start standalone server
+# Start standalone server with custom port
 cd apps/web/.next/standalone
-node server.js
+PORT=3333 node server.js
+
+# Or with environment variables:
+CLAWOPS_DB_PATH=/path/to/clawops.db PORT=3333 node server.js
 ```
+
+The standalone server reads the `PORT` environment variable (not `WEB_PORT`). If `CLAWOPS_DB_PATH` is relative, it will be resolved relative to the current working directory.
 
 ## Development
 

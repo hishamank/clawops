@@ -4,17 +4,19 @@ After=network.target
 
 [Service]
 Type=simple
-User=%USER%
-WorkingDirectory=%PROJECT_ROOT%
+# Replace REPLACE_ME_USER with your username (e.g., hicham)
+User=REPLACE_ME_USER
+# Replace REPLACE_ME_PROJECT_ROOT with the absolute path to the project root
+WorkingDirectory=/REPLACE_ME_PROJECT_ROOT
 Environment="NODE_ENV=production"
 Environment="PORT=3333"
 Environment="CLAWOPS_MODE=local"
-Environment="CLAWOPS_DB_PATH=%PROJECT_ROOT%/clawops.db"
-ExecStart=/usr/bin/node %PROJECT_ROOT%/apps/web/.next/standalone/server.js
+Environment="CLAWOPS_DB_PATH=/REPLACE_ME_PROJECT_ROOT/clawops.db"
+ExecStart=/usr/bin/node /REPLACE_ME_PROJECT_ROOT/apps/web/.next/standalone/server.js
 Restart=always
 RestartSec=10
-StandardOutput=append:%PROJECT_ROOT%/logs/clawops-web-out.log
-StandardError=append:%PROJECT_ROOT%/logs/clawops-web-error.log
+StandardOutput=append:/REPLACE_ME_PROJECT_ROOT/logs/clawops-web-out.log
+StandardError=append:/REPLACE_ME_PROJECT_ROOT/logs/clawops-web-error.log
 
 [Install]
 WantedBy=multi-user.target
