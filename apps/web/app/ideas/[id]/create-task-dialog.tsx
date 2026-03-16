@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,10 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 interface CreateTaskDialogProps {
   ideaId: string;
   variant?: "default" | "ghost" | "outline" | "secondary" | "link" | "destructive";
-  size?: "default" | "sm" | "lg" | "icon";
+  size?: "default" | "xs" | "sm" | "lg" | "icon";
 }
 
 export function CreateTaskDialog({ ideaId, variant = "default", size = "default" }: CreateTaskDialogProps): React.JSX.Element {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [title, setTitle] = useState("");
@@ -32,7 +34,7 @@ export function CreateTaskDialog({ ideaId, variant = "default", size = "default"
         setTitle("");
         setDescription("");
         setPriority("medium");
-        window.location.reload();
+        router.refresh();
       }
     });
   }

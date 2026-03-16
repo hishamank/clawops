@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 
 interface PromoteButtonProps {
   ideaId: string;
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
-export function PromoteButton({ ideaId }: PromoteButtonProps): React.JSX.Element {
+export function PromoteButton({ ideaId, disabled, disabledReason }: PromoteButtonProps): React.JSX.Element {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -32,25 +34,33 @@ export function PromoteButton({ ideaId }: PromoteButtonProps): React.JSX.Element
     }
   }
 
+  const reasonId = disabled && disabledReason ? `${ideaId}-promote-reason` : undefined;
+
   return (
-    <div className="flex items-center gap-2">
-      {error && (
-        <span className="text-xs text-rose-400">{error}</span>
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2">
+        {error && <span className="text-xs text-rose-400">{error}</span>}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handlePromote}
+          disabled={isPending || disabled}
+          className="h-7 text-xs"
+          aria-describedby={reasonId}
+        >
+          {isPending ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <ArrowUpRight className="h-3 w-3" />
+          )}
+          Promote
+        </Button>
+      </div>
+      {reasonId && (
+        <p id={reasonId} className="text-xs text-muted-foreground">
+          {disabledReason}
+        </p>
       )}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handlePromote}
-        disabled={isPending}
-        className="h-7 text-xs"
-      >
-        {isPending ? (
-          <Loader2 className="h-3 w-3 animate-spin" />
-        ) : (
-          <ArrowUpRight className="h-3 w-3" />
-        )}
-        Promote
-      </Button>
     </div>
   );
 }
