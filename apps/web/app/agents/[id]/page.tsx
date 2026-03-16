@@ -449,8 +449,6 @@ export default async function AgentProfile({ params }: PageProps): Promise<React
           {syncFailed ? (
             <PanelErrorState
               message={syncStatus?.error ?? "Sync failed"}
-              actionLabel="Run sync"
-              actionHref={`/api/integrations/openclaw/${openclawMapping?.connectionId}/reconcile`}
             />
           ) : sessions.length === 0 ? (
             hasOpenClawLink ? (
@@ -458,15 +456,11 @@ export default async function AgentProfile({ params }: PageProps): Promise<React
                 <PanelEmptyState
                   description="No sessions recorded from OpenClaw gateway."
                   diagnostic="Sessions are synced from the OpenClaw gateway during reconciliation. Run a sync to fetch latest sessions."
-                  actionLabel="Run sync"
-                  actionHref={`/api/integrations/openclaw/${openclawMapping?.connectionId}/reconcile`}
                 />
               ) : (
                 <PanelEmptyState
                   description="No sessions recorded."
                   diagnostic="Sync has not been run for this connection yet. Run a sync to fetch sessions from OpenClaw gateway."
-                  actionLabel="Run sync"
-                  actionHref={`/api/integrations/openclaw/${openclawMapping?.connectionId}/reconcile`}
                 />
               )
             ) : (
@@ -522,7 +516,21 @@ export default async function AgentProfile({ params }: PageProps): Promise<React
         </CardHeader>
         <CardContent>
           {cronJobs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No cron jobs configured.</p>
+            hasOpenClawLink ? (
+              hasSyncRun ? (
+                <PanelEmptyState
+                  description="No cron jobs synced from OpenClaw gateway."
+                  diagnostic="Cron jobs are synced from OpenClaw gateway during reconciliation."
+                />
+              ) : (
+                <PanelEmptyState
+                  description="No cron jobs configured."
+                  diagnostic="Sync has not been run for this connection yet."
+                />
+              )
+            ) : (
+              <p className="text-sm text-muted-foreground">No cron jobs configured.</p>
+            )
           ) : (
             <div className="space-y-3">
               {cronJobs.map((job) => (
@@ -586,8 +594,6 @@ export default async function AgentProfile({ params }: PageProps): Promise<React
           {syncFailed ? (
             <PanelErrorState
               message={syncStatus?.error ?? "Sync failed"}
-              actionLabel="Run sync"
-              actionHref={`/api/integrations/openclaw/${openclawMapping?.connectionId}/reconcile`}
             />
           ) : messages.length === 0 ? (
             hasOpenClawLink ? (
@@ -595,15 +601,11 @@ export default async function AgentProfile({ params }: PageProps): Promise<React
                 <PanelEmptyState
                   description="No messages from OpenClaw gateway."
                   diagnostic="Messages are synced from the OpenClaw gateway during reconciliation."
-                  actionLabel="Run sync"
-                  actionHref={`/api/integrations/openclaw/${openclawMapping?.connectionId}/reconcile`}
                 />
               ) : (
                 <PanelEmptyState
                   description="No messages yet."
                   diagnostic="Sync has not been run for this connection yet."
-                  actionLabel="Run sync"
-                  actionHref={`/api/integrations/openclaw/${openclawMapping?.connectionId}/reconcile`}
                 />
               )
             ) : (
@@ -662,7 +664,11 @@ export default async function AgentProfile({ params }: PageProps): Promise<React
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {activity.length === 0 ? (
+          {syncFailed ? (
+            <PanelErrorState
+              message={syncStatus?.error ?? "Sync failed"}
+            />
+          ) : activity.length === 0 ? (
             hasSyncRun ? (
               <PanelEmptyState
                 description="No recent activity recorded."
