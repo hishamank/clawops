@@ -56,6 +56,7 @@ function getProjectById(id: string): ReturnType<typeof getProjectByIdFromPackage
 export default async function ProjectDetailPage({ params, searchParams }: PageProps): Promise<React.JSX.Element> {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const view = str(sp.view) ?? "list";
+  const status = str(sp.status);
 
   const project = await getProject(id);
 
@@ -63,13 +64,16 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
     notFound();
   }
 
-  const tasks = project.tasks ?? (await getProjectTasks(id));
-  const completedTasks = tasks.filter((t) => t.status === "done").length;
+  const allTasks = project.tasks ?? (await getProjectTasks(id));
+  const tasks = status && status !== "all"
+    ? allTasks.filter((t) => t.status === status)
+    : allTasks;
+  const completedTasks = allTasks.filter((t) => t.status === "done").length;
 
-  // Batch-compute blocker / dependency info
+  // Batch-compute blocker / dependency info across all tasks (not just filtered)
   const db = getDb();
-  const taskIds = tasks.map((t) => t.id);
-  const { blockedIds, blockingIds } = getBlockedAndBlockingIds(db, taskIds);
+  const allTaskIds = allTasks.map((t) => t.id);
+  const { blockedIds, blockingIds } = getBlockedAndBlockingIds(db, allTaskIds);
 
   return (
     <div className="space-y-8 max-w-4xl">
@@ -149,11 +153,11 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">
-                  {completedTasks} of {tasks.length} tasks complete
+                  {completedTasks} of {allTasks.length} tasks complete
                 </span>
                 <span className="font-medium">
-                  {tasks.length > 0
-                    ? Math.round((completedTasks / tasks.length) * 100)
+                  {allTasks.length > 0
+                    ? Math.round((completedTasks / allTasks.length) * 100)
                     : 0}
                   %
                 </span>
@@ -163,8 +167,8 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
                   className="h-full rounded-full bg-emerald-500 transition-all"
                   style={{
                     width:
-                      tasks.length > 0
-                        ? `${Math.round((completedTasks / tasks.length) * 100)}%`
+                      allTasks.length > 0
+                        ? `${Math.round((completedTasks / allTasks.length) * 100)}%`
                         : "0%",
                   }}
                 />
@@ -187,7 +191,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
         />
         <StatsCard
           title="Open Tasks"
-          value={tasks.length - completedTasks}
+          value={allTasks.length - completedTasks}
           icon={CheckCircle2}
           description={completedTasks > 0 ? `${completedTasks} completed` : "None completed yet"}
         />
@@ -233,7 +237,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
         </div>
         <TaskFilterBar
           basePath={`/projects/${id}`}
-          current={{ view }}
+          current={{ status, view }}
           showPriority={false}
           showAssignee={false}
           showViewToggle

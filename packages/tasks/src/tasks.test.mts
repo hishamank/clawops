@@ -202,6 +202,39 @@ describe("getBlockedAndBlockingIds", () => {
     assert.ok(result.blockingIds.has("task-a"));
   });
 
+  it("identifies blocked and blocking tasks from depends-on relations", () => {
+    // task-x depends-on task-y → task-y blocks task-x
+    const relations = [
+      { type: "depends-on", fromTaskId: "task-x", toTaskId: "task-y" },
+    ];
+    const blockerTask = { ...FAKE_TASK, id: "task-y", status: "in-progress" };
+
+    let selectCallCount = 0;
+    const selectChain: any = {
+      all: () => {
+        selectCallCount++;
+        return selectCallCount === 1 ? relations : [blockerTask];
+      },
+      get: () => null,
+      where: () => selectChain,
+      from: () => selectChain,
+    };
+    const db: any = {
+      insert: () => selectChain,
+      select: () => selectChain,
+      update: () => selectChain,
+      delete: () => selectChain,
+    };
+
+    const result = getBlockedAndBlockingIds(db, ["task-x", "task-y"]);
+    // task-x should be blocked (it depends on task-y which is not done)
+    assert.ok(result.blockedIds.has("task-x"));
+    assert.equal(result.blockedIds.has("task-y"), false);
+    // task-y should be blocking (other tasks depend on it)
+    assert.ok(result.blockingIds.has("task-y"));
+    assert.equal(result.blockingIds.has("task-x"), false);
+  });
+
   it("does not mark task as blocked when blocker is done", () => {
     const relations = [
       { type: "blocks", fromTaskId: "task-a", toTaskId: "task-b" },

@@ -135,8 +135,9 @@ export function isTaskBlocked(db: DB, taskId: string): boolean {
 }
 
 /**
- * Batch-compute which task IDs are blocked and which block others,
- * using only two queries instead of one per task.
+ * Batch-compute which task IDs are blocked and which block others.
+ * Scopes the relations query to rows involving the provided taskIds,
+ * then fetches blocker completion status in a single follow-up query.
  */
 export function getBlockedAndBlockingIds(
   db: DB,
@@ -152,7 +153,15 @@ export function getBlockedAndBlockingIds(
   const relations = db
     .select()
     .from(taskRelations)
-    .where(inArray(taskRelations.type, ["blocks", "depends-on"]))
+    .where(
+      and(
+        inArray(taskRelations.type, ["blocks", "depends-on"]),
+        or(
+          inArray(taskRelations.fromTaskId, taskIds),
+          inArray(taskRelations.toTaskId, taskIds),
+        ),
+      ),
+    )
     .all();
 
   // Collect IDs of tasks referenced by blocking relations that we need to
