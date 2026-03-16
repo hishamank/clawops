@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { listWorkflowRuns, executeWorkflow, WorkflowNotActiveError } from "@clawops/workflows";
-import { getAgentIdFromApiKey, getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
+import { getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
 
 const idParams = z.object({ id: z.string().min(1) });
 
@@ -33,15 +33,14 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
-  const auth = requireAgentId(req);
-  if (auth instanceof NextResponse) return auth;
+  const agentId = requireAgentId(req);
+  if (agentId instanceof NextResponse) return agentId;
 
   try {
     const { id } = idParams.parse(await params);
     const body = triggerRunBody.parse(await req.json());
-    const agentId = getAgentIdFromApiKey(req) ?? undefined;
     const runId = await executeWorkflow(getDb(), id, {
-      triggeredBy: body.triggeredBy ?? (agentId ? "agent" : "human"),
+      triggeredBy: body.triggeredBy ?? "agent",
       triggeredById: body.triggeredById ?? agentId,
       metadata: body.metadata,
     });

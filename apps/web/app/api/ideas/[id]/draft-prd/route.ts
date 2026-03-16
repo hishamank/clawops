@@ -34,8 +34,8 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
-  const auth = requireAgentId(request);
-  if (auth instanceof NextResponse) return auth;
+  const agentId = requireAgentId(request);
+  if (agentId instanceof NextResponse) return agentId;
 
   const { id } = await params;
   try {
@@ -49,6 +49,7 @@ export async function PUT(
           action: "idea.draft_prd_updated",
           entityType: "idea",
           entityId: id,
+          agentId,
           meta: JSON.stringify({ contentLength: body.content.length }),
         })
         .run();

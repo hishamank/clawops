@@ -42,8 +42,8 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
-  const auth = requireAgentId(request);
-  if (auth instanceof NextResponse) return auth;
+  const agentId = requireAgentId(request);
+  if (agentId instanceof NextResponse) return agentId;
 
   const { id } = await params;
   try {
@@ -57,16 +57,18 @@ export async function PATCH(
           action: "idea.sections_updated",
           entityType: "idea",
           entityId: id,
+          agentId,
           meta: JSON.stringify({ updatedSections: Object.keys(body.sections) }),
         })
         .run();
       try {
         createActivityEvent(tx as unknown as DB, {
-          source: "user",
+          source: "agent",
           type: "idea.updated",
           title: `Idea sections updated: ${result.title}`,
           entityType: "idea",
           entityId: id,
+          agentId,
           metadata: JSON.stringify({ updatedSections: Object.keys(body.sections) }),
         });
       } catch {

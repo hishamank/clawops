@@ -5,18 +5,17 @@ import { revalidateTag } from "next/cache";
 import { events, createActivityEvent, type DB } from "@clawops/core";
 import { promoteIdeaToProject } from "@clawops/ideas";
 import { ConflictError, NotFoundError } from "@clawops/domain";
-import { getAgentIdFromApiKey, getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
+import { getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
-  const auth = requireAgentId(req);
-  if (auth instanceof NextResponse) return auth;
+  const agentId = requireAgentId(req);
+  if (agentId instanceof NextResponse) return agentId;
 
   const { id } = await params;
   const db = getDb();
-  const agentId = getAgentIdFromApiKey(req) ?? undefined;
   try {
     const result = db.transaction((tx) => {
       const r = promoteIdeaToProject(tx as unknown as DB, id);
@@ -39,7 +38,7 @@ export async function POST(
         })
         .run();
       createActivityEvent(tx as unknown as DB, {
-        source: agentId ? "agent" : "user",
+        source: "agent",
         type: "idea.promoted",
         title: `Idea promoted to project: ${r.idea.title}`,
         entityType: "idea",
@@ -49,7 +48,7 @@ export async function POST(
         metadata: JSON.stringify({ ideaTitle: r.idea.title, projectId: r.project.id, projectName: r.project.name }),
       });
       createActivityEvent(tx as unknown as DB, {
-        source: agentId ? "agent" : "user",
+        source: "agent",
         type: "project.created",
         title: `Project created from idea: ${r.project.name}`,
         entityType: "project",

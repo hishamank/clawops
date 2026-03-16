@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { events, createActivityEvent, type DB } from "@clawops/core";
 import { createWorkflowRun, getWorkflowDefinition } from "@clawops/workflows";
-import { getAgentIdFromApiKey, getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
+import { getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
 
 const triggerSourceValues = ["human", "agent", "schedule", "event"] as const;
 
@@ -18,14 +18,13 @@ interface RouteParams {
 }
 
 export async function POST(req: Request, { params }: RouteParams): Promise<NextResponse> {
-  const auth = requireAgentId(req);
-  if (auth instanceof NextResponse) return auth;
+  const agentId = requireAgentId(req);
+  if (agentId instanceof NextResponse) return agentId;
 
   try {
     const { id } = await params;
     const body = triggerWorkflowBody.parse(await req.json());
     const db = getDb();
-    const agentId = getAgentIdFromApiKey(req) ?? undefined;
 
     const workflow = getWorkflowDefinition(db, id);
     if (!workflow) {
@@ -35,7 +34,7 @@ export async function POST(req: Request, { params }: RouteParams): Promise<NextR
     const run = db.transaction((tx) => {
       const r = createWorkflowRun(tx as unknown as DB, {
         workflowId: id,
-        triggeredBy: body.triggeredBy ?? "human",
+        triggeredBy: body.triggeredBy ?? "agent",
         triggeredById: body.triggeredById,
         status: "pending",
       });
@@ -51,7 +50,7 @@ export async function POST(req: Request, { params }: RouteParams): Promise<NextR
         .run();
 
       createActivityEvent(tx as unknown as DB, {
-        source: agentId ? "agent" : "user",
+        source: "agent",
         type: "workflow_run.started",
         title: `Workflow run started: ${workflow.name}`,
         entityType: "workflow",
