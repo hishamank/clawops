@@ -1,17 +1,27 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  ClawOps — Production Setup"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
+# ── UI / Theme ───────────────────────────────────────────────────────────────
 
-# Color codes
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+DIM='\033[2m'
+NC='\033[0m'
+
+SPINNER_FRAMES=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+
+print_header() {
+  clear 2>/dev/null || true
+  echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${BOLD}  ClawOps — Production Setup${NC}"
+  echo -e "${DIM}  Clean install, quiet build, readable progress${NC}"
+  echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo ""
+}
 
 print_step() {
   echo -e "${BLUE}▶${NC} $1"
@@ -29,6 +39,102 @@ print_warning() {
   echo -e "${YELLOW}⚠${NC} $1"
 }
 
+# Move cursor up one line and clear it
+replace_last_line() {
+  printf '\r\033[2K'
+}
+
+# Run a command silently with spinner, show logs only on failure
+run_quiet_step() {
+  local label="$1"
+  shift
+
+  local logfile
+  logfile="$(mktemp -t clawops-install.XXXXXX.log)"
+
+  printf "${BLUE}▶${NC} %s\n" "$label"
+
+  (
+    "$@"
+  ) >"$logfile" 2>&1 &
+  local pid=$!
+
+  local i=0
+  while kill -0 "$pid" 2>/dev/null; do
+    local frame="${SPINNER_FRAMES[$((i % ${#SPINNER_FRAMES[@]}))]}"
+    printf "\r\033[2K${CYAN}%s${NC} %s ${DIM}(working...)${NC}" "$frame" "$label"
+    sleep 0.1
+    i=$((i + 1))
+  done
+
+  wait "$pid"
+  local status=$?
+
+  printf "\r\033[2K"
+  if [ $status -eq 0 ]; then
+    print_success "$label"
+    rm -f "$logfile"
+    return 0
+  fi
+
+  print_error "$label failed"
+  echo ""
+  echo -e "${YELLOW}Captured output:${NC}"
+  echo -e "${DIM}──────────────────────────────────────────────────────────────────${NC}"
+  cat "$logfile"
+  echo -e "${DIM}──────────────────────────────────────────────────────────────────${NC}"
+  echo -e "${DIM}Log file: $logfile${NC}"
+  return $status
+}
+
+# Same as above, but keeps output in a variable for later inspection
+run_capture_step() {
+  local __resultvar="$1"
+  shift
+  local label="$1"
+  shift
+
+  local logfile
+  logfile="$(mktemp -t clawops-install.XXXXXX.log)"
+
+  printf "${BLUE}▶${NC} %s\n" "$label"
+
+  (
+    "$@"
+  ) >"$logfile" 2>&1 &
+  local pid=$!
+
+  local i=0
+  while kill -0 "$pid" 2>/dev/null; do
+    local frame="${SPINNER_FRAMES[$((i % ${#SPINNER_FRAMES[@]}))]}"
+    printf "\r\033[2K${CYAN}%s${NC} %s ${DIM}(working...)${NC}" "$frame" "$label"
+    sleep 0.1
+    i=$((i + 1))
+  done
+
+  wait "$pid"
+  local status=$?
+
+  printf "\r\033[2K"
+  local output
+  output="$(cat "$logfile")"
+  rm -f "$logfile"
+
+  printf -v "$__resultvar" '%s' "$output"
+
+  if [ $status -eq 0 ]; then
+    print_success "$label"
+    return 0
+  fi
+
+  print_error "$label failed"
+  return $status
+}
+
+# ── Start ────────────────────────────────────────────────────────────────────
+
+print_header
+
 # Check if running from project root
 if [ ! -f "package.json" ] || [ ! -f "pnpm-workspace.yaml" ]; then
   print_error "Must run from ClawOps project root directory"
@@ -40,7 +146,7 @@ PROJECT_ROOT="$(pwd -P)"
 
 print_step "Checking prerequisites..."
 
-if ! command -v node &> /dev/null; then
+if ! command -v node >/dev/null 2>&1; then
   print_error "Node.js is required. Install from: https://nodejs.org"
   exit 1
 fi
@@ -52,7 +158,7 @@ if [ "$NODE_VERSION" -lt 18 ]; then
 fi
 print_success "Node.js $(node --version) found"
 
-if ! command -v pnpm &> /dev/null; then
+if ! command -v pnpm >/dev/null 2>&1; then
   print_error "pnpm is required. Install with: npm install -g pnpm"
   exit 1
 fi
@@ -61,23 +167,18 @@ echo ""
 
 # ── Step 2: Install dependencies ────────────────────────────────────────────
 
-print_step "Installing dependencies..."
-pnpm install --frozen-lockfile
-print_success "Dependencies installed"
+run_quiet_step "Installing dependencies" pnpm install --frozen-lockfile
 echo ""
 
 # ── Step 3: Build all packages ──────────────────────────────────────────────
 
-print_step "Building all packages..."
-pnpm build
-print_success "All packages built"
+run_quiet_step "Building all packages" pnpm build
 echo ""
 
 # ── Step 4: Port selection ──────────────────────────────────────────────────
 
 DEFAULT_WEB_PORT=3333
 
-# Check if port is available using the built port-check utility
 check_port() {
   local port=$1
   node -e "
@@ -103,7 +204,6 @@ get_listening_pid() {
     lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | head -n 1
     return
   fi
-  # Fallback to ss + /proc
   if command -v ss >/dev/null 2>&1; then
     ss -tlnp "sport = :$port" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | head -n 1
     return
@@ -118,7 +218,6 @@ get_process_cwd() {
     printf '%s\n' "${cwd_line#n}"
     return
   fi
-  # Fallback: read from /proc (Linux)
   if [ -d "/proc/$pid" ]; then
     readlink -f "/proc/$pid/cwd" 2>/dev/null || true
   fi
@@ -176,14 +275,14 @@ stop_process_for_port_if_clawops() {
 
 WEB_PORT=$DEFAULT_WEB_PORT
 
-if ! check_port $WEB_PORT; then
+if ! check_port "$WEB_PORT"; then
   if stop_tracked_web_process && check_port "$WEB_PORT"; then
     print_success "Freed port $WEB_PORT using tracked PID file"
   elif ! stop_process_for_port_if_clawops "$WEB_PORT"; then
     print_warning "Port $WEB_PORT (web) is in use"
-    read -p "Enter alternative web port (default: 3334): " alt_web
+    read -r -p "Enter alternative web port (default: 3334): " alt_web
     WEB_PORT=${alt_web:-3334}
-    if ! check_port $WEB_PORT; then
+    if ! check_port "$WEB_PORT"; then
       print_error "Port $WEB_PORT is also in use. Free up a port and try again."
       exit 1
     fi
@@ -210,7 +309,6 @@ else
   print_warning ".env already exists, skipping"
 fi
 
-# Load env vars for migrations
 set -a
 # shellcheck source=/dev/null
 . ".env"
@@ -219,16 +317,13 @@ echo ""
 
 # ── Step 6: Run database migrations ─────────────────────────────────────────
 
-print_step "Running database migrations..."
-
 run_migrations() {
-  pnpm --filter @clawops/core db:migrate 2>&1
+  pnpm --filter @clawops/core db:migrate
 }
 
-MIGRATION_OUTPUT=$(run_migrations) && MIGRATION_OK=true || MIGRATION_OK=false
-
-if $MIGRATION_OK; then
-  print_success "Database migrations complete"
+MIGRATION_OUTPUT=""
+if run_capture_step MIGRATION_OUTPUT "Running database migrations" run_migrations; then
+  :
 else
   if echo "$MIGRATION_OUTPUT" | grep -q "already exists"; then
     DB_PATH="${CLAWOPS_DB_PATH:-${PROJECT_ROOT}/clawops.db}"
@@ -238,7 +333,7 @@ else
       print_warning "Backing up existing database to ${BACKUP_PATH}"
       mv "$DB_PATH" "$BACKUP_PATH"
       print_step "Retrying migrations with fresh database..."
-      if run_migrations >/dev/null 2>&1; then
+      if run_quiet_step "Retrying database migrations" run_migrations; then
         print_success "Database migrations complete (old DB backed up)"
       else
         print_error "Database migrations failed even after reset. Restoring backup."
@@ -260,15 +355,13 @@ echo ""
 
 # ── Step 7: Install CLI globally ────────────────────────────────────────────
 
-print_step "Installing ClawOps CLI globally..."
-cd apps/cli && pnpm link --global && cd ../..
-print_success "CLI linked globally"
+run_quiet_step "Installing ClawOps CLI globally" bash -lc 'cd apps/cli && pnpm link --global'
 echo ""
 
 # ── Step 8: Verify installation ─────────────────────────────────────────────
 
 print_step "Verifying installation..."
-if command -v clawops &> /dev/null; then
+if command -v clawops >/dev/null 2>&1; then
   CLAWOPS_VERSION=$(clawops --version 2>/dev/null || echo "unknown")
   print_success "clawops $CLAWOPS_VERSION available"
 else
@@ -279,9 +372,9 @@ echo ""
 
 # ── Done ────────────────────────────────────────────────────────────────────
 
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 print_success "ClawOps installed"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo "  Next: run 'clawops onboard' to connect to OpenClaw"
+echo -e "  ${BOLD}Next:${NC} run 'clawops onboard' to connect to OpenClaw"
 echo ""
