@@ -1,0 +1,1 @@
+ALTER TABLE `tasks` ADD `auto_pull_eligible` integer DEFAULT true NOT NULL;

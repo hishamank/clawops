@@ -154,6 +154,13 @@ export const onboardCmd = new Command("onboard")
     const scan = isDryRun
       ? syncMod.openclaw.scanOpenClaw({ openclawDir, includeFiles: false })
       : null;
+
+    // Ensure migrations are run before any DB operations
+    if (!isDryRun) {
+      const { ensureMigrated } = await import("../lib/client.js");
+      ensureMigrated();
+    }
+
     const onboarding = isDryRun
       ? null
       : await syncMod.onboardOpenClaw((await import("@clawops/core/db")).db, {
