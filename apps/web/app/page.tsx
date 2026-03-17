@@ -10,11 +10,13 @@ import { listAgents } from "@clawops/agents";
 import { getTokenSummary as getAnalyticsTokenSummary } from "@clawops/analytics";
 import { getDb } from "@/lib/server/runtime";
 import { listActivityEvents } from "./activity/actions";
+import { mapAgent } from "@/lib/mappers";
 
 export const dynamic = "force-dynamic";
 
 async function getAgents(): Promise<Agent[]> {
-  return listAgents(getDb()) as unknown as Agent[];
+  const agents = listAgents(getDb());
+  return agents.map(mapAgent);
 }
 
 async function getTokenSummary(): Promise<TokenSummary> {

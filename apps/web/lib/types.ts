@@ -44,6 +44,7 @@ export interface Task {
   properties: string | null;
   ideaId: string | null;
   createdAt: string;
+  artifacts?: Artifact[];
 }
 
 export interface TaskRelationWithTask {

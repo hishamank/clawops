@@ -13,6 +13,7 @@ import { getTask, listTaskRelations, listTaskResourceLinks, parseTaskProperties 
 import { listAgents } from "@clawops/agents";
 import { listProjects } from "@clawops/projects";
 import { getDb } from "@/lib/server/runtime";
+import { mapTask, mapAgent, mapProject, mapResourceLink, mapArtifact } from "@/lib/mappers";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -21,17 +22,22 @@ interface PageProps {
 export default async function TaskDetailPage({ params }: PageProps): Promise<React.JSX.Element> {
   const { id } = await params;
   const db = getDb();
-  const task = getTask(db, id) as unknown as Task | null;
+  const dbTask = getTask(db, id);
 
-  if (!task) {
+  if (!dbTask) {
     notFound();
   }
 
+  const task: Task = {
+    ...mapTask(dbTask),
+    artifacts: dbTask.artifacts.map(mapArtifact),
+  };
+
   const [agents, projects, relations, links] = await Promise.all([
-    listAgents(db) as unknown as Agent[],
-    listProjects(db) as unknown as ProjectListItem[],
-    listTaskRelations(db, id) as unknown as TaskRelationWithTask[],
-    listTaskResourceLinks(db, id) as unknown as ResourceLink[],
+    listAgents(db).map(mapAgent),
+    listProjects(db).map(mapProject),
+    listTaskRelations(db, id),
+    listTaskResourceLinks(db, id).map(mapResourceLink),
   ]);
   const agentMap = new Map(agents.map((a) => [a.id, a.name]));
   const projectMap = new Map(projects.map((p) => [p.id, p.name]));

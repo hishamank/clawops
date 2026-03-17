@@ -8,6 +8,7 @@ import { listTasks, getBlockedTaskIds, type ListTasksFilters } from "@clawops/ta
 import { listAgents } from "@clawops/agents";
 import { listProjects } from "@clawops/projects";
 import { getDb } from "@/lib/server/runtime";
+import { mapTask, mapAgent, mapProject } from "@/lib/mappers";
 
 export const dynamic = "force-dynamic";
 
@@ -46,9 +47,9 @@ export default async function TasksPage({ searchParams }: PageProps): Promise<Re
   if (assigneeId && assigneeId !== "all") filters.assigneeId = assigneeId;
 
   const [tasks, agents, projects] = await Promise.all([
-    listTasks(db, Object.keys(filters).length > 0 ? filters : undefined) as unknown as Task[],
-    listAgents(db) as unknown as Agent[],
-    listProjects(db) as unknown as ProjectListItem[],
+    listTasks(db, Object.keys(filters).length > 0 ? filters : undefined).map(mapTask),
+    listAgents(db).map(mapAgent),
+    listProjects(db).map(mapProject),
   ]);
 
   const agentMap = new Map(agents.map((a) => [a.id, a.name]));

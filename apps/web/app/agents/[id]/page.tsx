@@ -49,6 +49,7 @@ import {
 import { getDb } from "@/lib/server/runtime";
 import { PanelEmptyState } from "@/components/agents/panel-empty-state";
 import { PanelErrorState } from "@/components/agents/panel-error-state";
+import { mapAgent, mapTask, mapHabit, mapArtifact } from "@/lib/mappers";
 
 export const dynamic = "force-dynamic";
 
@@ -118,17 +119,19 @@ function formatDuration(
 
 async function getAgent(id: string): Promise<AgentDetailResponse | null> {
   const db = getDb();
-  const agent = getAgentById(db, id);
-  if (!agent) return null;
+  const dbAgent = getAgentById(db, id);
+  if (!dbAgent) return null;
 
-  const recentTasks = listTasks(db, { assigneeId: id }).slice(0, 10);
+  const agent = mapAgent(dbAgent);
+
+  const recentTasks = listTasks(db, { assigneeId: id }).slice(0, 10).map(mapTask);
   const habits = listHabits(db, id).map((h) => ({
-    ...h,
+    ...mapHabit(h),
     streaks: getHabitStreak(db, h.id, 7),
   }));
 
   // OpenClaw mapping
-  const openclawMapping = getOpenClawMappingByAgentId(db, id) as OpenClawMapping | null;
+  const openclawMapping = getOpenClawMappingByAgentId(db, id);
 
   // Sessions — scoped to connection + external agent ID
   let sessions: OpenClawSession[] = [];
@@ -148,7 +151,7 @@ async function getAgent(id: string): Promise<AgentDetailResponse | null> {
   }
 
   // Cron jobs — habits of type "cron" for this agent
-  const cronJobs = listCronJobs(db).filter((h) => h.agentId === id) as Habit[];
+  const cronJobs = listCronJobs(db).filter((h) => h.agentId === id).map(mapHabit);
 
   // Messages — sent or received by this agent's external ID
   let messages: AgentMessage[] = [];
@@ -199,11 +202,11 @@ async function getAgent(id: string): Promise<AgentDetailResponse | null> {
     activity,
     openclawMapping,
     syncStatus,
-  } as unknown as AgentDetailResponse;
+  };
 }
 
 async function getAgentTasks(id: string): Promise<Task[]> {
-  return listTasks(getDb(), { assigneeId: id }) as unknown as Task[];
+  return listTasks(getDb(), { assigneeId: id }).map(mapTask);
 }
 
 async function getAgentArtifacts(tasks: Task[]): Promise<Artifact[]> {
@@ -213,8 +216,9 @@ async function getAgentArtifacts(tasks: Task[]): Promise<Artifact[]> {
   const results = await Promise.all(
     doneTasks.slice(0, 5).map(async (task) => {
       try {
-        const taskDetail = getTask(getDb(), task.id) as unknown as Task & { artifacts?: Artifact[] };
-        return taskDetail.artifacts ?? [];
+        const taskDetail = getTask(getDb(), task.id);
+        if (!taskDetail) return [];
+        return taskDetail.artifacts.map(mapArtifact) ?? [];
       } catch {
         return [];
       }
