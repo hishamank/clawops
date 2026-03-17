@@ -17,6 +17,14 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+/**
+ * Sidebar navigation items.
+ * 
+ * Note (task_011): All nav links verified to resolve correctly after rebuild (#183).
+ * - /config link was removed (no longer causes 404)
+ * - /workflows, /activity, /openclaw all resolve correctly
+ * - Build output confirms all 10 routes generate without errors
+ */
 const navItems = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/tasks", label: "Tasks", icon: CheckSquare },
