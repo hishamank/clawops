@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { notFound } from "next/navigation";
 import { ArrowLeft, FileText, Clock, Link2, Ban, ArrowRight, Layers } from "lucide-react";
 import Link from "next/link";
-import type { Task, Agent, ProjectListItem, TaskRelationWithTask, ResourceLink } from "@/lib/types";
+import type { Task } from "@/lib/types";
 import { timeAgo } from "@/lib/time";
 import { StatusBadge } from "@/components/status-badge";
 import { PriorityBadge } from "@/components/priority-badge";

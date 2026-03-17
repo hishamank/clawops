@@ -58,10 +58,6 @@ async function getProjectTasks(id: string): Promise<Task[]> {
   return listTasks(getDb(), { projectId: id }).map(mapTask);
 }
 
-function getProjectById(id: string): ReturnType<typeof getProjectByIdFromPackage> {
-  return getProjectByIdFromPackage(getDb(), id);
-}
-
 export default async function ProjectDetailPage({ params, searchParams }: PageProps): Promise<React.JSX.Element> {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const view = str(sp.view) ?? "list";

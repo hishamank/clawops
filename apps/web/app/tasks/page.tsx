@@ -1,5 +1,5 @@
 import { CheckSquare, ListTodo, Clock } from "lucide-react";
-import type { Task, Agent, ProjectListItem } from "@/lib/types";
+import type { Task } from "@/lib/types";
 import { StatsCard } from "@/components/stats-card";
 import { TaskList } from "@/components/tasks/task-list";
 import { TaskBoard } from "@/components/tasks/task-board";
