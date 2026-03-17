@@ -5,7 +5,7 @@ import {
   agentMessages,
   toJsonObject,
   parseJsonObject,
-  type DB,
+  type DBOrTx,
   type AgentMessage,
   type SQL,
 } from "@clawops/core";
@@ -44,13 +44,13 @@ function deserializeMessage(row: AgentMessage): AgentMessageRecord {
   };
 }
 
-export function getAgentMessage(db: DB, id: string): AgentMessageRecord | null {
+export function getAgentMessage(db: DBOrTx, id: string): AgentMessageRecord | null {
   const row = db.select().from(agentMessages).where(eq(agentMessages.id, id)).get() ?? null;
   return row ? deserializeMessage(row) : null;
 }
 
 export function listAgentMessages(
-  db: DB,
+  db: DBOrTx,
   filters: AgentMessageFilters = {},
 ): AgentMessageRecord[] {
   const conditions: SQL[] = [];
@@ -93,7 +93,7 @@ export function listAgentMessages(
 }
 
 export function createAgentMessage(
-  db: DB,
+  db: DBOrTx,
   input: CreateAgentMessageInput,
 ): AgentMessageRecord {
   const row = db
@@ -117,7 +117,7 @@ export function createAgentMessage(
 }
 
 export function upsertAgentMessages(
-  db: DB,
+  db: DBOrTx,
   connectionId: string,
   messages: CreateAgentMessageInput[],
 ): AgentMessageRecord[] {

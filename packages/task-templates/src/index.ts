@@ -1,5 +1,5 @@
 import { eq, asc } from "drizzle-orm";
-import type { DB, TaskTemplate, TaskTemplateStage } from "@clawops/core";
+import type { DBOrTx, TaskTemplate, TaskTemplateStage } from "@clawops/core";
 import { taskTemplates, taskTemplateStages } from "@clawops/core";
 
 // ── Built-in Template Definitions ──────────────────────────────────────────
@@ -64,13 +64,13 @@ const BUILTIN_TEMPLATES = [
 
 // ── listTemplates ───────────────────────────────────────────────────────────
 
-export function listTemplates(db: DB): TaskTemplate[] {
+export function listTemplates(db: DBOrTx): TaskTemplate[] {
   return db.select().from(taskTemplates).all();
 }
 
 // ── getTemplate ─────────────────────────────────────────────────────────────
 
-export function getTemplate(db: DB, id: string): (TaskTemplate & { stages: TaskTemplateStage[] }) | null {
+export function getTemplate(db: DBOrTx, id: string): (TaskTemplate & { stages: TaskTemplateStage[] }) | null {
   const template = db
     .select()
     .from(taskTemplates)
@@ -91,7 +91,7 @@ export function getTemplate(db: DB, id: string): (TaskTemplate & { stages: TaskT
 
 // ── getTemplateByName ───────────────────────────────────────────────────────
 
-export function getTemplateByName(db: DB, name: string): (TaskTemplate & { stages: TaskTemplateStage[] }) | null {
+export function getTemplateByName(db: DBOrTx, name: string): (TaskTemplate & { stages: TaskTemplateStage[] }) | null {
   const template = db
     .select()
     .from(taskTemplates)
@@ -120,7 +120,7 @@ interface CreateTemplateInput {
   stages?: Array<{ name: string; description?: string; order?: number }>;
 }
 
-export function createTemplate(db: DB, input: CreateTemplateInput): TaskTemplate {
+export function createTemplate(db: DBOrTx, input: CreateTemplateInput): TaskTemplate {
   return db.transaction((tx) => {
     const template = tx
       .insert(taskTemplates)
@@ -150,7 +150,7 @@ export function createTemplate(db: DB, input: CreateTemplateInput): TaskTemplate
 
 // ── listTemplateStages ──────────────────────────────────────────────────────
 
-export function listTemplateStages(db: DB, templateId: string): TaskTemplateStage[] {
+export function listTemplateStages(db: DBOrTx, templateId: string): TaskTemplateStage[] {
   return db
     .select()
     .from(taskTemplateStages)
@@ -161,7 +161,7 @@ export function listTemplateStages(db: DB, templateId: string): TaskTemplateStag
 
 // ── getStage ────────────────────────────────────────────────────────────────
 
-export function getStage(db: DB, id: string): TaskTemplateStage | null {
+export function getStage(db: DBOrTx, id: string): TaskTemplateStage | null {
   return db
     .select()
     .from(taskTemplateStages)

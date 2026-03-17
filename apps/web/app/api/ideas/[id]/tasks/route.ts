@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events, createActivityEvent, type DB } from "@clawops/core";
+import { events, createActivityEvent } from "@clawops/core";
 import { TaskPriority, Source } from "@clawops/domain";
 import { listIdeaTasks, createIdeaTask } from "@clawops/ideas";
 import { getDb, jsonError, parseSearch, requireAgentId } from "@/lib/server/runtime";
@@ -50,7 +50,7 @@ export async function POST(req: Request, { params }: RouteParams): Promise<NextR
     const body = createTaskBody.parse(await req.json());
     const db = getDb();
     const task = db.transaction((tx) => {
-      const t = createIdeaTask(tx as unknown as DB, ideaId, {
+      const t = createIdeaTask(tx, ideaId, {
         title: body.title,
         description: body.description,
         priority: body.priority,
@@ -67,7 +67,7 @@ export async function POST(req: Request, { params }: RouteParams): Promise<NextR
           meta: JSON.stringify({ title: t.title, ideaId }),
         })
         .run();
-      createActivityEvent(tx as unknown as DB, {
+      createActivityEvent(tx, {
         source: "agent",
         type: "task.created",
         title: `Task created: ${t.title}`,

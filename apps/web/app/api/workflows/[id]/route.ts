@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events, createActivityEvent, type DB } from "@clawops/core";
+import { events, createActivityEvent } from "@clawops/core";
 import {
   getWorkflowDefinition,
   updateWorkflowDefinition,
@@ -87,7 +87,7 @@ export async function PATCH(req: Request, { params }: RouteParams): Promise<Next
     }
 
     const workflow = db.transaction((tx) => {
-      const w = updateWorkflowDefinition(tx as unknown as DB, id, {
+      const w = updateWorkflowDefinition(tx, id, {
         name: body.name,
         description: body.description,
         version: body.version,
@@ -106,7 +106,7 @@ export async function PATCH(req: Request, { params }: RouteParams): Promise<Next
           meta: JSON.stringify({ fields: Object.keys(body) }),
         })
         .run();
-      createActivityEvent(tx as unknown as DB, {
+      createActivityEvent(tx, {
         source: "agent",
         type: "workflow.updated",
         title: `Workflow updated: ${w.name}`,

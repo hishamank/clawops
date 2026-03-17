@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events, createActivityEvent, type DB } from "@clawops/core";
+import { events, createActivityEvent } from "@clawops/core";
 import { getProject, getProjectSpec, setProjectSpec, appendProjectSpec } from "@clawops/projects";
 import { getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
 
@@ -56,7 +56,7 @@ export async function PUT(
     if (!project) return jsonError(404, "Project not found", "NOT_FOUND");
 
     const updatedProject = db.transaction((tx) => {
-      const p = setProjectSpec(tx as unknown as DB, id, body.specContent);
+      const p = setProjectSpec(tx, id, body.specContent);
       tx.insert(events)
         .values({
           action: "project.spec_updated",
@@ -66,7 +66,7 @@ export async function PUT(
           meta: JSON.stringify({ specLength: body.specContent.length }),
         })
         .run();
-      createActivityEvent(tx as unknown as DB, {
+      createActivityEvent(tx, {
         source: "agent",
         type: "project.spec_updated",
         title: `Project spec updated: ${project.name}`,
@@ -106,7 +106,7 @@ export async function POST(
     if (!project) return jsonError(404, "Project not found", "NOT_FOUND");
 
     const updatedProject = db.transaction((tx) => {
-      const p = appendProjectSpec(tx as unknown as DB, id, body.content);
+      const p = appendProjectSpec(tx, id, body.content);
       tx.insert(events)
         .values({
           action: "project.spec_appended",
@@ -116,7 +116,7 @@ export async function POST(
           meta: JSON.stringify({ appendedLength: body.content.length }),
         })
         .run();
-      createActivityEvent(tx as unknown as DB, {
+      createActivityEvent(tx, {
         source: "agent",
         type: "project.spec_appended",
         title: `Project spec appended: ${project.name}`,

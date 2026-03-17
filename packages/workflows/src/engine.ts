@@ -1,4 +1,4 @@
-import { createActivityEvent, type DB } from "@clawops/core";
+import { createActivityEvent, type DBOrTx } from "@clawops/core";
 import { createTask, updateTask } from "@clawops/tasks";
 import { createNotification } from "@clawops/notifications";
 import { triggerSupportedOpenClawEndpoint } from "@clawops/sync/openclaw";
@@ -31,7 +31,7 @@ interface StepContext {
   stepResults: Record<string, unknown>;
 }
 
-export function matchEventTrigger(db: DB, eventType: string): WorkflowRecord[] {
+export function matchEventTrigger(db: DBOrTx, eventType: string): WorkflowRecord[] {
   const workflows = listWorkflowDefinitions(db, {
     status: "active",
     triggerType: "event",
@@ -94,7 +94,7 @@ export function evaluateCondition(condition: string, ctx: StepContext): boolean 
 }
 
 async function dispatchAction(
-  db: DB,
+  db: DBOrTx,
   step: WorkflowStepDefinition,
   stepResults: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
@@ -179,7 +179,7 @@ async function dispatchAction(
 }
 
 export async function executeWorkflow(
-  db: DB,
+  db: DBOrTx,
   workflowId: string,
   input: WorkflowExecutionInput,
 ): Promise<string> {

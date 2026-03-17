@@ -10,13 +10,11 @@ import {
   sql,
   workspaceFileRevisions,
   workspaceFiles,
-  type DB,
+  type DBOrTx,
   type OpenClawConnection,
   type WorkspaceFile,
   type WorkspaceFileRevision,
 } from "@clawops/core";
-
-type TransactionDb = Parameters<DB["transaction"]>[0] extends (tx: infer T) => unknown ? T : DB;
 
 export interface OpenClawWorkspaceFile {
   workspacePath: string;
@@ -132,11 +130,11 @@ export async function fetchWorkspaceFiles(
 }
 
 export function upsertWorkspaceFiles(
-  db: DB,
+  db: DBOrTx,
   connectionId: string,
   files: OpenClawWorkspaceFile[],
 ): WorkspaceFileSyncResult {
-  return db.transaction((tx: TransactionDb) => {
+  return db.transaction((tx) => {
     const syncStartedAt = new Date();
     const existingRows = tx
       .select()
@@ -309,7 +307,7 @@ export function upsertWorkspaceFiles(
 }
 
 export function listWorkspaceFileRevisions(
-  db: DB,
+  db: DBOrTx,
   workspaceFileId: string,
   opts?: { limit?: number },
 ): WorkspaceFileRevision[] {
@@ -342,7 +340,7 @@ function resolveGatewayToken(connection: OpenClawConnection, tokenOverride?: str
 }
 
 export async function syncWorkspaceFiles(
-  db: DB,
+  db: DBOrTx,
   connection: OpenClawConnection,
   tokenOverride?: string,
 ): Promise<WorkspaceFileSyncResult> {

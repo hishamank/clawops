@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import crypto from "node:crypto";
-import { events, type DB } from "@clawops/core";
+import { events } from "@clawops/core";
 import { updateAgentStatus } from "@clawops/agents";
 import { AgentStatus } from "@clawops/domain";
 import { NextResponse } from "next/server";
@@ -29,7 +29,7 @@ export async function PATCH(
     const body = statusSchema.parse(await req.json());
     const db = getDb();
     const agent = db.transaction((tx) => {
-      const a = updateAgentStatus(tx as unknown as DB, id, body.status, body.message);
+      const a = updateAgentStatus(tx, id, body.status, body.message);
       tx.insert(events)
         .values({
           id: crypto.randomUUID(),

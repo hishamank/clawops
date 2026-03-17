@@ -12,7 +12,7 @@ import {
   parseJsonObject,
   toJsonObject,
   type ActivityEvent,
-  type DB,
+  type DBOrTx,
   type Event,
   type Habit,
   type OpenClawConnection,
@@ -20,8 +20,6 @@ import {
 } from "@clawops/core";
 import { AgentStatus } from "@clawops/domain";
 import { logHabitRun, logHeartbeat } from "@clawops/habits";
-
-type TransactionDb = Parameters<DB["transaction"]>[0] extends (tx: infer T) => unknown ? T : DB;
 
 type SupportedInboundType =
   | "agent.heartbeat"
@@ -385,7 +383,7 @@ export function normalizeOpenClawInboundEvent(
   };
 }
 
-function requireConnection(db: DB, connectionId: string): OpenClawConnection {
+function requireConnection(db: DBOrTx, connectionId: string): OpenClawConnection {
   const connection = db
     .select()
     .from(openclawConnections)
@@ -403,7 +401,7 @@ function requireConnection(db: DB, connectionId: string): OpenClawConnection {
 }
 
 function insertLowLevelEvent(
-  db: DB,
+  db: DBOrTx,
   input: {
     occurredAt: Date;
     agentId?: string | null;
@@ -434,7 +432,7 @@ function insertLowLevelEvent(
 }
 
 function recordActivity(
-  db: DB,
+  db: DBOrTx,
   input: {
     occurredAt: Date;
     type: string;
@@ -474,7 +472,7 @@ function recordActivity(
 }
 
 function requireMappedAgent(
-  db: DB,
+  db: DBOrTx,
   connectionId: string,
   externalAgentId: string,
 ) {
@@ -494,7 +492,7 @@ function requireMappedAgent(
 }
 
 function upsertOpenClawSessionState(
-  db: DB,
+  db: DBOrTx,
   input: {
     connectionId: string;
     sessionKey: string;
@@ -614,7 +612,7 @@ function upsertOpenClawSessionState(
 }
 
 function requireCronJob(
-  db: DB,
+  db: DBOrTx,
   connectionId: string,
   externalId: string,
 ): Habit {
@@ -641,7 +639,7 @@ function requireCronJob(
 }
 
 function ingestOpenClawInboundEventTx(
-  db: DB,
+  db: DBOrTx,
   normalizedEvent: NormalizedOpenClawInboundEvent,
 ): OpenClawInboundEventIngestResult {
   const connection = requireConnection(db, normalizedEvent.connectionId);
@@ -881,12 +879,12 @@ function ingestOpenClawInboundEventTx(
 }
 
 export function ingestOpenClawInboundEvent(
-  db: DB,
+  db: DBOrTx,
   input: unknown,
 ): OpenClawInboundEventIngestResult {
   const normalizedEvent = normalizeOpenClawInboundEvent(input);
 
-  return db.transaction((tx: TransactionDb) =>
-    ingestOpenClawInboundEventTx(tx as unknown as DB, normalizedEvent),
+  return db.transaction((tx) =>
+    ingestOpenClawInboundEventTx(tx, normalizedEvent),
   );
 }

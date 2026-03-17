@@ -1,5 +1,5 @@
 import { eq, or, and, inArray } from "drizzle-orm";
-import { taskRelations, tasks, type DB, type TaskRelation, type Task } from "@clawops/core";
+import { taskRelations, tasks, type DBOrTx, type TaskRelation, type Task } from "@clawops/core";
 
 export interface CreateTaskRelationInput {
   fromTaskId: string;
@@ -35,18 +35,18 @@ function chunkArray<T>(items: readonly T[], chunkSize: number): T[][] {
 }
 
 export function createTaskRelation(
-  db: DB,
+  db: DBOrTx,
   input: CreateTaskRelationInput,
 ): TaskRelation {
   return db.insert(taskRelations).values(input).returning().get();
 }
 
-export function deleteTaskRelation(db: DB, id: string): void {
+export function deleteTaskRelation(db: DBOrTx, id: string): void {
   db.delete(taskRelations).where(eq(taskRelations.id, id)).run();
 }
 
 export function listTaskRelations(
-  db: DB,
+  db: DBOrTx,
   taskId: string,
 ): TaskRelationWithTask[] {
   const relations = db
@@ -105,7 +105,7 @@ export function listTaskRelations(
   return results;
 }
 
-export function getBlockersForTask(db: DB, taskId: string): Task[] {
+export function getBlockersForTask(db: DBOrTx, taskId: string): Task[] {
   // Relations where type = "blocks" AND toTaskId = taskId → fromTask is the blocker
   const blockingRelations = db
     .select({
@@ -163,7 +163,7 @@ export function getBlockersForTask(db: DB, taskId: string): Task[] {
   return blockers;
 }
 
-export function isTaskBlocked(db: DB, taskId: string): boolean {
+export function isTaskBlocked(db: DBOrTx, taskId: string): boolean {
   return getBlockersForTask(db, taskId).length > 0;
 }
 
@@ -171,7 +171,7 @@ export function isTaskBlocked(db: DB, taskId: string): boolean {
  * Bulk check: returns the set of task IDs (from the given list) that are
  * actively blocked by at least one non-done/non-cancelled blocker.
  */
-export function getBlockedTaskIds(db: DB, taskIds: string[]): Set<string> {
+export function getBlockedTaskIds(db: DBOrTx, taskIds: string[]): Set<string> {
   if (taskIds.length === 0) return new Set();
 
   const blockingRelations: TaskRelationIds[] = [];
@@ -257,7 +257,7 @@ export function getBlockedTaskIds(db: DB, taskIds: string[]): Set<string> {
  * then fetches blocker completion status in a single follow-up query.
  */
 export function getBlockedAndBlockingIds(
-  db: DB,
+  db: DBOrTx,
   taskIds: string[],
 ): { blockedIds: Set<string>; blockingIds: Set<string> } {
   const blockedIds = new Set<string>();

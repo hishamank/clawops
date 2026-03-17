@@ -1,5 +1,5 @@
 import { eq, and, gte, lte, sum, count, sql, type SQL } from "drizzle-orm";
-import type { DB } from "@clawops/core";
+import type { DBOrTx } from "@clawops/core";
 import { usageLogs, tasks, taskTemplates } from "@clawops/core";
 
 // ── Token aggregation ──────────────────────────────────────────────────────
@@ -28,7 +28,7 @@ interface TokenSummary {
  * @param filters - Optional filters to narrow the aggregation.
  * @returns A summary with `totalIn`, `totalOut`, `totalCost`, and `count`.
  */
-export function getTokenSummary(db: DB, filters: TokenFilters): TokenSummary {
+export function getTokenSummary(db: DBOrTx, filters: TokenFilters): TokenSummary {
   const conditions: SQL[] = [];
 
   if (filters.agentId) {
@@ -81,7 +81,7 @@ interface CostByGroup {
  * @param db - Drizzle database handle.
  * @returns An array of cost summaries, one per agent.
  */
-export function getCostsByAgent(db: DB): CostByGroup[] {
+export function getCostsByAgent(db: DBOrTx): CostByGroup[] {
   const rows = db
     .select({
       group: usageLogs.agentId,
@@ -109,7 +109,7 @@ export function getCostsByAgent(db: DB): CostByGroup[] {
  * @param db - Drizzle database handle.
  * @returns An array of cost summaries, one per model.
  */
-export function getCostsByModel(db: DB): CostByGroup[] {
+export function getCostsByModel(db: DBOrTx): CostByGroup[] {
   const rows = db
     .select({
       group: usageLogs.model,
@@ -139,7 +139,7 @@ export function getCostsByModel(db: DB): CostByGroup[] {
  * @param db - Drizzle database handle.
  * @returns An array of cost summaries, one per project.
  */
-export function getCostsByProject(db: DB): CostByGroup[] {
+export function getCostsByProject(db: DBOrTx): CostByGroup[] {
   const rows = db
     .select({
       group: tasks.projectId,
@@ -247,7 +247,7 @@ function truncateToGranularity(granularity: Granularity): SQL {
  * @returns Array of timeline points ordered by timestamp.
  */
 export function getTokenTimeline(
-  db: DB,
+  db: DBOrTx,
   filters: TimelineFilters,
 ): TimelinePoint[] {
   const { from, to, granularity = "day" } = filters;
@@ -299,7 +299,7 @@ export function getTokenTimeline(
  * @returns Array of cost timeline points ordered by timestamp.
  */
 export function getCostTimeline(
-  db: DB,
+  db: DBOrTx,
   filters: TimelineFilters,
 ): CostTimelinePoint[] {
   const { from, to, granularity = "day" } = filters;
@@ -352,7 +352,7 @@ interface CostByTemplate {
   count: number;
 }
 
-export function getCostsByTemplate(db: DB): CostByTemplate[] {
+export function getCostsByTemplate(db: DBOrTx): CostByTemplate[] {
   const rows = db
     .select({
       templateId: tasks.templateId,
@@ -378,6 +378,6 @@ export function getCostsByTemplate(db: DB): CostByTemplate[] {
   }));
 }
 
-export function getTokensByTemplate(db: DB): CostByTemplate[] {
+export function getTokensByTemplate(db: DBOrTx): CostByTemplate[] {
   return getCostsByTemplate(db);
 }

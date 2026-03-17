@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import crypto from "node:crypto";
-import { events, type Agent, type DB } from "@clawops/core";
+import { events, type Agent } from "@clawops/core";
 import { createAgent, listAgents } from "@clawops/agents";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -39,7 +39,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     const data = registerSchema.parse(await req.json());
     const db = getDb();
     const result = db.transaction((tx) => {
-      const agent = createAgent(tx as unknown as DB, data);
+      const agent = createAgent(tx, data);
       tx.insert(events)
         .values({
           id: crypto.randomUUID(),

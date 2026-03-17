@@ -7,7 +7,7 @@ import {
   openclawSessions,
   toJsonObject,
   parseJsonObject,
-  type DB,
+  type DBOrTx,
   type OpenClawConnection,
   type OpenClawSession,
 } from "@clawops/core";
@@ -207,7 +207,7 @@ export async function fetchActiveSessions(
 }
 
 export function upsertSessions(
-  db: DB,
+  db: DBOrTx,
   connectionId: string,
   sessions: FetchedOpenClawSession[],
 ): OpenClawSession[] {
@@ -248,7 +248,7 @@ export function upsertSessions(
 }
 
 export async function syncSessions(
-  db: DB,
+  db: DBOrTx,
   connection: OpenClawConnection,
   tokenOverride?: string,
 ): Promise<OpenClawSessionRecord[]> {
@@ -269,7 +269,7 @@ export async function syncSessions(
   }
 
   return db.transaction((tx) => {
-    const upserted = upsertSessions(tx as unknown as DB, connection.id, activeSessions);
+    const upserted = upsertSessions(tx, connection.id, activeSessions);
     const activeSessionKeys = activeSessions.map((session) => session.sessionKey);
     const previouslyActive = tx
       .select()
@@ -311,7 +311,7 @@ export async function syncSessions(
 }
 
 export function listSessions(
-  db: DB,
+  db: DBOrTx,
   filters: OpenClawSessionFilters = {},
 ): OpenClawSessionRecord[] {
   const conditions: SQL[] = [];

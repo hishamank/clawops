@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events, createActivityEvent, type DB } from "@clawops/core";
+import { events, createActivityEvent } from "@clawops/core";
 import { deleteTaskRelation } from "@clawops/tasks";
 import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
 
@@ -17,7 +17,7 @@ export async function DELETE(
     const db = getDb();
     const agentId = getAgentIdFromApiKey(req) ?? undefined;
     db.transaction((tx) => {
-      deleteTaskRelation(tx as unknown as DB, relationId);
+      deleteTaskRelation(tx, relationId);
       tx.insert(events)
         .values({
           action: "task.relation.deleted",
@@ -27,7 +27,7 @@ export async function DELETE(
           meta: JSON.stringify({ relationId }),
         })
         .run();
-      createActivityEvent(tx as unknown as DB, {
+      createActivityEvent(tx, {
         source: agentId ? "agent" : "user",
         type: "task.relation.deleted",
         title: `Task relation deleted`,

@@ -1,5 +1,5 @@
 import { and, desc, eq, type SQL } from "drizzle-orm";
-import type { DB } from "./db.js";
+import type { DBOrTx } from "./db.js";
 import {
   activityEvents,
   type ActivityEvent,
@@ -104,7 +104,7 @@ export function normalizeActivityEvent(
 }
 
 export function createActivityEvent(
-  db: DB,
+  db: DBOrTx,
   event: Omit<NewActivityEvent, "id" | "createdAt">,
 ): ActivityEvent {
   return db
@@ -319,7 +319,7 @@ function normalizeWorkflowDefinitionInput(
 }
 
 export function createWorkflowDefinition(
-  db: DB,
+  db: DBOrTx,
   input: CreateWorkflowDefinitionInput,
 ): WorkflowDefinitionRecord {
   const row = db
@@ -332,7 +332,7 @@ export function createWorkflowDefinition(
 }
 
 export function getWorkflowDefinition(
-  db: DB,
+  db: DBOrTx,
   id: string,
 ): WorkflowDefinitionRecord | null {
   const row = db
@@ -345,7 +345,7 @@ export function getWorkflowDefinition(
 }
 
 export function listWorkflowDefinitions(
-  db: DB,
+  db: DBOrTx,
   filters: ListWorkflowDefinitionFilters = {},
 ): WorkflowDefinitionRecord[] {
   const conditions: SQL[] = [];
@@ -375,7 +375,7 @@ export function listWorkflowDefinitions(
 }
 
 export function startWorkflowRun(
-  db: DB,
+  db: DBOrTx,
   input: StartWorkflowRunInput,
 ): WorkflowRunRecord {
   const row = db
@@ -397,7 +397,7 @@ export function startWorkflowRun(
 }
 
 export function recordWorkflowRunStep(
-  db: DB,
+  db: DBOrTx,
   input: RecordWorkflowRunStepInput,
 ): WorkflowRunStepRecord {
   const stepName = input.stepName.trim();
@@ -427,7 +427,7 @@ export function recordWorkflowRunStep(
 }
 
 export function finishWorkflowRun(
-  db: DB,
+  db: DBOrTx,
   runId: string,
   input: FinishWorkflowRunInput = {},
 ): WorkflowRunRecord {

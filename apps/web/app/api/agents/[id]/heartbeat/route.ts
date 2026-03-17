@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import crypto from "node:crypto";
-import { events, type DB } from "@clawops/core";
+import { events } from "@clawops/core";
 import { getAgent, updateAgentStatus } from "@clawops/agents";
 import { logHeartbeat } from "@clawops/habits";
 import { AgentStatus } from "@clawops/domain";
@@ -27,8 +27,8 @@ export async function POST(
   }
 
   const run = db.transaction((tx) => {
-    const r = logHeartbeat(tx as unknown as DB, id);
-    updateAgentStatus(tx as unknown as DB, id, AgentStatus.online);
+    const r = logHeartbeat(tx, id);
+    updateAgentStatus(tx, id, AgentStatus.online);
     tx.insert(events)
       .values({
         id: crypto.randomUUID(),

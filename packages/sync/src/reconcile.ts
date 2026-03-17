@@ -1,6 +1,6 @@
 import {
   createActivityEvent,
-  type DB,
+  type DBOrTx,
   type OpenClawConnection,
   type SyncRunItem,
   type WorkspaceFile,
@@ -10,8 +10,6 @@ import { syncCronJobs } from "@clawops/habits";
 import { NotFoundError } from "@clawops/domain";
 import { syncWorkspaceFiles, type WorkspaceFileSyncResult } from "./openclaw/files.js";
 import { finishSyncRunWithTx, startSyncRun, type FinishSyncRunItemInput } from "./runs.js";
-
-type TransactionDb = Parameters<DB["transaction"]>[0] extends (tx: infer T) => unknown ? T : DB;
 
 /**
  * Reconciliation mode - controls which modules are synchronized.
@@ -113,7 +111,7 @@ function resolveGatewayToken(connection: OpenClawConnection, options?: Reconcile
  * Reconcile OpenClaw sessions.
  */
 async function reconcileSessions(
-  db: DB,
+  db: DBOrTx,
   connection: OpenClawConnection,
   options?: ReconcileOptions,
 ): Promise<{ agentCount: number; addedCount: number; updatedCount: number; items: FinishSyncRunItemInput[] }> {
@@ -146,7 +144,7 @@ async function reconcileSessions(
  * Reconcile cron jobs.
  */
 async function reconcileCronJobs(
-  db: DB,
+  db: DBOrTx,
   connection: OpenClawConnection,
   gatewayToken: string,
 ): Promise<{ cronJobCount: number; addedCount: number; updatedCount: number; items: FinishSyncRunItemInput[] }> {
@@ -180,7 +178,7 @@ async function reconcileCronJobs(
  * Reconcile workspace files.
  */
 async function reconcileFiles(
-  db: DB,
+  db: DBOrTx,
   connection: OpenClawConnection,
   options?: ReconcileOptions,
 ): Promise<{ workspaceCount: number; addedCount: number; updatedCount: number; items: FinishSyncRunItemInput[] }> {
@@ -212,7 +210,7 @@ async function reconcileFiles(
  * Execute reconciliation for a specific mode.
  */
 async function executeReconcileMode(
-  db: DB,
+  db: DBOrTx,
   ctx: ReconcileContext,
 ): Promise<{
   agentCount: number;
@@ -284,7 +282,7 @@ async function executeReconcileMode(
  * @returns Result of the reconciliation run
  */
 export async function reconcile(
-  db: DB,
+  db: DBOrTx,
   connection: OpenClawConnection,
   options: ReconcileOptions = {},
 ): Promise<ReconcileResult> {
@@ -311,8 +309,8 @@ export async function reconcile(
     const result = await executeReconcileMode(db, ctx);
 
     // Finish the sync run with results
-    const summary = db.transaction((tx: TransactionDb) => {
-      const syncResult = finishSyncRunWithTx(tx as unknown as DB, run.id, {
+    const summary = db.transaction((tx) => {
+      const syncResult = finishSyncRunWithTx(tx, run.id, {
         connectionId: connection.id,
         status: "success",
         agentCount: result.agentCount,
@@ -329,7 +327,7 @@ export async function reconcile(
       });
 
       try {
-        createActivityEvent(tx as unknown as DB, {
+        createActivityEvent(tx, {
           source: "sync",
           type: "sync.reconciled",
           title: `Reconciliation completed for ${connection.name} (${mode} mode)`,
@@ -366,8 +364,8 @@ export async function reconcile(
     };
   } catch (error) {
     // Mark sync run as failed
-    db.transaction((tx: TransactionDb) => {
-      finishSyncRunWithTx(tx as unknown as DB, run.id, {
+    db.transaction((tx) => {
+      finishSyncRunWithTx(tx, run.id, {
         status: "failed",
         error: error instanceof Error ? error.message : String(error),
         meta: {
@@ -377,7 +375,7 @@ export async function reconcile(
       });
 
       try {
-        createActivityEvent(tx as unknown as DB, {
+        createActivityEvent(tx, {
           source: "sync",
           severity: "error",
           type: "sync.reconcile_failed",
@@ -412,7 +410,7 @@ export async function reconcile(
  * @returns Result of the reconciliation run
  */
 export async function reconcileConnection(
-  db: DB,
+  db: DBOrTx,
   connectionId: string,
   options: ReconcileOptions = {},
 ): Promise<ReconcileResult> {

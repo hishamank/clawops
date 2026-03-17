@@ -7,12 +7,10 @@ import {
   syncRunItems,
   syncRuns,
   toJsonObject,
-  type DB,
+  type DBOrTx,
   type SyncRun,
   type SyncRunItem,
 } from "@clawops/core";
-
-type TransactionDb = Parameters<DB["transaction"]>[0] extends (tx: infer T) => unknown ? T : DB;
 
 export interface StartSyncRunInput {
   connectionId?: string;
@@ -61,7 +59,7 @@ function buildSyncRunSummary(
   };
 }
 
-function listSyncRunItemsByRunIds(db: DB, runIds: string[]): SyncRunItem[] {
+function listSyncRunItemsByRunIds(db: DBOrTx, runIds: string[]): SyncRunItem[] {
   if (runIds.length === 0) {
     return [];
   }
@@ -80,7 +78,7 @@ function listSyncRunItemsByRunIds(db: DB, runIds: string[]): SyncRunItem[] {
     .all();
 }
 
-export function startSyncRun(db: DB, input: StartSyncRunInput = {}): SyncRun {
+export function startSyncRun(db: DBOrTx, input: StartSyncRunInput = {}): SyncRun {
   const rows = db
     .insert(syncRuns)
     .values({
@@ -114,7 +112,7 @@ export function startSyncRun(db: DB, input: StartSyncRunInput = {}): SyncRun {
 }
 
 function finishSyncRunTx(
-  db: DB,
+  db: DBOrTx,
   id: string,
   input: FinishSyncRunInput,
 ): SyncRunSummary {
@@ -188,19 +186,19 @@ function finishSyncRunTx(
   return buildSyncRunSummary(run, items);
 }
 
-export function finishSyncRun(db: DB, id: string, input: FinishSyncRunInput): SyncRunSummary {
-  return db.transaction((tx: TransactionDb) => finishSyncRunTx(tx as unknown as DB, id, input));
+export function finishSyncRun(db: DBOrTx, id: string, input: FinishSyncRunInput): SyncRunSummary {
+  return db.transaction((tx) => finishSyncRunTx(tx, id, input));
 }
 
 export function finishSyncRunWithTx(
-  db: DB,
+  db: DBOrTx,
   id: string,
   input: FinishSyncRunInput,
 ): SyncRunSummary {
   return finishSyncRunTx(db, id, input);
 }
 
-export function getSyncRun(db: DB, id: string): SyncRunSummary | null {
+export function getSyncRun(db: DBOrTx, id: string): SyncRunSummary | null {
   const run = db.select().from(syncRuns).where(eq(syncRuns.id, id)).limit(1).all()[0] ?? null;
   if (!run) {
     return null;
@@ -210,7 +208,7 @@ export function getSyncRun(db: DB, id: string): SyncRunSummary | null {
   return buildSyncRunSummary(run, items);
 }
 
-export function listSyncRuns(db: DB, limit = 10): SyncRunSummary[] {
+export function listSyncRuns(db: DBOrTx, limit = 10): SyncRunSummary[] {
   const runs: SyncRun[] = db
     .select()
     .from(syncRuns)

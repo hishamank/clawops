@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { events, createActivityEvent, type DB } from "@clawops/core";
+import { events, createActivityEvent } from "@clawops/core";
 import { getIdeaSections, updateIdeaSections } from "@clawops/ideas";
 import { NotFoundError } from "@clawops/domain";
 import { getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
@@ -51,7 +51,7 @@ export async function PATCH(
     const db = getDb();
 
     const idea = db.transaction((tx) => {
-      const result = updateIdeaSections(tx as unknown as DB, id, body.sections);
+      const result = updateIdeaSections(tx, id, body.sections);
       tx.insert(events)
         .values({
           action: "idea.sections_updated",
@@ -62,7 +62,7 @@ export async function PATCH(
         })
         .run();
       try {
-        createActivityEvent(tx as unknown as DB, {
+        createActivityEvent(tx, {
           source: "agent",
           type: "idea.updated",
           title: `Idea sections updated: ${result.title}`,

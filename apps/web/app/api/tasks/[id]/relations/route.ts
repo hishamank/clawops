@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events, createActivityEvent, type DB } from "@clawops/core";
+import { events, createActivityEvent } from "@clawops/core";
 import { listTaskRelations, createTaskRelation } from "@clawops/tasks";
 import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
 
@@ -32,7 +32,7 @@ export async function POST(
     const db = getDb();
     const agentId = getAgentIdFromApiKey(req) ?? undefined;
     const relation = db.transaction((tx) => {
-      const r = createTaskRelation(tx as unknown as DB, {
+      const r = createTaskRelation(tx, {
         fromTaskId: id,
         toTaskId: body.targetTaskId,
         type: body.type,
@@ -46,7 +46,7 @@ export async function POST(
           meta: JSON.stringify({ relationId: r.id, targetTaskId: body.targetTaskId, type: body.type }),
         })
         .run();
-      createActivityEvent(tx as unknown as DB, {
+      createActivityEvent(tx, {
         source: agentId ? "agent" : "user",
         type: "task.relation.created",
         title: `Task relation created: ${body.type}`,

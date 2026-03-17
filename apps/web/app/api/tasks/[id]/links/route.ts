@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events, createActivityEvent, type DB } from "@clawops/core";
+import { events, createActivityEvent } from "@clawops/core";
 import {
   addTaskResourceLink,
   listTaskResourceLinks,
@@ -51,7 +51,7 @@ export async function POST(
     if (!task) return jsonError(404, "Task not found", "TASK_NOT_FOUND");
     const agentId = getAgentIdFromApiKey(req) ?? undefined;
     const link = db.transaction((tx) => {
-      const created = addTaskResourceLink(tx as unknown as DB, id, body);
+      const created = addTaskResourceLink(tx, id, body);
       const metadata = {
         provider: body.provider,
         resourceType: body.resourceType,
@@ -68,7 +68,7 @@ export async function POST(
           meta: JSON.stringify(metadata),
         })
         .run();
-      createActivityEvent(tx as unknown as DB, {
+      createActivityEvent(tx, {
         source: agentId ? "agent" : "user",
         type: "task.link.added",
         title: `Link added to task: ${task.title}`,

@@ -10,3 +10,6 @@ sqlite.pragma("foreign_keys = ON");
 
 export const db = drizzle(sqlite, { schema });
 export type DB = typeof db;
+
+export type TransactionDb = Parameters<DB["transaction"]>[0] extends (tx: infer T) => unknown ? T : DB;
+export type DBOrTx = DB | TransactionDb;

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { events, type DB } from "@clawops/core";
+import { events } from "@clawops/core";
 import { getIdeaSection, IDEA_SECTION_KEYS, updateIdeaSection, type IdeaSectionKey } from "@clawops/ideas";
 import { NotFoundError } from "@clawops/domain";
 import { getDb, jsonError } from "@/lib/server/runtime";
@@ -42,7 +42,7 @@ export async function PUT(
     const db = getDb();
 
     const idea = db.transaction((tx) => {
-      const result = updateIdeaSection(tx as unknown as DB, id, sectionKey, body.content);
+      const result = updateIdeaSection(tx, id, sectionKey, body.content);
       tx.insert(events)
         .values({
           action: "idea.section_updated",

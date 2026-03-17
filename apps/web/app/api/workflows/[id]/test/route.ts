@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events, createActivityEvent, type DB } from "@clawops/core";
+import { events, createActivityEvent } from "@clawops/core";
 import { createWorkflowRun, getWorkflowDefinition } from "@clawops/workflows";
 import { getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
 
@@ -32,7 +32,7 @@ export async function POST(req: Request, { params }: RouteParams): Promise<NextR
     }
 
     const run = db.transaction((tx) => {
-      const r = createWorkflowRun(tx as unknown as DB, {
+      const r = createWorkflowRun(tx, {
         workflowId: id,
         triggeredBy: body.triggeredBy ?? "agent",
         triggeredById: body.triggeredById,
@@ -49,7 +49,7 @@ export async function POST(req: Request, { params }: RouteParams): Promise<NextR
         })
         .run();
 
-      createActivityEvent(tx as unknown as DB, {
+      createActivityEvent(tx, {
         source: "agent",
         type: "workflow_run.started",
         title: `Workflow run started: ${workflow.name}`,

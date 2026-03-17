@@ -6,7 +6,7 @@ import {
   habits,
   openclawAgents,
   openclawConnections,
-  type DB,
+  type DBOrTx,
   type Habit,
   type OpenClawConnection,
 } from "@clawops/core";
@@ -172,7 +172,7 @@ function resolveGatewayToken(connection: OpenClawConnection, token?: string): st
   return resolved;
 }
 
-function getConnectionOrThrow(db: DB, connectionId: string): ConnectionRecord {
+function getConnectionOrThrow(db: DBOrTx, connectionId: string): ConnectionRecord {
   const connection = db
     .select()
     .from(openclawConnections)
@@ -191,7 +191,7 @@ function getConnectionOrThrow(db: DB, connectionId: string): ConnectionRecord {
 }
 
 function resolveAgentId(
-  db: DB,
+  db: DBOrTx,
   connectionId: string,
   sessionTarget: string | null,
   existingAgentId: string | null,
@@ -276,7 +276,7 @@ export async function fetchCronJobs(
 }
 
 export function listCronJobs(
-  db: DB,
+  db: DBOrTx,
   filters: {
     connectionId?: string;
   } = {},
@@ -295,12 +295,12 @@ export function listCronJobs(
   return query.where(eq(habits.type, "cron")).all();
 }
 
-export function getCronJob(db: DB, id: string): Habit | null {
+export function getCronJob(db: DBOrTx, id: string): Habit | null {
   return db.select().from(habits).where(eq(habits.id, id)).get() ?? null;
 }
 
 export function upsertCronJobs(
-  db: DB,
+  db: DBOrTx,
   connectionId: string,
   jobs: OpenClawCronJob[],
 ): Habit[] {
@@ -319,7 +319,7 @@ export function upsertCronJobs(
         )
         .get();
 
-      const agentId = resolveAgentId(tx as unknown as DB, connectionId, job.sessionTarget, existing?.agentId ?? null);
+      const agentId = resolveAgentId(tx, connectionId, job.sessionTarget, existing?.agentId ?? null);
       const values = {
         connectionId,
         agentId,
@@ -397,7 +397,7 @@ export async function updateCronJob(
 }
 
 export async function syncCronJobs(
-  db: DB,
+  db: DBOrTx,
   connection: OpenClawConnection,
   token?: string,
 ): Promise<Habit[]> {
@@ -414,7 +414,7 @@ export async function syncCronJobs(
 }
 
 export function updateLocalCronJob(
-  db: DB,
+  db: DBOrTx,
   id: string,
   updates: Partial<Pick<Habit, "name" | "schedule" | "cronExpr" | "scheduleKind" | "scheduleExpr" | "sessionTarget" | "enabled" | "status" | "lastSyncedAt">>,
 ): Habit {
@@ -433,7 +433,7 @@ export function updateLocalCronJob(
 }
 
 export async function updateConnectionCronJob(
-  db: DB,
+  db: DBOrTx,
   localCronJobId: string,
   patch: UpdateCronJobPatch,
   token?: string,

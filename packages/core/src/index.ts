@@ -1,4 +1,4 @@
-export type { DB } from "./db.js";
+export type { DB, DBOrTx } from "./db.js";
 export * from "./schema.js";
 export type { SQL } from "drizzle-orm";
 export {

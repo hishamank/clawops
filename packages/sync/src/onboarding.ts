@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { initAgent } from "@clawops/agents";
-import { events, type DB, type OpenClawConnection } from "@clawops/core";
+import { events, type DBOrTx, type OpenClawConnection } from "@clawops/core";
 import { upsertCronJobs } from "@clawops/habits";
 import { upsertOpenClawConnection, type OpenClawConnectionSyncMode } from "./connections.js";
 import { fetchGatewayCronJobs, scanOpenClaw } from "./openclaw/index.js";
@@ -11,8 +11,6 @@ import { syncWorkspaceFiles } from "./openclaw/files.js";
 import { syncSessions } from "./openclaw/sessions.js";
 import { finishSyncRunWithTx, startSyncRun } from "./runs.js";
 import type { SyncAgent, SyncCronJob, SyncWorkspace } from "./types.js";
-
-type TransactionDb = Parameters<DB["transaction"]>[0] extends (tx: infer T) => unknown ? T : DB;
 
 export interface OpenClawOnboardingInput {
   source: string;
@@ -108,7 +106,7 @@ function validateOpenClawDir(
 }
 
 export async function onboardOpenClaw(
-  db: DB,
+  db: DBOrTx,
   input: OpenClawOnboardingInput,
   dependencies: OnboardingDependencies = defaultDependencies,
 ): Promise<OpenClawOnboardingResult> {
@@ -141,8 +139,8 @@ export async function onboardOpenClaw(
     const syncedAt = new Date();
     let connectionForFileSync: OpenClawConnection | null = null;
 
-    const result = db.transaction((tx: TransactionDb) => {
-      const connection = dependencies.upsertOpenClawConnection(tx as unknown as DB, {
+    const result = db.transaction((tx) => {
+      const connection = dependencies.upsertOpenClawConnection(tx, {
         name: input.connectionName ?? defaultConnectionName(openclawDir),
         rootPath: openclawDir,
         gatewayUrl: scanResult.gatewayUrl,
@@ -179,7 +177,7 @@ export async function onboardOpenClaw(
         .run();
 
       const agentRegistrations = scanResult.agents.map((discovered) => {
-        const registration = dependencies.initAgent(tx as unknown as DB, {
+        const registration = dependencies.initAgent(tx, {
           name: discovered.name,
           model: discovered.model ?? "unknown",
           role: discovered.role ?? "agent",
@@ -226,7 +224,7 @@ export async function onboardOpenClaw(
       });
 
       dependencies.upsertCronJobs(
-        tx as unknown as DB,
+        tx,
         connection.connection.id,
         cronJobs.map((job) => ({
           id: job.id,
@@ -241,7 +239,7 @@ export async function onboardOpenClaw(
         })),
       );
 
-      dependencies.finishSyncRunWithTx(tx as unknown as DB, run.id, {
+      dependencies.finishSyncRunWithTx(tx, run.id, {
         connectionId: connection.connection.id,
         status: "success",
         agentCount: scanResult.agents.length,
@@ -333,8 +331,8 @@ export async function onboardOpenClaw(
     return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    db.transaction((tx: TransactionDb) => {
-      dependencies.finishSyncRunWithTx(tx as unknown as DB, run.id, {
+    db.transaction((tx) => {
+      dependencies.finishSyncRunWithTx(tx, run.id, {
         status: "failed",
         error: message,
         meta: {

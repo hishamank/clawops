@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { events, type DB } from "@clawops/core";
+import { events } from "@clawops/core";
 import { markRead } from "@clawops/notifications";
 import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
 
@@ -14,7 +14,7 @@ export async function PATCH(
   const agentId = getAgentIdFromApiKey(_request) ?? undefined;
 
   const notification = db.transaction((tx) => {
-    const n = markRead(tx as unknown as DB, id);
+    const n = markRead(tx, id);
     if (!n) return null;
     tx.insert(events)
       .values({

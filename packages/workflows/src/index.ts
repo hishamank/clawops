@@ -8,7 +8,7 @@ import {
   workflowDefinitions,
   workflowRuns,
   workflowRunSteps,
-  type DB,
+  type DBOrTx,
   type SQL,
   type WorkflowDefinition,
   type WorkflowRun,
@@ -420,7 +420,7 @@ export function validateTriggerConfig(
   }
 }
 
-export function createWorkflowDefinition(db: DB, input: CreateWorkflowInput): WorkflowRecord {
+export function createWorkflowDefinition(db: DBOrTx, input: CreateWorkflowInput): WorkflowRecord {
   const row = db
     .insert(workflowDefinitions)
     .values(normalizeCreateInput(input))
@@ -430,7 +430,7 @@ export function createWorkflowDefinition(db: DB, input: CreateWorkflowInput): Wo
   return toWorkflowRecord(getReturningRow(row, "workflow definition"));
 }
 
-export function getWorkflowDefinition(db: DB, id: string): WorkflowRecord | null {
+export function getWorkflowDefinition(db: DBOrTx, id: string): WorkflowRecord | null {
   const row = db
     .select()
     .from(workflowDefinitions)
@@ -441,7 +441,7 @@ export function getWorkflowDefinition(db: DB, id: string): WorkflowRecord | null
 }
 
 export function listWorkflowDefinitions(
-  db: DB,
+  db: DBOrTx,
   filters: ListWorkflowsFilters = {},
 ): WorkflowRecord[] {
   const whereClause = buildWorkflowFilter(filters);
@@ -451,7 +451,7 @@ export function listWorkflowDefinitions(
 }
 
 export function updateWorkflowDefinition(
-  db: DB,
+  db: DBOrTx,
   id: string,
   input: UpdateWorkflowInput,
 ): WorkflowRecord {
@@ -465,7 +465,7 @@ export function updateWorkflowDefinition(
   return toWorkflowRecord(getReturningRow(row, "workflow definition", "update"));
 }
 
-export function createWorkflowRun(db: DB, input: CreateWorkflowRunInput): WorkflowRunRecord {
+export function createWorkflowRun(db: DBOrTx, input: CreateWorkflowRunInput): WorkflowRunRecord {
   const row = db
     .insert(workflowRuns)
     .values({
@@ -486,7 +486,7 @@ export function createWorkflowRun(db: DB, input: CreateWorkflowRunInput): Workfl
 }
 
 export function updateWorkflowRun(
-  db: DB,
+  db: DBOrTx,
   id: string,
   input: UpdateWorkflowRunInput,
 ): WorkflowRunRecord {
@@ -508,7 +508,7 @@ export function updateWorkflowRun(
   return toWorkflowRunRecord(getReturningRow(row, "workflow run", "update"));
 }
 
-export function listWorkflowRuns(db: DB, workflowId: string): WorkflowRunRecord[] {
+export function listWorkflowRuns(db: DBOrTx, workflowId: string): WorkflowRunRecord[] {
   return db
     .select()
     .from(workflowRuns)
@@ -518,7 +518,7 @@ export function listWorkflowRuns(db: DB, workflowId: string): WorkflowRunRecord[
     .map(toWorkflowRunRecord);
 }
 
-export function getWorkflowRun(db: DB, id: string): WorkflowRunWithSteps | null {
+export function getWorkflowRun(db: DBOrTx, id: string): WorkflowRunWithSteps | null {
   const run = db.select().from(workflowRuns).where(eq(workflowRuns.id, id)).get();
   if (!run) {
     return null;
@@ -531,7 +531,7 @@ export function getWorkflowRun(db: DB, id: string): WorkflowRunWithSteps | null 
 }
 
 export function createWorkflowRunStep(
-  db: DB,
+  db: DBOrTx,
   input: CreateWorkflowRunStepInput,
 ): WorkflowStepRunRecord {
   const row = db
@@ -556,7 +556,7 @@ export function createWorkflowRunStep(
 }
 
 export function updateWorkflowRunStep(
-  db: DB,
+  db: DBOrTx,
   id: string,
   input: UpdateWorkflowRunStepInput,
 ): WorkflowStepRunRecord {
@@ -578,7 +578,7 @@ export function updateWorkflowRunStep(
 }
 
 export function listWorkflowRunSteps(
-  db: DB,
+  db: DBOrTx,
   workflowRunId: string,
 ): WorkflowStepRunRecord[] {
   return db
