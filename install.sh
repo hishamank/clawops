@@ -99,21 +99,29 @@ process.exit(1);
 
 get_listening_pid() {
   local port=$1
-  if ! command -v lsof >/dev/null 2>&1; then
-    return 0
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | head -n 1
+    return
   fi
-  lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | head -n 1
+  # Fallback to ss + /proc
+  if command -v ss >/dev/null 2>&1; then
+    ss -tlnp "sport = :$port" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | head -n 1
+    return
+  fi
 }
 
 get_process_cwd() {
   local pid=$1
-  if ! command -v lsof >/dev/null 2>&1; then
-    return 0
+  if command -v lsof >/dev/null 2>&1; then
+    local cwd_line
+    cwd_line=$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | tail -n 1 || true)
+    printf '%s\n' "${cwd_line#n}"
+    return
   fi
-
-  local cwd_line
-  cwd_line=$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | tail -n 1 || true)
-  printf '%s\n' "${cwd_line#n}"
+  # Fallback: read from /proc (Linux)
+  if [ -d "/proc/$pid" ]; then
+    readlink -f "/proc/$pid/cwd" 2>/dev/null || true
+  fi
 }
 
 is_clawops_web_process() {
@@ -212,8 +220,42 @@ echo ""
 # ── Step 6: Run database migrations ─────────────────────────────────────────
 
 print_step "Running database migrations..."
-pnpm --filter @clawops/core db:migrate
-print_success "Database migrations complete"
+
+run_migrations() {
+  pnpm --filter @clawops/core db:migrate 2>&1
+}
+
+MIGRATION_OUTPUT=$(run_migrations) && MIGRATION_OK=true || MIGRATION_OK=false
+
+if $MIGRATION_OK; then
+  print_success "Database migrations complete"
+else
+  if echo "$MIGRATION_OUTPUT" | grep -q "already exists"; then
+    DB_PATH="${CLAWOPS_DB_PATH:-${PROJECT_ROOT}/clawops.db}"
+    if [ -f "$DB_PATH" ]; then
+      BACKUP_PATH="${DB_PATH}.bak.$(date +%s)"
+      print_warning "Database from a prior install detected (migration failed: table already exists)"
+      print_warning "Backing up existing database to ${BACKUP_PATH}"
+      mv "$DB_PATH" "$BACKUP_PATH"
+      print_step "Retrying migrations with fresh database..."
+      if run_migrations >/dev/null 2>&1; then
+        print_success "Database migrations complete (old DB backed up)"
+      else
+        print_error "Database migrations failed even after reset. Restoring backup."
+        mv "$BACKUP_PATH" "$DB_PATH"
+        exit 1
+      fi
+    else
+      print_error "Database migrations failed:"
+      echo "$MIGRATION_OUTPUT"
+      exit 1
+    fi
+  else
+    print_error "Database migrations failed:"
+    echo "$MIGRATION_OUTPUT"
+    exit 1
+  fi
+fi
 echo ""
 
 # ── Step 7: Install CLI globally ────────────────────────────────────────────
