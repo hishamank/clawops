@@ -185,9 +185,6 @@ export function AnalyticsContent(): React.JSX.Element {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to fetch analytics";
       setError(message);
-      if (process.env.NODE_ENV !== "production") {
-        console.error("Failed to fetch analytics:", err);
-      }
     } finally {
       setIsLoading(false);
     }
@@ -257,7 +254,7 @@ export function AnalyticsContent(): React.JSX.Element {
             variant="outline"
             size="sm"
             className="mt-4"
-            onClick={() => fetchData()}
+            onClick={() => fetchData(filters ?? undefined)}
           >
             Retry
           </Button>
