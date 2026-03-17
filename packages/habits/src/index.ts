@@ -131,7 +131,7 @@ export function logHabitRun(
 
 // ── getHabitStreak ─────────────────────────────────────────────────────────
 
-interface StreakEntry {
+export interface StreakEntry {
   date: string;
   ran: boolean;
   success: boolean;

@@ -20,13 +20,13 @@ import type {
   Agent,
   Task,
   Habit,
-  HabitStreak,
   Artifact,
   OpenClawSession,
   AgentMessage,
   ActivityEvent,
   OpenClawMapping,
 } from "@/lib/types";
+import type { StreakEntry } from "@clawops/habits";
 import { timeAgo } from "@/lib/time";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,7 +54,7 @@ export const dynamic = "force-dynamic";
 
 interface AgentDetailResponse extends Agent {
   recentTasks?: Task[];
-  habits?: (Habit & { streaks?: HabitStreak[] })[];
+  habits?: (Habit & { streaks?: StreakEntry[] })[];
   sessions?: OpenClawSession[];
   cronJobs?: Habit[];
   messages?: AgentMessage[];
@@ -124,7 +124,7 @@ async function getAgent(id: string): Promise<AgentDetailResponse | null> {
   const recentTasks = listTasks(db, { assigneeId: id }).slice(0, 10);
   const habits = listHabits(db, id).map((h) => ({
     ...h,
-    streaks: getHabitStreak(db, h.id, 7) as HabitStreak[],
+    streaks: getHabitStreak(db, h.id, 7),
   }));
 
   // OpenClaw mapping
@@ -223,7 +223,7 @@ async function getAgentArtifacts(tasks: Task[]): Promise<Artifact[]> {
   return results.flat();
 }
 
-function StreakDots({ streaks }: { streaks?: HabitStreak[] }): React.JSX.Element {
+function StreakDots({ streaks }: { streaks?: StreakEntry[] }): React.JSX.Element {
   const dots = Array.from({ length: 7 }, (_, i) => {
     const streak = streaks?.[i];
     if (!streak) return "bg-muted";
