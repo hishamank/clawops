@@ -39,12 +39,16 @@ import {
   openclawSessions,
   agentMessages,
   activityEvents,
+  syncRuns,
   eq,
   or,
   and,
   desc,
+  type SyncRun,
 } from "@clawops/core";
 import { getDb } from "@/lib/server/runtime";
+import { PanelEmptyState } from "@/components/agents/panel-empty-state";
+import { PanelErrorState } from "@/components/agents/panel-error-state";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +60,7 @@ interface AgentDetailResponse extends Agent {
   messages?: AgentMessage[];
   activity?: ActivityEvent[];
   openclawMapping?: OpenClawMapping | null;
+  syncStatus?: SyncRun | null;
 }
 
 interface PageProps {
@@ -171,6 +176,19 @@ async function getAgent(id: string): Promise<AgentDetailResponse | null> {
     .limit(15)
     .all() as ActivityEvent[];
 
+  // Sync status — get latest sync run for this connection
+  let syncStatus: SyncRun | null = null;
+  if (openclawMapping) {
+    const latestSync = db
+      .select()
+      .from(syncRuns)
+      .where(eq(syncRuns.connectionId, openclawMapping.connectionId))
+      .orderBy(desc(syncRuns.startedAt))
+      .limit(1)
+      .get() as SyncRun | undefined;
+    syncStatus = latestSync ?? null;
+  }
+
   return {
     ...agent,
     recentTasks,
@@ -180,6 +198,7 @@ async function getAgent(id: string): Promise<AgentDetailResponse | null> {
     messages,
     activity,
     openclawMapping,
+    syncStatus,
   } as unknown as AgentDetailResponse;
 }
 
@@ -248,6 +267,11 @@ export default async function AgentProfile({ params }: PageProps): Promise<React
   const messages = agent.messages ?? [];
   const activity = agent.activity ?? [];
   const openclawMapping = agent.openclawMapping ?? null;
+  const syncStatus = agent.syncStatus ?? null;
+
+  const hasOpenClawLink = openclawMapping !== null;
+  const hasSyncRun = syncStatus !== null;
+  const syncFailed = syncStatus?.status === "failed";
 
   const completedTasks = tasks.filter((t) => t.status === "done");
   const completionRate =
@@ -422,8 +446,26 @@ export default async function AgentProfile({ params }: PageProps): Promise<React
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {sessions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No sessions recorded.</p>
+          {syncFailed ? (
+            <PanelErrorState
+              message={syncStatus?.error ?? "Sync failed"}
+            />
+          ) : sessions.length === 0 ? (
+            hasOpenClawLink ? (
+              hasSyncRun ? (
+                <PanelEmptyState
+                  description="No sessions recorded from OpenClaw gateway."
+                  diagnostic="Sessions are synced from the OpenClaw gateway during reconciliation. Run a sync to fetch latest sessions."
+                />
+              ) : (
+                <PanelEmptyState
+                  description="No sessions recorded."
+                  diagnostic="Sync has not been run for this connection yet. Run a sync to fetch sessions from OpenClaw gateway."
+                />
+              )
+            ) : (
+              <p className="text-sm text-muted-foreground">No sessions recorded.</p>
+            )
           ) : (
             <div className="space-y-3">
               {sessions.map((session) => (
@@ -474,7 +516,21 @@ export default async function AgentProfile({ params }: PageProps): Promise<React
         </CardHeader>
         <CardContent>
           {cronJobs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No cron jobs configured.</p>
+            hasOpenClawLink ? (
+              hasSyncRun ? (
+                <PanelEmptyState
+                  description="No cron jobs synced from OpenClaw gateway."
+                  diagnostic="Cron jobs are synced from OpenClaw gateway during reconciliation."
+                />
+              ) : (
+                <PanelEmptyState
+                  description="No cron jobs configured."
+                  diagnostic="Sync has not been run for this connection yet."
+                />
+              )
+            ) : (
+              <p className="text-sm text-muted-foreground">No cron jobs configured.</p>
+            )
           ) : (
             <div className="space-y-3">
               {cronJobs.map((job) => (
@@ -535,8 +591,26 @@ export default async function AgentProfile({ params }: PageProps): Promise<React
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {messages.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No messages yet.</p>
+          {syncFailed ? (
+            <PanelErrorState
+              message={syncStatus?.error ?? "Sync failed"}
+            />
+          ) : messages.length === 0 ? (
+            hasOpenClawLink ? (
+              hasSyncRun ? (
+                <PanelEmptyState
+                  description="No messages from OpenClaw gateway."
+                  diagnostic="Messages are synced from the OpenClaw gateway during reconciliation."
+                />
+              ) : (
+                <PanelEmptyState
+                  description="No messages yet."
+                  diagnostic="Sync has not been run for this connection yet."
+                />
+              )
+            ) : (
+              <p className="text-sm text-muted-foreground">No messages yet.</p>
+            )
           ) : (
             <div className="space-y-3">
               {messages.map((msg) => {
@@ -590,8 +664,22 @@ export default async function AgentProfile({ params }: PageProps): Promise<React
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {activity.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No recent activity.</p>
+          {syncFailed ? (
+            <PanelErrorState
+              message={syncStatus?.error ?? "Sync failed"}
+            />
+          ) : activity.length === 0 ? (
+            hasSyncRun ? (
+              <PanelEmptyState
+                description="No recent activity recorded."
+                diagnostic="Activity is recorded during sync operations and agent interactions."
+              />
+            ) : (
+              <PanelEmptyState
+                description="No recent activity recorded."
+                diagnostic="Activity will be recorded when sync runs or the agent performs actions."
+              />
+            )
           ) : (
             <div className="space-y-3">
               {activity.map((event) => {
