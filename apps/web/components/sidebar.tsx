@@ -19,11 +19,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Sidebar navigation items.
- * 
- * Note (task_011): All nav links verified to resolve correctly after rebuild (#183).
- * - /config link was removed (no longer causes 404)
- * - /workflows, /activity, /openclaw all resolve correctly
- * - Build output confirms all 10 routes generate without errors
+ * Each href must have a corresponding page.tsx in the app directory.
  */
 const navItems = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
