@@ -5,6 +5,7 @@ import { ArrowDownRight, ArrowUpRight, DollarSign, Users } from "lucide-react";
 import type { TokenSummary } from "@/lib/types";
 import { StatsCard } from "@/components/stats-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { TimelineChart } from "@/components/analytics/timeline-chart";
 import { FilterControls, type AnalyticsFilters } from "@/components/analytics/filter-controls";
 
@@ -126,20 +127,19 @@ export function AnalyticsContent(): React.JSX.Element {
   const [costTimeline, setCostTimeline] = useState<TimelinePoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filters, setFilters] = useState<AnalyticsFilters | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async (appliedFilters?: AnalyticsFilters) => {
     setIsLoading(true);
+    setError(null);
     try {
-      // Fetch summary
       const summaryRes = await fetch("/api/analytics/tokens");
+      if (!summaryRes.ok) {
+        const statusText = summaryRes.statusText ? ` ${summaryRes.statusText}` : "";
+        throw new Error(`Failed to fetch token summary: ${summaryRes.status}${statusText}`);
+      }
       const summary = await summaryRes.json();
-      setTokenSummary({
-        totalTokensIn: summary.totalTokensIn,
-        totalTokensOut: summary.totalTokensOut,
-        totalCost: summary.totalCost,
-      });
 
-      // Fetch breakdowns
       const [agentRes, modelRes, projectRes, templateRes] = await Promise.all([
         fetch("/api/analytics/costs?groupBy=agent"),
         fetch("/api/analytics/costs?groupBy=model"),
@@ -147,12 +147,33 @@ export function AnalyticsContent(): React.JSX.Element {
         fetch("/api/analytics/costs/by-template"),
       ]);
 
-      setByAgent(await agentRes.json());
-      setByModel(await modelRes.json());
-      setByProject(await projectRes.json());
-      setByTemplate(await templateRes.json());
+      const errorMessages: string[] = [];
+      if (!agentRes.ok) errorMessages.push(`agent: ${agentRes.status}${agentRes.statusText ? ` ${agentRes.statusText}` : ""}`);
+      if (!modelRes.ok) errorMessages.push(`model: ${modelRes.status}${modelRes.statusText ? ` ${modelRes.statusText}` : ""}`);
+      if (!projectRes.ok) errorMessages.push(`project: ${projectRes.status}${projectRes.statusText ? ` ${projectRes.statusText}` : ""}`);
+      if (!templateRes.ok) errorMessages.push(`template: ${templateRes.status}${templateRes.statusText ? ` ${templateRes.statusText}` : ""}`);
 
-      // Fetch timelines if filters are provided
+      if (errorMessages.length > 0) {
+        throw new Error(`Failed to fetch cost breakdowns: ${errorMessages.join(", ")}`);
+      }
+
+      const [byAgentData, byModelData, byProjectData, byTemplateData] = await Promise.all([
+        agentRes.json(),
+        modelRes.json(),
+        projectRes.json(),
+        templateRes.json(),
+      ]);
+
+      setTokenSummary({
+        totalTokensIn: summary.totalTokensIn,
+        totalTokensOut: summary.totalTokensOut,
+        totalCost: summary.totalCost,
+      });
+      setByAgent(byAgentData);
+      setByModel(byModelData);
+      setByProject(byProjectData);
+      setByTemplate(byTemplateData);
+
       if (appliedFilters) {
         const [tokenTimelineRes, costTimelineRes] = await Promise.all([
           fetch(`/api/analytics/tokens/timeline?from=${appliedFilters.from}&to=${appliedFilters.to}&granularity=${appliedFilters.granularity}`),
@@ -161,8 +182,9 @@ export function AnalyticsContent(): React.JSX.Element {
         if (tokenTimelineRes.ok) setTokenTimeline(await tokenTimelineRes.json());
         if (costTimelineRes.ok) setCostTimeline(await costTimelineRes.json());
       }
-    } catch (error) {
-      console.error("Failed to fetch analytics:", error);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to fetch analytics";
+      setError(message);
     } finally {
       setIsLoading(false);
     }
@@ -207,6 +229,35 @@ export function AnalyticsContent(): React.JSX.Element {
               </CardContent>
             </Card>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Analytics</h1>
+          <p className="mt-1 text-muted-foreground">
+            Token usage and cost intelligence across your fleet.
+          </p>
+        </div>
+        <div className="flex flex-col items-center justify-center rounded-xl border border-destructive/50 bg-destructive/10 p-8 text-center">
+          <p className="text-sm text-destructive">
+            Failed to load analytics data.
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {error}
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-4"
+            onClick={() => fetchData(filters ?? undefined)}
+          >
+            Retry
+          </Button>
         </div>
       </div>
     );
