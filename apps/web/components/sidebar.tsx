@@ -17,6 +17,10 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+/**
+ * Sidebar navigation items.
+ * Each href must have a corresponding page.tsx in the app directory.
+ */
 const navItems = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/tasks", label: "Tasks", icon: CheckSquare },
