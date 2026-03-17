@@ -10,6 +10,7 @@ import { IdeaFilterTabs } from "./filter-tabs";
 import { PromoteButton } from "./promote-button";
 import { listIdeas, listIdeaTasks } from "@clawops/ideas";
 import { getDb } from "@/lib/server/runtime";
+import { mapIdea } from "@/lib/mappers";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -59,7 +60,7 @@ async function getIdeas(status?: string): Promise<IdeaWithTaskCount[]> {
   const ideas = listIdeas(
     db,
     status && status !== "all" ? { status: status as IdeaStatus } : undefined,
-  ) as unknown as Idea[];
+  ).map(mapIdea);
   
   // Get task counts for each idea
   const ideasWithCounts: IdeaWithTaskCount[] = ideas.map((idea) => ({

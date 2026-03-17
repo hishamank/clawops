@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { getProject as getProjectByIdFromPackage } from "@clawops/projects";
 import { listTasks, getBlockedAndBlockingIds } from "@clawops/tasks";
 import { getDb } from "@/lib/server/runtime";
+import { mapProject, mapTask } from "@/lib/mappers";
 
 export const dynamic = "force-dynamic";
 
@@ -41,16 +42,20 @@ function str(v: string | string[] | undefined): string | undefined {
 }
 
 async function getProject(id: string): Promise<ProjectDetail | null> {
-  const project = getProjectById(id);
-  return project as unknown as ProjectDetail | null;
+  const project = getProjectByIdFromPackage(getDb(), id);
+  if (!project) return null;
+  return {
+    ...mapProject(project),
+    milestones: project.milestones.map((m) => ({
+      ...m,
+      createdAt: m.createdAt.toISOString(),
+    })),
+    taskCount: project.taskCount,
+  };
 }
 
 async function getProjectTasks(id: string): Promise<Task[]> {
-  return listTasks(getDb(), { projectId: id }) as unknown as Task[];
-}
-
-function getProjectById(id: string): ReturnType<typeof getProjectByIdFromPackage> {
-  return getProjectByIdFromPackage(getDb(), id);
+  return listTasks(getDb(), { projectId: id }).map(mapTask);
 }
 
 export default async function ProjectDetailPage({ params, searchParams }: PageProps): Promise<React.JSX.Element> {

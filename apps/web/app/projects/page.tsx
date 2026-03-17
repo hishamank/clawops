@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { listProjects } from "@clawops/projects";
 import { getDb } from "@/lib/server/runtime";
+import { mapProject } from "@/lib/mappers";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,7 @@ const projectStatusLabels: Record<ProjectStatus, string> = {
 };
 
 async function getProjects(): Promise<ProjectListItem[]> {
-  return listProjects(getDb()) as unknown as ProjectListItem[];
+  return listProjects(getDb()).map(mapProject);
 }
 
 export default async function ProjectsPage(): Promise<React.JSX.Element> {
