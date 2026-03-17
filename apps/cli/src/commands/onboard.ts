@@ -294,6 +294,7 @@ export const onboardCmd = new Command("onboard")
         ...envFromFile,
         ...process.env,
         WEB_PORT: webPort,
+        PORT: webPort,
       };
       const configuredDbPath = runtimeEnv["CLAWOPS_DB_PATH"];
       runtimeEnv["CLAWOPS_DB_PATH"] =
