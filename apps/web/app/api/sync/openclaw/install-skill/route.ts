@@ -3,8 +3,12 @@ export const dynamic = "force-dynamic";
 import { openclaw } from "@clawops/sync";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireAgentId } from "@/lib/server/runtime";
 
 export async function POST(req: Request): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const body = z.object({ workspacePaths: z.array(z.string().min(1)) }).parse(await req.json());
     const safePaths = body.workspacePaths.filter((p) => !p.includes(".."));

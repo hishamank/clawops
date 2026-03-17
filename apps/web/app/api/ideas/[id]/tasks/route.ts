@@ -5,7 +5,7 @@ import { z } from "zod";
 import { events, createActivityEvent, type DB } from "@clawops/core";
 import { TaskPriority, Source } from "@clawops/domain";
 import { listIdeaTasks, createIdeaTask } from "@clawops/ideas";
-import { getAgentIdFromApiKey, getDb, jsonError, parseSearch } from "@/lib/server/runtime";
+import { getDb, jsonError, parseSearch, requireAgentId } from "@/lib/server/runtime";
 
 const taskPriorityEnum = z.nativeEnum(TaskPriority);
 const sourceEnum = z.nativeEnum(Source);
@@ -28,6 +28,9 @@ interface RouteParams {
 }
 
 export async function GET(req: Request, { params }: RouteParams): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { id: ideaId } = await params;
     const filters = parseSearch(req, listTasksQuery);
@@ -39,11 +42,13 @@ export async function GET(req: Request, { params }: RouteParams): Promise<NextRe
 }
 
 export async function POST(req: Request, { params }: RouteParams): Promise<NextResponse> {
+  const agentId = requireAgentId(req);
+  if (agentId instanceof NextResponse) return agentId;
+
   try {
     const { id: ideaId } = await params;
     const body = createTaskBody.parse(await req.json());
     const db = getDb();
-    const agentId = getAgentIdFromApiKey(req) ?? undefined;
     const task = db.transaction((tx) => {
       const t = createIdeaTask(tx as unknown as DB, ideaId, {
         title: body.title,
@@ -63,7 +68,7 @@ export async function POST(req: Request, { params }: RouteParams): Promise<NextR
         })
         .run();
       createActivityEvent(tx as unknown as DB, {
-        source: agentId ? "agent" : body.source === "agent" ? "agent" : "user",
+        source: "agent",
         type: "task.created",
         title: `Task created: ${t.title}`,
         entityType: "task",

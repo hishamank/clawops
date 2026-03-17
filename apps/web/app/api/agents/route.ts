@@ -5,7 +5,7 @@ import { events, type Agent, type DB } from "@clawops/core";
 import { createAgent, listAgents } from "@clawops/agents";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getDb, jsonError } from "@/lib/server/runtime";
+import { getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
 
 const registerSchema = z.object({
   name: z.string().min(1),
@@ -22,13 +22,19 @@ function stripApiKey(agent: Agent): Omit<Agent, "apiKey"> {
   return rest;
 }
 
-export async function GET(): Promise<NextResponse> {
+export async function GET(req: Request): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   const db = getDb();
   return NextResponse.json(listAgents(db).map(stripApiKey));
 }
 
 // Optional convenience endpoint mirroring /agents/register
 export async function POST(req: Request): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const data = registerSchema.parse(await req.json());
     const db = getDb();

@@ -5,7 +5,7 @@ import { revalidateTag } from "next/cache";
 import { events, createActivityEvent, type DB } from "@clawops/core";
 import { getIdeaSections, updateIdeaSections } from "@clawops/ideas";
 import { NotFoundError } from "@clawops/domain";
-import { getDb, jsonError } from "@/lib/server/runtime";
+import { getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
 import { z } from "zod";
 
 const sectionSchema = z.object({
@@ -21,9 +21,12 @@ const updateSectionsBody = z.object({
 });
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  const auth = requireAgentId(request);
+  if (auth instanceof NextResponse) return auth;
+
   const { id } = await params;
   try {
     const db = getDb();
@@ -39,6 +42,9 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  const agentId = requireAgentId(request);
+  if (agentId instanceof NextResponse) return agentId;
+
   const { id } = await params;
   try {
     const body = updateSectionsBody.parse(await request.json());
@@ -51,16 +57,18 @@ export async function PATCH(
           action: "idea.sections_updated",
           entityType: "idea",
           entityId: id,
+          agentId,
           meta: JSON.stringify({ updatedSections: Object.keys(body.sections) }),
         })
         .run();
       try {
         createActivityEvent(tx as unknown as DB, {
-          source: "user",
+          source: "agent",
           type: "idea.updated",
           title: `Idea sections updated: ${result.title}`,
           entityType: "idea",
           entityId: id,
+          agentId,
           metadata: JSON.stringify({ updatedSections: Object.keys(body.sections) }),
         });
       } catch {

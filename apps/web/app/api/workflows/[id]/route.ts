@@ -9,7 +9,7 @@ import {
   validateWorkflow,
   type WorkflowStepDefinition,
 } from "@clawops/workflows";
-import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
+import { getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
 
 const workflowStatusEnum = z.enum(["draft", "active", "paused", "deprecated"]);
 const workflowTriggerTypeEnum = z.enum(["manual", "scheduled", "event", "webhook"]);
@@ -44,7 +44,10 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
-export async function GET(_req: Request, { params }: RouteParams): Promise<NextResponse> {
+export async function GET(req: Request, { params }: RouteParams): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const { id } = idParams.parse(await params);
     const workflow = getWorkflowDefinition(getDb(), id);
@@ -57,11 +60,13 @@ export async function GET(_req: Request, { params }: RouteParams): Promise<NextR
 }
 
 export async function PATCH(req: Request, { params }: RouteParams): Promise<NextResponse> {
+  const agentId = requireAgentId(req);
+  if (agentId instanceof NextResponse) return agentId;
+
   try {
     const { id } = idParams.parse(await params);
     const body = updateWorkflowBody.parse(await req.json());
     const db = getDb();
-    const agentId = getAgentIdFromApiKey(req) ?? undefined;
 
     const existing = getWorkflowDefinition(db, id);
     if (!existing) {
@@ -102,7 +107,7 @@ export async function PATCH(req: Request, { params }: RouteParams): Promise<Next
         })
         .run();
       createActivityEvent(tx as unknown as DB, {
-        source: agentId ? "agent" : "user",
+        source: "agent",
         type: "workflow.updated",
         title: `Workflow updated: ${w.name}`,
         entityType: "workflow",

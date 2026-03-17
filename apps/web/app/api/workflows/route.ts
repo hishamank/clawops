@@ -9,7 +9,7 @@ import {
   validateWorkflow,
   type WorkflowStepDefinition,
 } from "@clawops/workflows";
-import { getAgentIdFromApiKey, getDb, jsonError, parseSearch } from "@/lib/server/runtime";
+import { getDb, jsonError, parseSearch, requireAgentId } from "@/lib/server/runtime";
 
 const workflowStatusEnum = z.enum(["draft", "active", "paused", "deprecated"]);
 const workflowTriggerTypeEnum = z.enum(["manual", "scheduled", "event", "webhook"]);
@@ -45,6 +45,9 @@ const listWorkflowsQuery = z.object({
 });
 
 export async function GET(req: Request): Promise<NextResponse> {
+  const auth = requireAgentId(req);
+  if (auth instanceof NextResponse) return auth;
+
   try {
     const filters = parseSearch(req, listWorkflowsQuery);
     return NextResponse.json(listWorkflowDefinitions(getDb(), filters));
@@ -55,10 +58,12 @@ export async function GET(req: Request): Promise<NextResponse> {
 }
 
 export async function POST(req: Request): Promise<NextResponse> {
+  const agentId = requireAgentId(req);
+  if (agentId instanceof NextResponse) return agentId;
+
   try {
     const body = createWorkflowBody.parse(await req.json());
     const db = getDb();
-    const agentId = getAgentIdFromApiKey(req) ?? undefined;
 
     try {
       validateWorkflow({
@@ -92,7 +97,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         })
         .run();
       createActivityEvent(tx as unknown as DB, {
-        source: agentId ? "agent" : "user",
+        source: "agent",
         type: "workflow.created",
         title: `Workflow created: ${w.name}`,
         entityType: "workflow",
