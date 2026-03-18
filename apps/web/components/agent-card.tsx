@@ -57,7 +57,7 @@ export function AgentCard({ agent, activeTasks }: AgentCardProps): React.JSX.Ele
 
               <div className="mt-2 flex items-center gap-2">
                 <span className="rounded bg-white/8 px-1.5 py-0.5 font-mono text-[10px] text-[#6b7080]">
-                  {agent.model}
+                  {agent.modelAlias ?? agent.model}
                 </span>
                 {agent.framework && (
                   <span className="rounded border border-white/8 px-1.5 py-0.5 text-[10px] text-[#6b7080]">

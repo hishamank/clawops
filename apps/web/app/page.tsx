@@ -9,6 +9,7 @@ import { listAgents } from "@clawops/agents";
 import { listTasks, getBlockedTaskIds } from "@clawops/tasks";
 import { listIdeas } from "@clawops/ideas";
 import { getTokenSummary as getAnalyticsTokenSummary } from "@clawops/analytics";
+import { scanOpenClaw } from "@clawops/sync/openclaw";
 import { getDb } from "@/lib/server/runtime";
 import { listActivityEvents } from "./activity/actions";
 import { mapAgent, mapTask } from "@/lib/mappers";
@@ -29,9 +30,18 @@ interface DashboardData {
 
 async function getDashboardData(): Promise<DashboardData> {
   const db = getDb();
+  const openclawScan = scanOpenClaw({ includeFiles: false });
+  const openClawAliasByModel = new Map(
+    openclawScan.agents
+      .filter((agent) => agent.model && agent.modelAlias)
+      .map((agent) => [agent.model as string, agent.modelAlias as string]),
+  );
 
   const agentsRaw = listAgents(db);
-  const agents = agentsRaw.map(mapAgent);
+  const agents = agentsRaw.map((agent) => ({
+    ...mapAgent(agent),
+    modelAlias: openClawAliasByModel.get(agent.model) ?? null,
+  }));
   const activeCount = agents.filter((a) => a.status === "online" || a.status === "busy").length;
 
   const allTasksRaw = listTasks(db);

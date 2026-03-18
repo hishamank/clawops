@@ -5,6 +5,7 @@ export interface SyncAgent {
   channels: string[];
   sessionKey?: string;
   model?: string;
+  modelAlias?: string;
   role?: string;
   framework?: string;
   avatar?: string;

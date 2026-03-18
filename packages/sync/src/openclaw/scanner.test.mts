@@ -68,6 +68,36 @@ describe("scanOpenClaw()", () => {
     assert.equal(result.gatewayUrl, "http://custom:9999");
   });
 
+  it("reads model aliases from openclaw.json agent config", () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "openclaw.json"),
+      JSON.stringify({
+        agents: {
+          defaults: {
+            models: {
+              "anthropic/claude-sonnet-4-6": {
+                alias: "sonnet",
+              },
+            },
+          },
+          list: [
+            {
+              id: "rick",
+              name: "Rick",
+              workspace: path.join(tmpDir, "workspace-rick"),
+              model: "anthropic/claude-sonnet-4-6",
+            },
+          ],
+        },
+      }),
+    );
+
+    const result = scanOpenClaw({ openclawDir: tmpDir });
+    const agent = result.agents.find((entry) => entry.id === "rick");
+    assert.ok(agent);
+    assert.equal(agent.modelAlias, "sonnet");
+  });
+
   it("returns empty agents array gracefully if directory does not exist", () => {
     const result = scanOpenClaw({ openclawDir: "/nonexistent/path/xyz" });
     // Returns default "main" agent when no workspaces found

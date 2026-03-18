@@ -4,6 +4,7 @@ export interface OpenClawAgentConfig {
   id?: string;
   name?: string;
   model?: string | { primary?: string; fallbacks?: string[] };
+  models?: Record<string, { alias?: string; [key: string]: unknown }>;
   role?: string;
   framework?: string;
   avatar?: string;

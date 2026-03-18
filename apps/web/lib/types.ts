@@ -15,6 +15,7 @@ export interface Agent {
   id: string;
   name: string;
   model: string;
+  modelAlias?: string | null;
   role: string;
   status: AgentStatus;
   lastActive: string | null;

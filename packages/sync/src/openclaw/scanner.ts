@@ -136,6 +136,13 @@ function pickModel(value: unknown): string | undefined {
   return pickString(modelRecord["primary"], modelRecord["model"], modelRecord["default"]);
 }
 
+function pickModelAlias(value: unknown, modelId: string | undefined): string | undefined {
+  if (!modelId) return undefined;
+  const modelMap = asRecord(value);
+  const modelConfig = asRecord(modelMap[modelId]);
+  return pickString(modelConfig["alias"]);
+}
+
 export function scanOpenClaw(options: OpenClawScanOptions = {}): {
   agents: SyncAgent[];
   workspaces: SyncWorkspace[];
@@ -253,6 +260,7 @@ export function scanOpenClaw(options: OpenClawScanOptions = {}): {
       merged["defaultModel"],
       llmConfig["model"],
     );
+    const modelAlias = pickModelAlias(merged["models"], model);
     const role = pickString(merged["role"], merged["agentRole"]);
     const framework = pickString(merged["framework"], merged["platform"], "openclaw");
     const avatar = pickString(
@@ -274,6 +282,7 @@ export function scanOpenClaw(options: OpenClawScanOptions = {}): {
       workspacePath,
       channels,
       model,
+      modelAlias,
       role,
       framework,
       avatar,
