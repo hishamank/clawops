@@ -28,13 +28,22 @@ export async function POST(req: Request): Promise<NextResponse> {
       })
       .run();
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       id: agent.id,
       name: agent.name,
       model: agent.model,
       role: agent.role,
       status: agent.status,
     });
+
+    response.cookies.set("api_key", apiKey, {
+      path: "/",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7,
+      secure: process.env.NODE_ENV === "production",
+    });
+
+    return response;
   } catch (err) {
     if (err instanceof z.ZodError) {
       return jsonError(400, err.message, "VALIDATION_ERROR");

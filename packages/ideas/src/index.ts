@@ -35,7 +35,7 @@ function getIdeaSectionsRow(db: DBOrTx, id: string): { sections: string | null }
 
 export function createIdea(
   db: DBOrTx,
-  input: { title: string; description?: string; tags?: string[]; sections?: IdeaSections; source?: NewIdea["source"] },
+  input: { title: string; description?: string; tags?: string[]; sections?: IdeaSections; source?: NewIdea["source"]; projectId?: string },
 ): Idea {
   const [idea] = db
     .insert(ideas)
@@ -45,6 +45,7 @@ export function createIdea(
       tags: input.tags ? toJsonArray(input.tags) : null,
       sections: input.sections ? toJsonObject(input.sections) : null,
       source: input.source ?? "human",
+      projectId: input.projectId ?? null,
     })
     .returning()
     .all();

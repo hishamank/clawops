@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { IdeaFilterTabs } from "./filter-tabs";
 import { PromoteButton } from "./promote-button";
+import { CreateIdeaDialog } from "./create-idea-dialog";
 import { listIdeas, listIdeaTasks } from "@clawops/ideas";
 import { getDb } from "@/lib/server/runtime";
 import { mapIdea } from "@/lib/mappers";
@@ -82,11 +83,14 @@ export default async function IdeasPage({ searchParams }: PageProps): Promise<Re
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Ideas</h1>
-        <p className="mt-1 text-muted-foreground">
-          Captured insights from your agent fleet
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Ideas</h1>
+          <p className="mt-1 text-muted-foreground">
+            Captured insights from your agent fleet
+          </p>
+        </div>
+        <CreateIdeaDialog />
       </div>
 
       {/* Stats row */}
