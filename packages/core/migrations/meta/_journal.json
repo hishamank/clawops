@@ -33,117 +33,124 @@
     {
       "idx": 4,
       "version": "6",
+      "when": 1773175000000,
+      "tag": "0003_idea_sections",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
       "when": 1773180600000,
       "tag": "0004_structured_activity_events",
       "breakpoints": true
     },
     {
-      "idx": 5,
+      "idx": 6,
       "version": "6",
       "when": 1773181238461,
       "tag": "0005_wild_purifiers",
       "breakpoints": true
     },
     {
-      "idx": 6,
+      "idx": 7,
       "version": "6",
       "when": 1773179808200,
       "tag": "0006_thick_mandarin",
       "breakpoints": true
     },
     {
-      "idx": 7,
+      "idx": 8,
       "version": "7",
       "when": 1773212403000,
       "tag": "0007_durable_openclaw_identity",
       "breakpoints": true
     },
     {
-      "idx": 8,
+      "idx": 9,
       "version": "7",
       "when": 1773225600000,
       "tag": "0008_tracked_workspace_files",
       "breakpoints": true
     },
     {
-      "idx": 9,
+      "idx": 10,
       "version": "7",
       "when": 1773222000000,
       "tag": "0009_openclaw_cron_foundation",
       "breakpoints": true
     },
     {
-      "idx": 10,
+      "idx": 11,
       "version": "7",
       "when": 1773226000000,
       "tag": "0010_openclaw_sessions",
       "breakpoints": true
     },
     {
-      "idx": 11,
+      "idx": 12,
       "version": "7",
       "when": 1773228000000,
       "tag": "0011_workspace_file_revisions",
       "breakpoints": true
     },
     {
-      "idx": 12,
+      "idx": 13,
       "version": "7",
       "when": 1773405720000,
       "tag": "0012_workflow_persistence",
       "breakpoints": true
     },
     {
-      "idx": 13,
+      "idx": 14,
       "version": "7",
       "when": 1773700000000,
       "tag": "0013_task_template_fields",
       "breakpoints": true
     },
     {
-      "idx": 14,
+      "idx": 15,
       "version": "7",
       "when": 1773800000000,
       "tag": "0014_file_revision_content",
       "breakpoints": true
     },
     {
-      "idx": 15,
+      "idx": 16,
       "version": "6",
       "when": 1773495311273,
       "tag": "0015_ordinary_ghost_rider",
       "breakpoints": true
     },
     {
-      "idx": 16,
+      "idx": 17,
       "version": "6",
       "when": 1773496051106,
       "tag": "0016_exotic_shadowcat",
       "breakpoints": true
     },
     {
-      "idx": 17,
+      "idx": 18,
       "version": "6",
       "when": 1773496246844,
       "tag": "0017_lyrical_lucky_pierre",
       "breakpoints": true
     },
     {
-      "idx": 18,
+      "idx": 19,
       "version": "6",
       "when": 1773496371396,
       "tag": "0016_loving_orphan",
       "breakpoints": true
     },
     {
-      "idx": 19,
+      "idx": 20,
       "version": "6",
       "when": 1773800100000,
       "tag": "0019_flippant_phil_sheldon",
       "breakpoints": true
     },
     {
-      "idx": 20,
+      "idx": 21,
       "version": "6",
       "when": 1773800200000,
       "tag": "0020_add_sync_runs_tables",
