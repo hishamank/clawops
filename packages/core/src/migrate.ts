@@ -3,6 +3,10 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { db } from "./db.js";
 
 export function runMigrations(): void {
-  const migrationsFolder = path.resolve(__dirname, "../migrations");
+  // When bundled by webpack (Next.js), __dirname points to the bundle directory, not the
+  // actual package root. Use CLAWOPS_MIGRATIONS_DIR env var to override if needed.
+  const migrationsFolder =
+    process.env["CLAWOPS_MIGRATIONS_DIR"] ??
+    path.resolve(__dirname, "../migrations");
   migrate(db, { migrationsFolder });
 }

@@ -15,6 +15,8 @@ CREATE TABLE `agent_messages` (
 	FOREIGN KEY (`session_id`) REFERENCES `openclaw_sessions`(`id`) ON UPDATE no action ON DELETE set null
 );
 --> statement-breakpoint
-CREATE INDEX `idx_agent_messages_connection_sent` ON `agent_messages` (`connection_id`,`sent_at`);--> statement-breakpoint
-CREATE INDEX `idx_agent_messages_from_agent` ON `agent_messages` (`from_agent_id`);--> statement-breakpoint
+CREATE INDEX `idx_agent_messages_connection_sent` ON `agent_messages` (`connection_id`,`sent_at`);
+--> statement-breakpoint
+CREATE INDEX `idx_agent_messages_from_agent` ON `agent_messages` (`from_agent_id`);
+--> statement-breakpoint
 CREATE INDEX `idx_agent_messages_to_agent` ON `agent_messages` (`to_agent_id`);
