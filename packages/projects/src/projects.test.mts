@@ -74,6 +74,28 @@ describe("createProject", () => {
     const result = createProject(makeDb(), { name: "New Project" });
     assert.equal(result.status, "planning");
   });
+
+  it("passes through repoUrl and directoryPath", () => {
+    let capturedValues: any;
+    const mockChain: any = {
+      all: () => [],
+      get: () => ({ ...FAKE_PROJECT, repoUrl: "https://github.com/test/repo", directoryPath: "/home/test/project" }),
+      returning: () => mockChain,
+      where: () => mockChain,
+      from: () => mockChain,
+      orderBy: () => mockChain,
+      set: () => mockChain,
+      values: (v: any) => { capturedValues = v; return mockChain; },
+    };
+    const db: any = { insert: () => mockChain, select: () => mockChain, update: () => mockChain, delete: () => mockChain };
+    createProject(db, {
+      name: "Test Project",
+      repoUrl: "https://github.com/test/repo",
+      directoryPath: "/home/test/project",
+    });
+    assert.equal(capturedValues.repoUrl, "https://github.com/test/repo");
+    assert.equal(capturedValues.directoryPath, "/home/test/project");
+  });
 });
 
 describe("getProject", () => {

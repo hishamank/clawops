@@ -244,6 +244,8 @@ export const projects = sqliteTable("projects", {
     .notNull()
     .default("planning"),
   ideaId: text("idea_id"),
+  repoUrl: text("repo_url"),
+  directoryPath: text("directory_path"),
   prd: text("prd"),
   prdUpdatedAt: integer("prd_updated_at", { mode: "timestamp" }),
   specContent: text("spec_content"),

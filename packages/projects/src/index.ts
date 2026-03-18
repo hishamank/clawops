@@ -62,7 +62,7 @@ export function appendProjectSpec(
 
 export function createProject(
   db: DBOrTx,
-  input: { name: string; description?: string; status?: ProjectStatus; prd?: string; ideaId?: string },
+  input: { name: string; description?: string; status?: ProjectStatus; prd?: string; ideaId?: string; repoUrl?: string; directoryPath?: string },
 ): Project {
   const project = db
     .insert(projects)
@@ -73,6 +73,8 @@ export function createProject(
       prd: input.prd ?? null,
       prdUpdatedAt: input.prd ? new Date() : null,
       ideaId: input.ideaId ?? null,
+      repoUrl: input.repoUrl ?? null,
+      directoryPath: input.directoryPath ?? null,
     })
     .returning()
     .get();
@@ -113,7 +115,7 @@ export function listProjects(db: DBOrTx): Project[] {
 export function updateProject(
   db: DBOrTx,
   id: string,
-  updates: Partial<{ name: string; description: string; status: ProjectStatus; prd: string }>,
+  updates: Partial<{ name: string; description: string; status: ProjectStatus; prd: string; repoUrl: string; directoryPath: string }>,
 ): Project {
   const values: Record<string, unknown> = { ...updates };
   if (updates.prd !== undefined) {

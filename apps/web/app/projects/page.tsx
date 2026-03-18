@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { listProjects } from "@clawops/projects";
 import { getDb } from "@/lib/server/runtime";
 import { mapProject } from "@/lib/mappers";
+import { CreateProjectDialog } from "./create-project-dialog";
 
 export const dynamic = "force-dynamic";
 
@@ -40,11 +41,14 @@ export default async function ProjectsPage(): Promise<React.JSX.Element> {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Projects</h1>
-        <p className="mt-1 text-muted-foreground">
-          Strategic containers for focused work
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Projects</h1>
+          <p className="mt-1 text-muted-foreground">
+            Strategic containers for focused work
+          </p>
+        </div>
+        <CreateProjectDialog />
       </div>
 
       {/* Stats row */}
