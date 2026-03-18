@@ -4,6 +4,7 @@ import { StatsCard } from "@/components/stats-card";
 import { TaskList } from "@/components/tasks/task-list";
 import { TaskBoard } from "@/components/tasks/task-board";
 import { TaskFilterBar } from "@/components/tasks/task-filter-bar";
+import { CreateTaskDialog } from "@/components/tasks/create-task-dialog";
 import { listTasks, getBlockedTaskIds, type ListTasksFilters } from "@clawops/tasks";
 import { listAgents } from "@clawops/agents";
 import { listProjects } from "@clawops/projects";
@@ -64,11 +65,16 @@ export default async function TasksPage({ searchParams }: PageProps): Promise<Re
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Tasks</h1>
-        <p className="mt-1 text-muted-foreground">
-          Work items across your agent fleet
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Tasks</h1>
+          <p className="mt-1 text-muted-foreground">
+            Work items across your agent fleet
+          </p>
+        </div>
+        <CreateTaskDialog
+          projects={projects.map((p) => ({ id: p.id, name: p.name }))}
+        />
       </div>
 
       {/* Stats row */}
