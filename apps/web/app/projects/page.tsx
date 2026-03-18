@@ -72,7 +72,7 @@ export default async function ProjectsPage(): Promise<React.JSX.Element> {
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatsCard title="Total" value={projects.length} icon={FolderKanban} description="All projects" />
         <StatsCard title="Active"   value={active}   icon={Activity} description="In progress" />
         <StatsCard title="Planning" value={planning} icon={FileText}  description="Not yet started" />

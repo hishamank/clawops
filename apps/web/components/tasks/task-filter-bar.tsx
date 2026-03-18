@@ -24,6 +24,8 @@ export interface TaskFilterBarProps {
     assigneeId?: string;
     view?: string;
   };
+  /** Extra query params to preserve in every generated href (e.g. { tab: "tasks" }) */
+  preserveParams?: Record<string, string>;
   counts?: Partial<Record<StatusValue, number>>;
   agents?: Array<{ id: string; name: string }>;
   showPriority?: boolean;
@@ -35,9 +37,10 @@ function buildHref(
   basePath: string,
   current: TaskFilterBarProps["current"],
   overrides: Record<string, string | undefined>,
+  preserve?: Record<string, string>,
 ): string {
   const merged = { ...current, ...overrides };
-  const params = new URLSearchParams();
+  const params = new URLSearchParams(preserve);
   if (merged.status && merged.status !== "all") params.set("status", merged.status);
   if (merged.priority && merged.priority !== "all") params.set("priority", merged.priority);
   if (merged.assigneeId && merged.assigneeId !== "all") params.set("assigneeId", merged.assigneeId);
@@ -49,6 +52,7 @@ function buildHref(
 export function TaskFilterBar({
   basePath,
   current,
+  preserveParams,
   counts,
   agents,
   showPriority = true,
@@ -70,7 +74,7 @@ export function TaskFilterBar({
           return (
             <Link
               key={tab.value}
-              href={buildHref(basePath, current, { status: tab.value })}
+              href={buildHref(basePath, current, { status: tab.value }, preserveParams)}
               className={cn(
                 "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
                 isActive
@@ -110,7 +114,7 @@ export function TaskFilterBar({
           aria-label="Filter by priority"
           value={current.priority ?? "all"}
           onChange={(e) =>
-            router.push(buildHref(basePath, current, { priority: e.target.value }))
+            router.push(buildHref(basePath, current, { priority: e.target.value }, preserveParams))
           }
           className="h-8 rounded-lg border border-white/8 bg-[#0d0d1a] px-2 text-xs text-[#ededef]"
         >
@@ -128,7 +132,7 @@ export function TaskFilterBar({
           aria-label="Filter by assignee"
           value={current.assigneeId ?? "all"}
           onChange={(e) =>
-            router.push(buildHref(basePath, current, { assigneeId: e.target.value }))
+            router.push(buildHref(basePath, current, { assigneeId: e.target.value }, preserveParams))
           }
           className="h-8 rounded-lg border border-white/8 bg-[#0d0d1a] px-2 text-xs text-[#ededef]"
         >
@@ -145,7 +149,7 @@ export function TaskFilterBar({
       {showViewToggle && (
         <div className="ml-auto flex items-center gap-0.5 rounded-xl border border-white/8 bg-[#0d0d1a] p-1">
           <Link
-            href={buildHref(basePath, current, { view: "list" })}
+            href={buildHref(basePath, current, { view: "list" }, preserveParams)}
             className={cn(
               "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
               (current.view ?? "list") === "list"
@@ -156,7 +160,7 @@ export function TaskFilterBar({
             List
           </Link>
           <Link
-            href={buildHref(basePath, current, { view: "board" })}
+            href={buildHref(basePath, current, { view: "board" }, preserveParams)}
             className={cn(
               "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
               current.view === "board"

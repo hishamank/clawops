@@ -172,7 +172,7 @@ export function AnalyticsContent(): React.JSX.Element {
 
   const agentCount = byAgent.length;
   const avgCostPerAgent = agentCount > 0 ? tokenSummary.totalCost / agentCount : 0;
-  const hasData = tokenSummary.totalTokensIn > 0 || tokenSummary.totalCost > 0;
+  const hasData = tokenSummary.totalTokensIn > 0 || tokenSummary.totalTokensOut > 0 || tokenSummary.totalCost > 0;
 
   const Header = (
     <div>

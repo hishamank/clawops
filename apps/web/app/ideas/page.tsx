@@ -61,7 +61,7 @@ function IdeaRow({ idea }: { idea: IdeaWithCount }): React.JSX.Element {
   const tags = parseTags(idea.tags);
   return (
     <div className="group relative flex items-start gap-3 rounded-xl border border-white/8 bg-[#0d0d1a] p-4 transition-colors hover:bg-white/[0.03]">
-      <Link href={`/ideas/${idea.id}`} className="absolute inset-0 rounded-xl" aria-label={idea.title} />
+      <Link href={`/ideas/${idea.id}`} className="absolute inset-0 rounded-xl" aria-label={idea.title}><span className="sr-only">{idea.title}</span></Link>
 
       <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#5e6ad2]/10">
         <Lightbulb className="h-3.5 w-3.5 text-[#5e6ad2]" />
@@ -128,12 +128,9 @@ function StageSection({ status, ideas }: { status: IdeaStatus; ideas: IdeaWithCo
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
-async function getIdeas(status?: string): Promise<IdeaWithCount[]> {
+async function getIdeas(): Promise<IdeaWithCount[]> {
   const db = getDb();
-  const ideas = listIdeas(
-    db,
-    status && status !== "all" ? { status: status as IdeaStatus } : undefined,
-  ).map(mapIdea);
+  const ideas = listIdeas(db).map(mapIdea);
   return ideas.map((idea) => ({ ...idea, taskCount: listIdeaTasks(db, idea.id).length }));
 }
 
@@ -143,13 +140,12 @@ export default async function IdeasPage({ searchParams }: PageProps): Promise<Re
   const sp = await searchParams;
   const status = typeof sp?.status === "string" ? sp.status : undefined;
 
-  // Fetch all ideas for accurate counts regardless of active filter
-  const [allIdeas, filteredIdeas] = await Promise.all([
-    getIdeas(),
-    status && status !== "all" ? getIdeas(status) : Promise.resolve<IdeaWithCount[]>([]),
-  ]);
-
-  const activeIdeas = status && status !== "all" ? filteredIdeas : allIdeas;
+  // Fetch all ideas once; derive filtered view in memory
+  const allIdeas = await getIdeas();
+  const activeIdeas =
+    status && status !== "all"
+      ? allIdeas.filter((i) => i.status === status)
+      : allIdeas;
 
   const counts = {
     all:      allIdeas.length,

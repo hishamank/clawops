@@ -43,7 +43,7 @@ export function StatsCard({
           <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", variantIcon[variant])}>
             <Icon className="h-4 w-4" />
           </div>
-          {delta && (
+          {delta && deltaUp !== undefined && (
             <span
               className={cn(
                 "flex items-center gap-0.5 text-[11px] font-medium",

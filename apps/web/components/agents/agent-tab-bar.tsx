@@ -13,15 +13,20 @@ const tabs = [
 
 type TabValue = (typeof tabs)[number]["value"];
 
+const VALID_TABS = new Set(tabs.map((t) => t.value));
+
+function resolveTab(value: string | null): TabValue {
+  return value && VALID_TABS.has(value as TabValue) ? (value as TabValue) : "overview";
+}
+
 export function AgentTabBar({
   counts,
 }: {
-  agentId: string;
   counts?: Partial<Record<TabValue, number>>;
 }): React.JSX.Element {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const activeTab = (searchParams.get("tab") ?? "overview") as TabValue;
+  const activeTab = resolveTab(searchParams.get("tab"));
 
   function href(tab: TabValue): string {
     const params = new URLSearchParams(searchParams.toString());

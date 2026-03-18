@@ -25,6 +25,8 @@ export function KeyboardShortcuts(): null {
       if (
         target.tagName === "INPUT" ||
         target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT" ||
+        target.tagName === "BUTTON" ||
         target.isContentEditable ||
         e.metaKey ||
         e.ctrlKey ||

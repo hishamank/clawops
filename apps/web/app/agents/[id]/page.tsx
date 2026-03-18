@@ -190,7 +190,9 @@ async function getAgentData(id: string): Promise<AgentDetailData | null> {
 
 export default async function AgentProfile({ params, searchParams }: PageProps): Promise<React.JSX.Element> {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
-  const tab = (typeof sp.tab === "string" ? sp.tab : "overview") as
+  const VALID_TABS = new Set(["overview", "tasks", "activity", "automation"]);
+  const rawTab = typeof sp.tab === "string" ? sp.tab : "overview";
+  const tab = (VALID_TABS.has(rawTab) ? rawTab : "overview") as
     "overview" | "tasks" | "activity" | "automation";
 
   const agent = await getAgentData(id);
@@ -310,7 +312,7 @@ export default async function AgentProfile({ params, searchParams }: PageProps):
       )}
 
       {/* Tab bar */}
-      <AgentTabBar agentId={id} counts={tabCounts} />
+      <AgentTabBar counts={tabCounts} />
 
       {/* ── Overview Tab ── */}
       {tab === "overview" && (
@@ -398,6 +400,7 @@ export default async function AgentProfile({ params, searchParams }: PageProps):
           <TaskFilterBar
             basePath={`/agents/${id}`}
             current={{ status: taskStatus, priority: taskPriority, view: "list" }}
+            preserveParams={{ tab: "tasks" }}
             counts={taskCounts}
             showAssignee={false}
             showPriority
