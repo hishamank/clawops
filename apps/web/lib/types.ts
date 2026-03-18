@@ -140,6 +140,8 @@ export interface ProjectListItem {
   description: string | null;
   status: ProjectStatus;
   ideaId: string | null;
+  repoUrl: string | null;
+  directoryPath: string | null;
   prd: string | null;
   prdUpdatedAt: string | null;
   specContent: string | null;

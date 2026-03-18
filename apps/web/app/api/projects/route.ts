@@ -10,6 +10,8 @@ import { getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
 const createProjectBody = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
+  repoUrl: z.string().url().optional(),
+  directoryPath: z.string().optional(),
   status: z.nativeEnum(ProjectStatus).optional(),
   prd: z.string().optional(),
   ideaId: z.string().optional(),
