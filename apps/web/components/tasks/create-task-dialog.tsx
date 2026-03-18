@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { createTaskAction } from "@/app/tasks/actions";
 import type { TaskPriority } from "@clawops/domain";
 
 interface Project {
@@ -36,53 +37,6 @@ const initialFormState: FormState = {
   issueUrl: "",
 };
 
-function isValidUrl(url: string): boolean {
-  if (!url) return true;
-  try {
-    new URL(url);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function createTask(form: FormState): Promise<{ id: string } | null> {
-  const response = await fetch("/api/tasks", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      title: form.title,
-      description: form.description || undefined,
-      projectId: form.projectId || undefined,
-      properties: { complexity: form.complexity },
-      priority: form.priority,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to create task");
-  }
-
-  return response.json();
-}
-
-async function createIssueLink(taskId: string, issueUrl: string): Promise<void> {
-  const response = await fetch(`/api/tasks/${taskId}/links`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      provider: "issue",
-      resourceType: "url",
-      url: issueUrl,
-      label: "Issue",
-    }),
-  });
-
-  if (!response.ok) {
-    // Silent failure - issue link is optional
-  }
-}
-
 export function CreateTaskDialog({
   projects,
   variant = "default",
@@ -93,6 +47,27 @@ export function CreateTaskDialog({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(initialFormState);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (open && titleInputRef.current) {
+      titleInputRef.current.focus();
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handleKeyDown(e: KeyboardEvent): void {
+      if (e.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open]);
 
   function handleOpenChange(open: boolean): void {
     setOpen(open);
@@ -110,7 +85,7 @@ export function CreateTaskDialog({
     if (error) setError(null);
   }
 
-  async function handleSubmit(e: React.FormEvent): Promise<void> {
+  function handleSubmit(e: React.FormEvent): void {
     e.preventDefault();
     setError(null);
 
@@ -119,28 +94,36 @@ export function CreateTaskDialog({
       return;
     }
 
-    if (!isValidUrl(form.issueUrl)) {
-      setError("Please enter a valid URL for the issue link");
-      return;
+    if (form.issueUrl) {
+      try {
+        const url = new URL(form.issueUrl);
+        if (!["http:", "https:"].includes(url.protocol)) {
+          setError("Issue URL must use http or https protocol");
+          return;
+        }
+      } catch {
+        setError("Please enter a valid URL for the issue link");
+        return;
+      }
     }
 
     startTransition(async () => {
-      try {
-        const task = await createTask(form);
-        if (!task) {
-          setError("Failed to create task");
-          return;
-        }
+      const result = await createTaskAction({
+        title: form.title.trim(),
+        description: form.description.trim() || undefined,
+        projectId: form.projectId || undefined,
+        priority: form.priority,
+        complexity: form.complexity,
+        issueUrl: form.issueUrl.trim() || undefined,
+      });
 
-        if (form.issueUrl) {
-          await createIssueLink(task.id, form.issueUrl);
-        }
-
-        handleOpenChange(false);
-        router.refresh();
-      } catch {
-        setError("Failed to create task. Please try again.");
+      if (result.error) {
+        setError(result.error);
+        return;
       }
+
+      handleOpenChange(false);
+      router.refresh();
     });
   }
 
@@ -158,24 +141,34 @@ export function CreateTaskDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-lg">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      role="presentation"
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-task-title"
+        className="w-full max-w-lg"
+      >
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Create New Task</CardTitle>
+              <CardTitle id="create-task-title">Create New Task</CardTitle>
               <Button
                 variant="ghost"
                 size="icon-sm"
                 onClick={() => handleOpenChange(false)}
                 disabled={isPending}
+                aria-label="Close dialog"
               >
-                <span className="sr-only">Close</span>
                 <svg
                   className="h-4 w-4"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
+                  aria-hidden="true"
                 >
                   <path
                     strokeLinecap="round"
@@ -190,7 +183,10 @@ export function CreateTaskDialog({
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
               {error && (
-                <div className="rounded-lg bg-red-500/10 p-3 text-sm text-red-400 border border-red-500/20">
+                <div
+                  className="rounded-lg bg-red-500/10 p-3 text-sm text-red-400 border border-red-500/20"
+                  role="alert"
+                >
                   {error}
                 </div>
               )}
@@ -200,6 +196,7 @@ export function CreateTaskDialog({
                   Title <span className="text-red-500">*</span>
                 </label>
                 <input
+                  ref={titleInputRef}
                   id="title"
                   type="text"
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -208,6 +205,7 @@ export function CreateTaskDialog({
                   placeholder="Enter task title"
                   required
                   disabled={isPending}
+                  aria-required="true"
                 />
               </div>
 
