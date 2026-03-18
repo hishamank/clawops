@@ -22,6 +22,7 @@ interface DashboardData {
   activeCount: number;
   activeTasks: number;
   blockedTasks: Pick<Task, "id" | "title" | "status" | "priority">[];
+  tasksByAgent: Map<string, number>;
   ideasQueued: number;
   tokenSummary: TokenSummary;
 }
@@ -41,6 +42,14 @@ async function getDashboardData(): Promise<DashboardData> {
     .filter((t) => blockedIds.has(t.id))
     .map((t) => ({ id: t.id, title: t.title, status: t.status, priority: t.priority }));
 
+  // Task counts per agent (for workload bar on agent cards)
+  const tasksByAgent = new Map<string, number>();
+  for (const t of nonTerminal) {
+    if (t.assigneeId) {
+      tasksByAgent.set(t.assigneeId, (tasksByAgent.get(t.assigneeId) ?? 0) + 1);
+    }
+  }
+
   const allIdeas = listIdeas(db);
   const ideasQueued = allIdeas.filter((i) => i.status === "raw" || i.status === "reviewed").length;
 
@@ -51,7 +60,7 @@ async function getDashboardData(): Promise<DashboardData> {
     totalCost: summary.totalCost,
   };
 
-  return { agents, activeCount, activeTasks: nonTerminal.length, blockedTasks, ideasQueued, tokenSummary };
+  return { agents, activeCount, activeTasks: nonTerminal.length, blockedTasks, tasksByAgent, ideasQueued, tokenSummary };
 }
 
 export default async function FleetOverview(): Promise<React.JSX.Element> {
@@ -60,7 +69,7 @@ export default async function FleetOverview(): Promise<React.JSX.Element> {
     listActivityEvents({ limit: 20 }),
   ]);
 
-  const { agents, activeCount, activeTasks, blockedTasks, ideasQueued, tokenSummary } = data;
+  const { agents, activeCount, activeTasks, blockedTasks, tasksByAgent, ideasQueued, tokenSummary } = data;
 
   return (
     <div className="space-y-6">
@@ -164,7 +173,11 @@ export default async function FleetOverview(): Promise<React.JSX.Element> {
           ) : (
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {agents.map((agent) => (
-                <AgentCard key={agent.id} agent={agent} />
+                <AgentCard
+                  key={agent.id}
+                  agent={agent}
+                  activeTasks={tasksByAgent.get(agent.id) ?? 0}
+                />
               ))}
             </div>
           )}
