@@ -2,7 +2,14 @@ import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "./schema.js";
 
-const dbPath = process.env["CLAWOPS_DB_PATH"] || "./clawops.db";
+const dbPath = process.env["CLAWOPS_DB_PATH"]?.trim() || "./clawops.db";
+
+if (!dbPath || typeof dbPath !== "string") {
+  throw new Error(
+    `Invalid CLAWOPS_DB_PATH: got ${JSON.stringify(dbPath)} (type: ${typeof dbPath}). ` +
+    `Expected a valid file path string. Check your .env file.`
+  );
+}
 
 const sqlite = new Database(dbPath);
 sqlite.pragma("journal_mode = WAL");
