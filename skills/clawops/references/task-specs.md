@@ -77,20 +77,22 @@ backlog → todo → in-progress → review → done
 
 ## Auto-Pull Eligibility
 
-Tasks can be marked eligible for autonomous agent pickup:
+Tasks can be marked eligible for autonomous agent pickup at creation time. The `task pullable` command filters for tasks that agents can autonomously pick up:
+
+- Status is `backlog`, `todo`, `in-progress`, or `review`
+- Has no assignee (`assigneeId` is null)
+- `autoPullEligible` is true
+- Not actively blocked by another task
 
 ```bash
-# Create pullable task
+# Create pullable task (autoPullEligible defaults to true)
 clawops task create --title "..." --priority high
 
-# Default: autoPullEligible = true
-# Update manually via task update if needed
+# List pullable tasks
+clawops task pullable --priority high
 ```
 
-The `task pullable` command filters for tasks that agents can autonomously pick up:
-- Status is `todo`
-- `autoPullEligible` is true
-- Has a spec with sufficient context
+Note: The CLI does not currently expose a way to modify `autoPullEligible` after task creation.
 
 ## Complexity Assessment
 

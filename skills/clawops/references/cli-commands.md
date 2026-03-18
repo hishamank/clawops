@@ -74,14 +74,13 @@ clawops task create --title <title> [--desc <description>] [--priority <priority
 - `--desc`: Task description
 - `--priority`: Priority level (`low`, `medium`, `high`, `urgent`)
 - `--project`: Project ID to link task to
-- `--assignee`: Assignee agent ID (use `self` for current agent)
+- `--assignee`: Assignee agent ID (omit to leave unassigned)
 - `--spec`: Path to spec file with task context
 - `--idea-id`: Link task to an idea
 
 **Example:**
 ```bash
-clawops task create --title "Fix login bug" --priority high --project prj-123 --assignee self
-```
+clawops task create --title "Fix login bug" --priority high --project prj-123
 
 ### task list
 List tasks with optional filters.

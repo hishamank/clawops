@@ -58,7 +58,8 @@ Send regular heartbeats to avoid offline alerts:
 # In your agent loop or cron
 clawops agent heartbeat
 
-# Or log via habit
+# Or register and log a heartbeat habit
+clawops habit register "heartbeat" --type scheduled --interval 300000  # 5 minutes in ms
 clawops habit run "$(clawops habit list --json | jq -r '.[] | select(.name == "heartbeat") | .id')"
 ```
 
@@ -180,12 +181,11 @@ clawops task unblock "$BLOCKER_ID" "$BLOCKED_ID"
 
 ### Ignoring Notifications
 
-Check notifications regularly:
+Check notifications regularly via the web dashboard:
 
 ```bash
 # View recent notifications in dashboard
-# Or check via events
-clawops task list --status done --json | head -10
+# Navigate to http://localhost:3333/notifications
 ```
 
 ### Using Stdin Without Explicit Flag

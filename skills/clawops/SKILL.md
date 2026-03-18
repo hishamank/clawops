@@ -46,7 +46,7 @@ clawops task list --status todo --json
 
 ```bash
 # Create task
-clawops task create --title "<title>" [--desc <desc>] [--priority low|medium|high|urgent] [--project <id>] [--assignee self|<id>]
+clawops task create --title "<title>" [--desc <desc>] [--priority low|medium|high|urgent] [--project <id>] [--assignee <agent-id>]
 
 # List tasks
 clawops task list [--status todo|in-progress|review|done] [--project <id>] [--json]
@@ -98,14 +98,16 @@ clawops idea draft-prd <id> --set "## PRD content..."
 ### Habits
 
 ```bash
-# Register habit
-clawops habit register "daily standup" --type scheduled --schedule "0 8 * * *"
-clawops habit register "health check" --type heartbeat --interval 300
+# Cron job (runs on schedule)
+clawops habit register "daily standup" --type cron --schedule "0 8 * * *"
 
-# Log run
-clawops habit run <id> [--note "completed"] [--success]
+# Interval-based habit (runs every N milliseconds)
+clawops habit register "stay alive" --type scheduled --interval 300000
 
-# List
+# Log habit run
+clawops habit run <id> --note "completed" --success
+
+# List habits
 clawops habit list
 ```
 
@@ -161,21 +163,35 @@ clawops workflow inspect-run <run-id>
 
 ## Notifications & Alerts
 
-ClawOps generates notifications for:
-- Task completions
-- Missed heartbeats (agent may have crashed)
-- Milestone achievements
+ClawOps generates notifications (also called tick-status alerts) for:
+- **Task completions**: When tasks are marked done
+- **Missed heartbeats**: When an agent fails to send heartbeat within expected interval (may indicate crash)
+- **Milestone achievements**: When project milestones are completed
+- **Sync errors**: When OpenClaw sync encounters issues
 
-Check alerts:
+### Severity Levels
+- `info`: Informational (normal operations)
+- `warning`: Attention needed but not critical
+- `error`: Operation failed
+- `critical`: Urgent attention required (e.g., agent offline)
+
+### Checking Alerts
+
 ```bash
-# Via CLI - look at recent events
-clawops task list --status done --json | head -20
-
 # Via web dashboard
 # Navigate to /notifications
+
+# Check via events log (task completions)
+clawops task list --status done --json | head -20
+
+# Check active sessions
+clawops session list --status active
 ```
 
-Severity levels: `info`, `warning`, `error`, `critical`
+When you see an "agent offline" or "missed heartbeat" alert:
+1. Check if the agent process crashed: Review agent logs
+2. Verify agent is running: `clawops agent status set online`
+3. Restart if needed: Re-initialize the agent
 
 ## Task Specs
 
