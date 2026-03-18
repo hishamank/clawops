@@ -23,7 +23,9 @@ const createTaskBody = z.object({
   specContent: z.string().optional(),
   templateId: z.string().optional(),
   stageId: z.string().optional(),
-  properties: z.record(z.string(), z.unknown()).optional(),
+  properties: z.object({
+    complexity: z.number().int().min(1).max(5).optional(),
+  }).optional(),
   ideaId: z.string().optional(),
 });
 
