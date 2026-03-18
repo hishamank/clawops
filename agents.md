@@ -183,11 +183,15 @@ await db.insert(events).values({
 
 ## Web UI Rules
 
+**Before writing any web UI code, read `apps/web/DESIGN_GUIDE.md` in full.** It is the single source of truth for all visual and component decisions in the web app.
+
 - Use shadcn/ui components — do not install additional UI libraries without asking
 - Tailwind utility classes only — no custom CSS files
 - All data fetching via the API — do not import `@clawops/core` or any package library in the web app
 - No `useEffect` for data fetching — use React Server Components or SWR/React Query
 - Loading states and error states are required on every data-fetching component — never leave them blank
+- Follow the exact color palette from `DESIGN_GUIDE.md` — never use Tailwind zinc/slate/muted/card/border tokens; always use the explicit hex values defined in the guide
+- Follow the card padding model, tab patterns, badge variants, empty state patterns, and all other conventions documented in the guide
 
 ---
 
