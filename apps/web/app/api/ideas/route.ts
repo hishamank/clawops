@@ -21,6 +21,7 @@ const createIdeaBody = z.object({
   tags: z.array(z.string()).optional(),
   sections: sectionSchema.optional(),
   source: z.enum([Source.human, Source.agent]).optional(),
+  projectId: z.string().optional(),
 });
 
 const listIdeasQuery = z.object({

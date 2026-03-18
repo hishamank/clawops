@@ -45,8 +45,16 @@ export function CreateIdeaDialog(): React.JSX.Element {
 
   useEffect(() => {
     if (open && projects.length === 0) {
-      fetch("/api/projects")
-        .then((res) => res.json())
+      const apiKey = getApiKey();
+      const headers: HeadersInit = {};
+      if (apiKey) {
+        headers["x-api-key"] = apiKey;
+      }
+      fetch("/api/projects", { headers })
+        .then((res) => {
+          if (!res.ok) throw new Error("Failed to fetch projects");
+          return res.json();
+        })
         .then((data) => {
           if (Array.isArray(data)) {
             setProjects(data);
