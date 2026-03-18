@@ -1,21 +1,20 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { timeAgo } from "@/lib/time";
 import type { Agent } from "@/lib/types";
 
-const statusColors: Record<Agent["status"], string> = {
-  online: "bg-emerald-500",
-  busy: "bg-amber-500",
-  idle: "bg-amber-500",
-  offline: "bg-zinc-500",
+const statusDot: Record<Agent["status"], string> = {
+  online:  "bg-emerald-500",
+  busy:    "bg-amber-500",
+  idle:    "bg-amber-500",
+  offline: "bg-[#6b7080]/50",
 };
 
-const statusLabels: Record<Agent["status"], string> = {
-  online: "Active",
-  busy: "Busy",
-  idle: "Idle",
+const statusLabel: Record<Agent["status"], string> = {
+  online:  "Active",
+  busy:    "Busy",
+  idle:    "Idle",
   offline: "Offline",
 };
 
@@ -30,48 +29,72 @@ function getInitials(name: string): string {
 
 interface AgentCardProps {
   agent: Agent;
+  activeTasks?: number;
 }
 
-export function AgentCard({ agent }: AgentCardProps): React.JSX.Element {
+export function AgentCard({ agent, activeTasks }: AgentCardProps): React.JSX.Element {
   return (
     <Link href={`/agents/${agent.id}`}>
-      <Card className="py-4 transition-colors hover:bg-accent/50 cursor-pointer">
-        <CardContent className="flex items-start gap-4">
-          {/* Avatar */}
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary font-semibold text-sm">
-            {agent.avatar ?? getInitials(agent.name)}
-          </div>
+      <Card className="py-0 cursor-pointer transition-colors hover:bg-white/[0.03]">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            {/* Avatar */}
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#5e6ad2]/10 font-semibold text-sm text-[#5e6ad2]">
+              {agent.avatar ?? getInitials(agent.name)}
+            </div>
 
-          {/* Details */}
-          <div className="flex flex-1 flex-col gap-1.5 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-sm truncate">{agent.name}</span>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <div
-                  className={cn("h-2 w-2 rounded-full", statusColors[agent.status])}
-                />
-                <span className="text-xs text-muted-foreground">
-                  {statusLabels[agent.status]}
-                </span>
+            {/* Details */}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate text-sm font-medium text-[#ededef]">{agent.name}</span>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <div className={cn("h-1.5 w-1.5 rounded-full", statusDot[agent.status])} />
+                  <span className="text-[11px] text-[#6b7080]">{statusLabel[agent.status]}</span>
+                </div>
               </div>
-            </div>
 
-            <p className="text-xs text-muted-foreground truncate">{agent.role}</p>
+              <p className="mt-0.5 truncate text-xs text-[#6b7080]">{agent.role}</p>
 
-            <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                {agent.model}
-              </Badge>
-              {agent.framework && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                  {agent.framework}
-                </Badge>
+              <div className="mt-2 flex items-center gap-2">
+                <span className="rounded bg-white/8 px-1.5 py-0.5 font-mono text-[10px] text-[#6b7080]">
+                  {agent.model}
+                </span>
+                {agent.framework && (
+                  <span className="rounded border border-white/8 px-1.5 py-0.5 text-[10px] text-[#6b7080]">
+                    {agent.framework}
+                  </span>
+                )}
+              </div>
+
+              {/* Task load bar */}
+              {activeTasks != null && (
+                <div className="mt-3">
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-[10px] text-[#6b7080]">Active tasks</span>
+                    <span className="font-mono text-[10px] text-[#6b7080]">{activeTasks}</span>
+                  </div>
+                  <div className="h-1 w-full overflow-hidden rounded-full bg-white/8">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all",
+                        activeTasks === 0
+                          ? "w-0"
+                          : activeTasks <= 3
+                          ? "bg-emerald-500"
+                          : activeTasks <= 7
+                          ? "bg-amber-500"
+                          : "bg-rose-500",
+                      )}
+                      style={{ width: `${Math.min(activeTasks * 10, 100)}%` }}
+                    />
+                  </div>
+                </div>
               )}
-            </div>
 
-            <span className="text-[11px] text-muted-foreground mt-0.5">
-              Active {timeAgo(agent.lastActive)}
-            </span>
+              <p className="mt-2 text-[10px] text-[#6b7080]/60">
+                Active {timeAgo(agent.lastActive)}
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>

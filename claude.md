@@ -255,6 +255,8 @@ All commands support `--json`. Default output is minimal. Every CLI call auto-wr
 | `/notifications` | Notification log |
 | `/settings` | API keys, model pricing table, agent memory paths |
 
+**Web UI Design System:** All web UI work must follow `apps/web/DESIGN_GUIDE.md`. This file defines the color palette, typography, spacing, card patterns, interactive states, and component conventions for the entire dashboard. Do not use Tailwind semantic tokens (zinc, slate, muted, card, border) — use the explicit hex values in the guide.
+
 ---
 
 ## Coding Principles

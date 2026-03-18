@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { notFound } from "next/navigation";
-import { ArrowLeft, FileText, Clock, Link2, Ban, ArrowRight, Layers } from "lucide-react";
+import { ArrowLeft, FileText, Clock, Link2, Ban, ArrowRight, Layers, Calendar, User, FolderKanban } from "lucide-react";
 import Link from "next/link";
 import type { Task } from "@/lib/types";
 import { timeAgo } from "@/lib/time";
@@ -9,6 +9,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { PriorityBadge } from "@/components/priority-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Markdown } from "@/components/markdown";
 import { getTask, listTaskRelations, listTaskResourceLinks, parseTaskProperties } from "@clawops/tasks";
 import { listAgents } from "@clawops/agents";
 import { listProjects } from "@clawops/projects";
@@ -39,252 +40,307 @@ export default async function TaskDetailPage({ params }: PageProps): Promise<Rea
     listTaskRelations(db, id),
     listTaskResourceLinks(db, id).map(mapResourceLink),
   ]);
-  const agentMap = new Map(agents.map((a) => [a.id, a.name]));
+  const agentMap   = new Map(agents.map((a) => [a.id, a.name]));
   const projectMap = new Map(projects.map((p) => [p.id, p.name]));
   const properties = parseTaskProperties(task);
 
   // Categorize relations
   const blockers = relations.filter(
     (r) =>
-      (r.relation.type === "blocks" && r.direction === "incoming") ||
+      (r.relation.type === "blocks"     && r.direction === "incoming") ||
       (r.relation.type === "depends-on" && r.direction === "outgoing"),
   );
   const blocking = relations.filter(
     (r) =>
-      (r.relation.type === "blocks" && r.direction === "outgoing") ||
+      (r.relation.type === "blocks"     && r.direction === "outgoing") ||
       (r.relation.type === "depends-on" && r.direction === "incoming"),
   );
   const related = relations.filter((r) => r.relation.type === "related-to");
 
+  const assigneeName = task.assigneeId ? (agentMap.get(task.assigneeId) ?? "Unknown") : null;
+  const projectName  = task.projectId  ? (projectMap.get(task.projectId)  ?? "Unknown") : null;
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/tasks">
-          <ArrowLeft className="h-5 w-5 text-muted-foreground hover:text-foreground" />
+    <div className="mx-auto max-w-6xl space-y-5">
+      {/* Back + title */}
+      <div className="flex items-start gap-3">
+        <Link
+          href="/tasks"
+          className="mt-1 shrink-0 rounded-md p-1 text-[#6b7080] transition-colors hover:bg-white/5 hover:text-[#ededef]"
+        >
+          <ArrowLeft className="h-4 w-4" />
         </Link>
-        <div className="flex-1">
-          <h1 className="text-3xl font-semibold tracking-tight">{task.title}</h1>
-          <p className="text-muted-foreground mt-1">Task {id}</p>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            {blockers.length > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[11px] font-medium text-rose-300">
+                <Ban className="h-3 w-3" />
+                Blocked
+              </span>
+            )}
+            <span className="font-mono text-[11px] text-[#6b7080]">{id}</span>
+          </div>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight text-[#ededef]">{task.title}</h1>
         </div>
       </div>
 
-      {/* Meta info */}
-      <div className="flex flex-wrap gap-2">
-        <StatusBadge status={task.status} />
-        <PriorityBadge priority={task.priority} />
-        {task.assigneeId && (
-          <Badge variant="secondary">
-            Assignee: {agentMap.get(task.assigneeId) ?? "Unknown"}
-          </Badge>
-        )}
-        {task.projectId && (
-          <Link href={`/projects/${task.projectId}`}>
-            <Badge variant="secondary">
-              Project: {projectMap.get(task.projectId) ?? "Unknown"}
-            </Badge>
-          </Link>
-        )}
-        {task.dueDate && (
-          <Badge variant="outline">
-            Due: {new Date(task.dueDate).toLocaleDateString()}
-          </Badge>
-        )}
-        {blockers.length > 0 && (
-          <Badge variant="outline" className="bg-rose-500/10 text-rose-400 border-rose-500/20">
-            <Ban className="h-3 w-3 mr-1" />
-            Blocked
-          </Badge>
-        )}
-        {task.stageId && (
-          <Badge variant="outline">
-            <Layers className="h-3 w-3 mr-1" />
-            Stage
-          </Badge>
-        )}
-      </div>
-
-      {/* Description */}
-      {task.description && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Description</CardTitle>
-          </CardHeader>
-          <CardContent className="text-muted-foreground whitespace-pre-wrap">
-            {task.description}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Blockers */}
-      {blockers.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Ban className="h-5 w-5 text-rose-400" />
-              Blocked By
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {blockers.map((r) => (
-              <Link
-                key={r.relation.id}
-                href={`/tasks/${r.task.id}`}
-                className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-accent/50 transition-colors"
-              >
-                <StatusBadge status={r.task.status} />
-                <span className="text-sm truncate flex-1">{r.task.title}</span>
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Blocking others */}
-      {blocking.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <ArrowRight className="h-5 w-5 text-amber-400" />
-              Blocking
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {blocking.map((r) => (
-              <Link
-                key={r.relation.id}
-                href={`/tasks/${r.task.id}`}
-                className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-accent/50 transition-colors"
-              >
-                <StatusBadge status={r.task.status} />
-                <span className="text-sm truncate flex-1">{r.task.title}</span>
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Related tasks */}
-      {related.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Related Tasks</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {related.map((r) => (
-              <Link
-                key={r.relation.id}
-                href={`/tasks/${r.task.id}`}
-                className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-accent/50 transition-colors"
-              >
-                <StatusBadge status={r.task.status} />
-                <span className="text-sm truncate flex-1">{r.task.title}</span>
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Resource Links */}
-      {links.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Link2 className="h-5 w-5" />
-              Links
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {links.map((link) => (
-              <a
-                key={link.id}
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-accent/50 transition-colors"
-              >
-                <Badge variant="outline" className="shrink-0">
-                  {link.provider}
-                </Badge>
-                <span className="text-sm truncate flex-1">
-                  {link.label ?? link.url}
-                </span>
-                <span className="text-xs text-muted-foreground shrink-0">
-                  {link.resourceType}
-                </span>
-              </a>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Properties */}
-      {Object.keys(properties).length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Properties</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
-              {Object.entries(properties).map(([key, value]) => (
-                <div key={key}>
-                  <dt className="text-xs text-muted-foreground">{key}</dt>
-                  <dd className="text-sm">{String(value)}</dd>
-                </div>
-              ))}
-            </dl>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Spec */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              <CardTitle className="text-lg">Spec</CardTitle>
-            </div>
-            {task.specUpdatedAt && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Clock className="h-3 w-3" />
-                Updated {timeAgo(task.specUpdatedAt)}
-              </div>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {task.specContent ? (
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <pre className="whitespace-pre-wrap font-sans text-sm">{task.specContent}</pre>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
-              <FileText className="h-10 w-10 mb-3 opacity-50" />
-              <p className="text-sm">No spec yet</p>
-              <p className="text-xs mt-1">
-                Use the CLI to add a spec: <code className="bg-muted px-2 py-1 rounded">clawops task spec {id} --set &quot;...&quot;</code>
-              </p>
-            </div>
+      {/* Two-column layout */}
+      <div className="flex gap-6">
+        {/* ── Left: content ── */}
+        <div className="min-w-0 flex-1 space-y-4">
+          {/* Description */}
+          {task.description && (
+            <Card className="py-0 gap-0">
+              <CardContent className="p-5">
+                <p className="text-sm leading-relaxed text-[#ededef]/80 whitespace-pre-wrap">
+                  {task.description}
+                </p>
+              </CardContent>
+            </Card>
           )}
-        </CardContent>
-      </Card>
 
-      {/* Summary (if completed) */}
-      {task.summary && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Completion Summary</CardTitle>
-          </CardHeader>
-          <CardContent className="text-muted-foreground whitespace-pre-wrap">
-            {task.summary}
-          </CardContent>
-        </Card>
-      )}
+          {/* Spec */}
+          <Card className="py-0 gap-0">
+            <CardHeader className="flex flex-row items-center justify-between py-3 px-5">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-[#6b7080]" />
+                <CardTitle className="text-sm font-semibold">Spec</CardTitle>
+              </div>
+              {task.specUpdatedAt && (
+                <div className="flex items-center gap-1 text-[11px] text-[#6b7080]">
+                  <Clock className="h-3 w-3" />
+                  Updated {timeAgo(task.specUpdatedAt)}
+                </div>
+              )}
+            </CardHeader>
+            <CardContent className="px-5 pb-5 pt-0">
+              {task.specContent ? (
+                <Markdown content={task.specContent} />
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <FileText className="mb-2 h-8 w-8 text-[#6b7080]/40" />
+                  <p className="text-sm text-[#6b7080]">No spec yet</p>
+                  <p className="mt-1 text-xs text-[#6b7080]/60">
+                    Use{" "}
+                    <code className="rounded bg-white/8 px-1.5 py-0.5 font-mono text-[0.8em] text-[#ededef]">
+                      clawops task spec {id} --set &quot;...&quot;
+                    </code>
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-      {/* Created at */}
-      <div className="text-xs text-muted-foreground">
-        Created {timeAgo(task.createdAt)}
+          {/* Completion summary */}
+          {task.summary && (
+            <Card className="py-0 gap-0">
+              <CardHeader className="py-3 px-5">
+                <CardTitle className="text-sm font-semibold">Completion Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="px-5 pb-5 pt-0">
+                <Markdown content={task.summary} />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Blocked by */}
+          {blockers.length > 0 && (
+            <Card className="py-0 gap-0">
+              <CardHeader className="flex flex-row items-center gap-2 py-3 px-5">
+                <Ban className="h-4 w-4 text-rose-400" />
+                <CardTitle className="text-sm font-semibold text-rose-300">Blocked By</CardTitle>
+              </CardHeader>
+              <CardContent className="px-5 pb-5 pt-0 space-y-1">
+                {blockers.map((r) => (
+                  <Link
+                    key={r.relation.id}
+                    href={`/tasks/${r.task.id}`}
+                    className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-white/5"
+                  >
+                    <StatusBadge status={r.task.status} />
+                    <span className="min-w-0 flex-1 truncate text-sm text-[#ededef]/80">
+                      {r.task.title}
+                    </span>
+                  </Link>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Blocking others */}
+          {blocking.length > 0 && (
+            <Card className="py-0 gap-0">
+              <CardHeader className="flex flex-row items-center gap-2 py-3 px-5">
+                <ArrowRight className="h-4 w-4 text-amber-400" />
+                <CardTitle className="text-sm font-semibold">Blocking</CardTitle>
+              </CardHeader>
+              <CardContent className="px-5 pb-5 pt-0 space-y-1">
+                {blocking.map((r) => (
+                  <Link
+                    key={r.relation.id}
+                    href={`/tasks/${r.task.id}`}
+                    className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-white/5"
+                  >
+                    <StatusBadge status={r.task.status} />
+                    <span className="min-w-0 flex-1 truncate text-sm text-[#ededef]/80">
+                      {r.task.title}
+                    </span>
+                  </Link>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Related tasks */}
+          {related.length > 0 && (
+            <Card className="py-0 gap-0">
+              <CardHeader className="py-3 px-5">
+                <CardTitle className="text-sm font-semibold">Related Tasks</CardTitle>
+              </CardHeader>
+              <CardContent className="px-5 pb-5 pt-0 space-y-1">
+                {related.map((r) => (
+                  <Link
+                    key={r.relation.id}
+                    href={`/tasks/${r.task.id}`}
+                    className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-white/5"
+                  >
+                    <StatusBadge status={r.task.status} />
+                    <span className="min-w-0 flex-1 truncate text-sm text-[#ededef]/80">
+                      {r.task.title}
+                    </span>
+                  </Link>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Links */}
+          {links.length > 0 && (
+            <Card className="py-0 gap-0">
+              <CardHeader className="flex flex-row items-center gap-2 py-3 px-5">
+                <Link2 className="h-4 w-4 text-[#6b7080]" />
+                <CardTitle className="text-sm font-semibold">Links</CardTitle>
+              </CardHeader>
+              <CardContent className="px-5 pb-5 pt-0 space-y-1">
+                {links.map((link) => (
+                  <a
+                    key={link.id}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-white/5"
+                  >
+                    <Badge variant="outline" className="shrink-0 text-[10px]">
+                      {link.provider}
+                    </Badge>
+                    <span className="min-w-0 flex-1 truncate text-sm text-[#ededef]/80">
+                      {link.label ?? link.url}
+                    </span>
+                    <span className="shrink-0 text-xs text-[#6b7080]">{link.resourceType}</span>
+                  </a>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* ── Right: properties panel ── */}
+        <div className="w-64 shrink-0 space-y-4">
+          <Card className="py-0 gap-0">
+            <CardContent className="p-0">
+              {/* Status */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/6">
+                <span className="text-xs text-[#6b7080]">Status</span>
+                <StatusBadge status={task.status} />
+              </div>
+
+              {/* Priority */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/6">
+                <span className="text-xs text-[#6b7080]">Priority</span>
+                <PriorityBadge priority={task.priority} />
+              </div>
+
+              {/* Assignee */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/6">
+                <span className="flex items-center gap-1.5 text-xs text-[#6b7080]">
+                  <User className="h-3 w-3" />
+                  Assignee
+                </span>
+                <span className="text-xs text-[#ededef]">
+                  {assigneeName ?? <span className="text-[#6b7080]">—</span>}
+                </span>
+              </div>
+
+              {/* Project */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/6">
+                <span className="flex items-center gap-1.5 text-xs text-[#6b7080]">
+                  <FolderKanban className="h-3 w-3" />
+                  Project
+                </span>
+                {projectName ? (
+                  <Link
+                    href={`/projects/${task.projectId}`}
+                    className="text-xs text-[#5e6ad2] hover:underline"
+                  >
+                    {projectName}
+                  </Link>
+                ) : (
+                  <span className="text-xs text-[#6b7080]">—</span>
+                )}
+              </div>
+
+              {/* Due date */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/6">
+                <span className="flex items-center gap-1.5 text-xs text-[#6b7080]">
+                  <Calendar className="h-3 w-3" />
+                  Due Date
+                </span>
+                <span className="text-xs text-[#ededef]">
+                  {task.dueDate
+                    ? new Date(task.dueDate).toLocaleDateString()
+                    : <span className="text-[#6b7080]">—</span>
+                  }
+                </span>
+              </div>
+
+              {/* Stage */}
+              {task.stageId && (
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/6">
+                  <span className="flex items-center gap-1.5 text-xs text-[#6b7080]">
+                    <Layers className="h-3 w-3" />
+                    Stage
+                  </span>
+                  <span className="text-xs text-[#ededef]">{task.stageId}</span>
+                </div>
+              )}
+
+              {/* Created */}
+              <div className="flex items-center justify-between px-4 py-3">
+                <span className="text-xs text-[#6b7080]">Created</span>
+                <span className="text-xs text-[#6b7080]">{timeAgo(task.createdAt)}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Custom properties */}
+          {Object.keys(properties).length > 0 && (
+            <Card className="py-0 gap-0">
+              <CardHeader className="py-3 px-4">
+                <CardTitle className="text-xs font-semibold uppercase tracking-widest text-[#6b7080]/70">
+                  Properties
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0 pb-3">
+                {Object.entries(properties).map(([key, value]) => (
+                  <div key={key} className="flex items-center justify-between px-4 py-2">
+                    <span className="text-xs text-[#6b7080]">{key}</span>
+                    <span className="text-xs text-[#ededef]">{String(value)}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
     </div>
   );
