@@ -1,10 +1,7 @@
-import { Lightbulb, Sparkles, ArrowUpRight, ListTodo } from "lucide-react";
+import { Lightbulb, ListTodo, Archive } from "lucide-react";
 import type { Idea } from "@/lib/types";
 import type { IdeaStatus, Source } from "@clawops/domain";
 import { timeAgo } from "@/lib/time";
-import { StatsCard } from "@/components/stats-card";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { IdeaFilterTabs } from "./filter-tabs";
 import { PromoteButton } from "./promote-button";
@@ -20,26 +17,30 @@ interface PageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-const ideaStatusStyles: Record<IdeaStatus, string> = {
-  raw: "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
-  reviewed: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+// ─── Status styles ─────────────────────────────────────────────────────────────
+
+const statusPill: Record<IdeaStatus, string> = {
+  raw:      "bg-[#6b7080]/10 text-[#6b7080] border-[#6b7080]/20",
+  reviewed: "bg-[#5e6ad2]/10 text-[#5e6ad2] border-[#5e6ad2]/20",
   promoted: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  archived: "bg-zinc-500/10 text-zinc-500 border-zinc-500/20",
+  archived: "bg-[#6b7080]/8 text-[#6b7080]/50 border-[#6b7080]/10",
 };
 
-const ideaStatusLabels: Record<IdeaStatus, string> = {
-  raw: "Raw",
-  reviewed: "Reviewed",
-  promoted: "Promoted",
-  archived: "Archived",
+const sourceColors: Record<Source, string> = {
+  human:  "text-[#5e6ad2]",
+  agent:  "text-amber-400",
+  cli:    "text-[#6b7080]",
+  script: "text-purple-400",
 };
 
-const sourceStyles: Record<Source, string> = {
-  human: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
-  agent: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-  cli: "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
-  script: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+const stageMeta: Record<IdeaStatus, { label: string; color: string; dot: string }> = {
+  raw:      { label: "Raw",      color: "text-[#6b7080]",     dot: "bg-[#6b7080]/50"    },
+  reviewed: { label: "Reviewed", color: "text-[#5e6ad2]",     dot: "bg-[#5e6ad2]"       },
+  promoted: { label: "Promoted", color: "text-emerald-400",   dot: "bg-emerald-500"     },
+  archived: { label: "Archived", color: "text-[#6b7080]/50",  dot: "bg-[#6b7080]/30"   },
 };
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function parseTags(tags: string | null): string[] {
   if (!tags) return [];
@@ -52,150 +53,159 @@ function parseTags(tags: string | null): string[] {
   }
 }
 
-interface IdeaWithTaskCount extends Idea {
-  taskCount: number;
+interface IdeaWithCount extends Idea { taskCount: number }
+
+// ─── Idea card ────────────────────────────────────────────────────────────────
+
+function IdeaRow({ idea }: { idea: IdeaWithCount }): React.JSX.Element {
+  const tags = parseTags(idea.tags);
+  return (
+    <div className="group relative flex items-start gap-3 rounded-xl border border-white/8 bg-[#0d0d1a] p-4 transition-colors hover:bg-white/[0.03]">
+      <Link href={`/ideas/${idea.id}`} className="absolute inset-0 rounded-xl" aria-label={idea.title} />
+
+      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#5e6ad2]/10">
+        <Lightbulb className="h-3.5 w-3.5 text-[#5e6ad2]" />
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-[#ededef]">{idea.title}</span>
+          <span className={cn("shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium", statusPill[idea.status])}>
+            {idea.status}
+          </span>
+          <span className={cn("shrink-0 text-[10px]", sourceColors[idea.source])}>
+            {idea.source}
+          </span>
+          {idea.taskCount > 0 && (
+            <span className="flex shrink-0 items-center gap-0.5 text-[10px] text-[#6b7080]">
+              <ListTodo className="h-3 w-3" />
+              {idea.taskCount}
+            </span>
+          )}
+        </div>
+
+        {idea.description && (
+          <p className="mt-1 line-clamp-2 text-xs text-[#6b7080]">{idea.description}</p>
+        )}
+
+        {tags.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {tags.map((tag) => (
+              <span key={tag} className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-[#6b7080]">
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="relative z-10 flex shrink-0 flex-col items-end gap-2">
+        <span className="text-[11px] text-[#6b7080]">{timeAgo(idea.createdAt)}</span>
+        {(idea.status === "raw" || idea.status === "reviewed") && (
+          <PromoteButton ideaId={idea.id} />
+        )}
+      </div>
+    </div>
+  );
 }
 
-async function getIdeas(status?: string): Promise<IdeaWithTaskCount[]> {
+// ─── Stage section ────────────────────────────────────────────────────────────
+
+function StageSection({ status, ideas }: { status: IdeaStatus; ideas: IdeaWithCount[] }): React.JSX.Element | null {
+  if (ideas.length === 0) return null;
+  const meta = stageMeta[status];
+  return (
+    <section className="space-y-2">
+      <div className="flex items-center gap-2 px-1">
+        <div className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} />
+        <span className={cn("text-xs font-semibold", meta.color)}>{meta.label}</span>
+        <span className="font-mono text-[10px] text-[#6b7080]/50">{ideas.length}</span>
+      </div>
+      {ideas.map((idea) => <IdeaRow key={idea.id} idea={idea} />)}
+    </section>
+  );
+}
+
+// ─── Data ─────────────────────────────────────────────────────────────────────
+
+async function getIdeas(status?: string): Promise<IdeaWithCount[]> {
   const db = getDb();
   const ideas = listIdeas(
     db,
     status && status !== "all" ? { status: status as IdeaStatus } : undefined,
   ).map(mapIdea);
-  
-  // Get task counts for each idea
-  const ideasWithCounts: IdeaWithTaskCount[] = ideas.map((idea) => ({
-    ...idea,
-    taskCount: listIdeaTasks(db, idea.id).length,
-  }));
-  
-  return ideasWithCounts;
+  return ideas.map((idea) => ({ ...idea, taskCount: listIdeaTasks(db, idea.id).length }));
 }
 
-export default async function IdeasPage({ searchParams }: PageProps): Promise<React.JSX.Element> {
-  const resolvedParams = await searchParams;
-  const status = typeof resolvedParams?.status === "string" ? resolvedParams.status : undefined;
-  const ideas = await getIdeas(status);
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
-  const raw = ideas.filter((i) => i.status === "raw").length;
-  const promoted = ideas.filter((i) => i.status === "promoted").length;
+export default async function IdeasPage({ searchParams }: PageProps): Promise<React.JSX.Element> {
+  const sp = await searchParams;
+  const status = typeof sp?.status === "string" ? sp.status : undefined;
+
+  // Fetch all ideas for accurate counts regardless of active filter
+  const [allIdeas, filteredIdeas] = await Promise.all([
+    getIdeas(),
+    status && status !== "all" ? getIdeas(status) : Promise.resolve<IdeaWithCount[]>([]),
+  ]);
+
+  const activeIdeas = status && status !== "all" ? filteredIdeas : allIdeas;
+
+  const counts = {
+    all:      allIdeas.length,
+    raw:      allIdeas.filter((i) => i.status === "raw").length,
+    reviewed: allIdeas.filter((i) => i.status === "reviewed").length,
+    promoted: allIdeas.filter((i) => i.status === "promoted").length,
+    archived: allIdeas.filter((i) => i.status === "archived").length,
+  };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Ideas</h1>
-          <p className="mt-1 text-muted-foreground">
-            Captured insights from your agent fleet
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-[#ededef]">Ideas</h1>
+          <p className="mt-0.5 text-sm text-[#6b7080]">Captured insights from your agent fleet</p>
         </div>
         <CreateIdeaDialog />
       </div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatsCard
-          title="Total Ideas"
-          value={ideas.length}
-          icon={Lightbulb}
-          description="All ideas"
-        />
-        <StatsCard
-          title="Raw"
-          value={raw}
-          icon={Sparkles}
-          description="Unreviewed"
-        />
-        <StatsCard
-          title="Promoted"
-          value={promoted}
-          icon={ArrowUpRight}
-          description="Became projects"
-        />
-      </div>
-
       {/* Filter tabs */}
-      <IdeaFilterTabs current={status ?? "all"} />
+      <IdeaFilterTabs current={status ?? "all"} counts={counts} />
 
-      {/* Ideas list */}
-      {ideas.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-16 text-center">
-          <Lightbulb className="h-10 w-10 text-muted-foreground mb-3" />
-          <p className="text-sm text-muted-foreground">No ideas yet</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Ideas will appear here as your agents capture them.
-          </p>
+      {/* Grouped pipeline view (all) */}
+      {(!status || status === "all") && allIdeas.length > 0 && (
+        <div className="space-y-6">
+          <StageSection status="raw"      ideas={allIdeas.filter((i) => i.status === "raw")}      />
+          <StageSection status="reviewed" ideas={allIdeas.filter((i) => i.status === "reviewed")} />
+          <StageSection status="promoted" ideas={allIdeas.filter((i) => i.status === "promoted")} />
+          <StageSection status="archived" ideas={allIdeas.filter((i) => i.status === "archived")} />
         </div>
-      ) : (
-        <div className="space-y-2">
-          {ideas.map((idea) => {
-            const tags = parseTags(idea.tags);
-            return (
-              <Card key={idea.id} className="transition-colors hover:bg-accent/50">
-                <CardContent className="py-3">
-                  <Link href={`/ideas/${idea.id}`} className="block">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0 flex-1 space-y-1.5">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-medium truncate">
-                            {idea.title}
-                          </span>
-                          <Badge
-                            variant="outline"
-                            className={cn(ideaStatusStyles[idea.status], "shrink-0")}
-                          >
-                            {ideaStatusLabels[idea.status]}
-                          </Badge>
-                          <Badge
-                            variant="outline"
-                            className={cn(sourceStyles[idea.source], "shrink-0")}
-                          >
-                            {idea.source}
-                          </Badge>
-                          {idea.taskCount > 0 && (
-                            <Badge
-                              variant="outline"
-                              className="bg-zinc-500/10 text-zinc-400 border-zinc-500/20 shrink-0"
-                            >
-                              <ListTodo className="h-3 w-3 mr-1" />
-                              {idea.taskCount} task{idea.taskCount !== 1 ? "s" : ""}
-                            </Badge>
-                          )}
-                        </div>
-                        {idea.description && (
-                          <p className="text-xs text-muted-foreground line-clamp-2">
-                            {idea.description}
-                          </p>
-                        )}
-                        {tags.length > 0 && (
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {tags.map((tag) => (
-                              <Badge
-                                key={tag}
-                                variant="secondary"
-                                className="text-[10px] px-1.5 py-0"
-                              >
-                                {tag}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        <span className="text-xs text-muted-foreground">
-                          {timeAgo(idea.createdAt)}
-                        </span>
-                        {(idea.status === "raw" || idea.status === "reviewed") && (
-                          <PromoteButton ideaId={idea.id} />
-                        )}
-                      </div>
-                    </div>
-                  </Link>
-                </CardContent>
-              </Card>
-            );
-          })}
+      )}
+
+      {/* Filtered flat list */}
+      {status && status !== "all" && (
+        activeIdeas.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-white/8 py-14 text-center">
+            {status === "archived"
+              ? <Archive className="mb-3 h-9 w-9 text-[#6b7080]" />
+              : <Lightbulb className="mb-3 h-9 w-9 text-[#6b7080]" />
+            }
+            <p className="text-sm text-[#6b7080]">No {status} ideas</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {activeIdeas.map((idea) => <IdeaRow key={idea.id} idea={idea} />)}
+          </div>
+        )
+      )}
+
+      {/* All empty state */}
+      {(!status || status === "all") && allIdeas.length === 0 && (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-white/8 py-14 text-center">
+          <Lightbulb className="mb-3 h-9 w-9 text-[#6b7080]" />
+          <p className="text-sm text-[#6b7080]">No ideas yet</p>
+          <p className="mt-1 text-xs text-[#6b7080]/60">Ideas appear here as your agents capture them.</p>
         </div>
       )}
     </div>
