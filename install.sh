@@ -211,6 +211,11 @@ echo ""
 run_quiet_step "Installing dependencies" pnpm install --frozen-lockfile
 echo ""
 
+# ── Step 2.5: Rebuild native modules ────────────────────────────────────────
+
+run_quiet_step "Rebuilding native modules" pnpm rebuild better-sqlite3
+echo ""
+
 # ── Step 3: Build all packages ──────────────────────────────────────────────
 
 run_quiet_step "Building all packages" pnpm build
@@ -348,8 +353,17 @@ EOF
   ENV_STATUS="created"
   print_success "Created .env"
 else
-  ENV_STATUS="already existed"
-  print_warning ".env already exists, skipping"
+  print_step "Updating .env with selected port..."
+
+  # Update WEB_PORT in existing .env file
+  if grep -q "^WEB_PORT=" .env; then
+    sed -i.bak "s/^WEB_PORT=.*/WEB_PORT=$WEB_PORT/" .env && rm -f .env.bak
+  else
+    echo "WEB_PORT=$WEB_PORT" >> .env
+  fi
+
+  ENV_STATUS="updated"
+  print_success "Updated .env with port $WEB_PORT"
 fi
 
 set -a
