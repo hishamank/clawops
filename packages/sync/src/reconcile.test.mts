@@ -182,6 +182,7 @@ mock.module("./openclaw/sessions.js", {
           updatedAt: new Date("2026-03-11T00:00:00.000Z"),
         },
       ] as OpenClawSession[]),
+    syncAgentStatusFromSessions: () => ({ updatedOnline: 0, updatedIdle: 0 }),
   },
 });
 

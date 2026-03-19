@@ -1,16 +1,21 @@
 import {
   type SQL,
+  agents,
   and,
   desc,
   eq,
+  gte,
   inArray,
+  openclawAgents,
   openclawSessions,
+  sql,
   toJsonObject,
   parseJsonObject,
   type DBOrTx,
   type OpenClawConnection,
   type OpenClawSession,
 } from "@clawops/core";
+import { AgentStatus } from "@clawops/domain";
 
 export type OpenClawSessionStatus = "active" | "ended";
 
@@ -335,4 +340,130 @@ export function listSessions(
     : query.limit(filters.limit ?? 20).all();
 
   return rows.map(deserializeSession);
+}
+
+const DEFAULT_ACTIVE_WINDOW_MINUTES = 30;
+
+export interface SyncAgentStatusOptions {
+  connectionId?: string;
+  windowMinutes?: number;
+}
+
+export interface SyncAgentStatusResult {
+  updatedOnline: number;
+  updatedIdle: number;
+}
+
+function getCutoffTime(windowMinutes: number): Date {
+  return new Date(Date.now() - windowMinutes * 60 * 1000);
+}
+
+export function getActiveSessionAgentIds(
+  db: DBOrTx,
+  options: { connectionId?: string; windowMinutes?: number } = {},
+): Set<string> {
+  const windowMinutes = options.windowMinutes ?? DEFAULT_ACTIVE_WINDOW_MINUTES;
+  const cutoff = getCutoffTime(windowMinutes);
+
+  const sessionConditions: SQL[] = [
+    eq(openclawSessions.status, "active"),
+    gte(openclawSessions.updatedAt, cutoff),
+  ];
+
+  if (options.connectionId) {
+    sessionConditions.push(eq(openclawSessions.connectionId, options.connectionId));
+  }
+
+  const sessions = db
+    .select({ agentId: openclawSessions.agentId })
+    .from(openclawSessions)
+    .where(and(...sessionConditions))
+    .all();
+
+  const externalAgentIds = sessions
+    .map((s) => s.agentId)
+    .filter((id): id is string => id !== null && id !== undefined);
+
+  if (externalAgentIds.length === 0) {
+    return new Set();
+  }
+
+  const mappingConditions: SQL[] = [
+    inArray(openclawAgents.externalAgentId, externalAgentIds),
+  ];
+
+  if (options.connectionId) {
+    mappingConditions.push(eq(openclawAgents.connectionId, options.connectionId));
+  }
+
+  const agentMappings = db
+    .select({ linkedAgentId: openclawAgents.linkedAgentId })
+    .from(openclawAgents)
+    .where(and(...mappingConditions))
+    .all();
+
+  return new Set(
+    agentMappings
+      .map((m) => m.linkedAgentId)
+      .filter((id): id is string => id !== null && id !== undefined),
+  );
+}
+
+export function syncAgentStatusFromSessions(
+  db: DBOrTx,
+  options: SyncAgentStatusOptions = {},
+): SyncAgentStatusResult {
+  const activeAgentIds = getActiveSessionAgentIds(db, options);
+
+  const linkedAgentsConditions: SQL[] = [];
+  if (options.connectionId) {
+    linkedAgentsConditions.push(eq(openclawAgents.connectionId, options.connectionId));
+  }
+
+  const allLinkedAgentsQuery = db
+    .select({ agentId: openclawAgents.linkedAgentId })
+    .from(openclawAgents);
+
+  const allLinkedAgents = linkedAgentsConditions.length > 0
+    ? allLinkedAgentsQuery.where(and(...linkedAgentsConditions)).all()
+    : allLinkedAgentsQuery.all();
+
+  const linkedAgentIds = allLinkedAgents
+    .map((m) => m.agentId)
+    .filter((id): id is string => id !== null && id !== undefined);
+
+  if (linkedAgentIds.length === 0) {
+    return { updatedOnline: 0, updatedIdle: 0 };
+  }
+
+  const now = new Date();
+
+  const onlineResult = activeAgentIds.size > 0
+    ? db
+        .update(agents)
+        .set({ status: AgentStatus.online, lastActive: now })
+        .where(inArray(agents.id, Array.from(activeAgentIds)))
+        .returning()
+    : { all: () => [] };
+
+  const onlineUpdated = onlineResult.all().length;
+
+  const idleCandidateIds = linkedAgentIds.filter((id) => !activeAgentIds.has(id));
+
+  const idleResult = idleCandidateIds.length > 0
+    ? db
+        .update(agents)
+        .set({ status: AgentStatus.idle })
+        .where(
+          and(
+            inArray(agents.id, idleCandidateIds),
+            sql`${agents.status} != ${AgentStatus.idle}`,
+          ),
+        )
+        .returning()
+    : { all: () => [] };
+
+  const idleUpdated = idleResult.all().length;
+
+  return { updatedOnline: onlineUpdated, updatedIdle: idleUpdated };
 }

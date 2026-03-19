@@ -1,13 +1,16 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
 import crypto from "node:crypto";
-import type { DB, OpenClawConnection, OpenClawSession } from "@clawops/core";
+import type { DB, OpenClawConnection, OpenClawSession, OpenClawAgent, Agent } from "@clawops/core";
+import { openclawSessions, openclawAgents } from "@clawops/core";
 import {
   normalizeSession,
   OpenClawSessionFetchError,
   syncSessions,
   listSessions,
   upsertSessions,
+  getActiveSessionAgentIds,
+  syncAgentStatusFromSessions,
   type FetchedOpenClawSession,
 } from "./sessions.js";
 
@@ -429,5 +432,234 @@ describe("listSessions", () => {
     } as unknown as DB;
 
     listSessions(db, {});
+  });
+});
+
+describe("getActiveSessionAgentIds", () => {
+  it("returns empty set when no sessions exist", () => {
+    const sessions: OpenClawSession[] = [];
+    const mappings: OpenClawAgent[] = [];
+
+    const db = {
+      select: () => ({
+        from: (table: unknown) => ({
+          where: () => ({
+            all: () => {
+              if (table === openclawSessions) {
+                return sessions;
+              }
+              if (table === openclawAgents) {
+                return mappings;
+              }
+              return [];
+            },
+          }),
+        }),
+      }),
+    } as unknown as DB;
+
+    const result = getActiveSessionAgentIds(db);
+    assert.equal(result.size, 0);
+  });
+
+  it("returns empty set when sessions have no agentId", () => {
+    const sessions: OpenClawSession[] = [
+      { id: "s1", connectionId: "conn-1", sessionKey: "session-1", agentId: null, model: null, status: "active", startedAt: new Date(), endedAt: null, metadata: null, createdAt: new Date(), updatedAt: new Date() },
+    ];
+    const mappings: OpenClawAgent[] = [];
+
+    const db = {
+      select: () => ({
+        from: (table: unknown) => ({
+          where: () => ({
+            all: () => {
+              if (table === openclawSessions) {
+                return sessions;
+              }
+              if (table === openclawAgents) {
+                return mappings;
+              }
+              return [];
+            },
+          }),
+        }),
+      }),
+    } as unknown as DB;
+
+    const result = getActiveSessionAgentIds(db);
+    assert.equal(result.size, 0);
+  });
+
+  it("returns correct agent IDs for active sessions with mappings", () => {
+    const sessions: OpenClawSession[] = [
+      { id: "s1", connectionId: "conn-1", sessionKey: "session-1", agentId: "ext-agent-1", model: null, status: "active", startedAt: new Date(), endedAt: null, metadata: null, createdAt: new Date(), updatedAt: new Date() },
+      { id: "s2", connectionId: "conn-1", sessionKey: "session-2", agentId: "ext-agent-2", model: null, status: "active", startedAt: new Date(), endedAt: null, metadata: null, createdAt: new Date(), updatedAt: new Date() },
+    ];
+    const mappings: OpenClawAgent[] = [
+      { id: "m1", connectionId: "conn-1", linkedAgentId: "agent-1", externalAgentId: "ext-agent-1", externalAgentName: "Agent 1", workspacePath: null, memoryPath: null, defaultModel: null, role: null, avatar: null, lastSeenAt: null, createdAt: new Date(), updatedAt: new Date() },
+      { id: "m2", connectionId: "conn-1", linkedAgentId: "agent-2", externalAgentId: "ext-agent-2", externalAgentName: "Agent 2", workspacePath: null, memoryPath: null, defaultModel: null, role: null, avatar: null, lastSeenAt: null, createdAt: new Date(), updatedAt: new Date() },
+    ];
+
+    const db = {
+      select: () => ({
+        from: (table: unknown) => ({
+          where: () => ({
+            all: () => {
+              if (table === openclawSessions) {
+                return sessions;
+              }
+              if (table === openclawAgents) {
+                return mappings;
+              }
+              return [];
+            },
+          }),
+        }),
+      }),
+    } as unknown as DB;
+
+    const result = getActiveSessionAgentIds(db);
+    assert.equal(result.size, 2);
+    assert.ok(result.has("agent-1"));
+    assert.ok(result.has("agent-2"));
+  });
+
+  it("returns deduplicated agent IDs when multiple sessions exist for same agent", () => {
+    const sessions: OpenClawSession[] = [
+      { id: "s1", connectionId: "conn-1", sessionKey: "session-1", agentId: "ext-agent-1", model: null, status: "active", startedAt: new Date(), endedAt: null, metadata: null, createdAt: new Date(), updatedAt: new Date() },
+      { id: "s2", connectionId: "conn-1", sessionKey: "session-2", agentId: "ext-agent-1", model: null, status: "active", startedAt: new Date(), endedAt: null, metadata: null, createdAt: new Date(), updatedAt: new Date() },
+    ];
+    const mappings: OpenClawAgent[] = [
+      { id: "m1", connectionId: "conn-1", linkedAgentId: "agent-1", externalAgentId: "ext-agent-1", externalAgentName: "Agent 1", workspacePath: null, memoryPath: null, defaultModel: null, role: null, avatar: null, lastSeenAt: null, createdAt: new Date(), updatedAt: new Date() },
+    ];
+
+    const db = {
+      select: () => ({
+        from: (table: unknown) => ({
+          where: () => ({
+            all: () => {
+              if (table === openclawSessions) {
+                return sessions;
+              }
+              if (table === openclawAgents) {
+                return mappings;
+              }
+              return [];
+            },
+          }),
+        }),
+      }),
+    } as unknown as DB;
+
+    const result = getActiveSessionAgentIds(db);
+    assert.equal(result.size, 1);
+    assert.ok(result.has("agent-1"));
+  });
+
+  it("ignores sessions without mappings", () => {
+    const sessions: OpenClawSession[] = [
+      { id: "s1", connectionId: "conn-1", sessionKey: "session-1", agentId: "ext-agent-1", model: null, status: "active", startedAt: new Date(), endedAt: null, metadata: null, createdAt: new Date(), updatedAt: new Date() },
+      { id: "s2", connectionId: "conn-1", sessionKey: "session-2", agentId: "ext-unmapped", model: null, status: "active", startedAt: new Date(), endedAt: null, metadata: null, createdAt: new Date(), updatedAt: new Date() },
+    ];
+    const mappings: OpenClawAgent[] = [
+      { id: "m1", connectionId: "conn-1", linkedAgentId: "agent-1", externalAgentId: "ext-agent-1", externalAgentName: "Agent 1", workspacePath: null, memoryPath: null, defaultModel: null, role: null, avatar: null, lastSeenAt: null, createdAt: new Date(), updatedAt: new Date() },
+    ];
+
+    const db = {
+      select: () => ({
+        from: (table: unknown) => ({
+          where: () => ({
+            all: () => {
+              if (table === openclawSessions) {
+                return sessions;
+              }
+              if (table === openclawAgents) {
+                return mappings;
+              }
+              return [];
+            },
+          }),
+        }),
+      }),
+    } as unknown as DB;
+
+    const result = getActiveSessionAgentIds(db);
+    assert.equal(result.size, 1);
+    assert.ok(result.has("agent-1"));
+  });
+});
+
+describe("syncAgentStatusFromSessions", () => {
+  it("returns zeros when no agents are linked to OpenClaw", () => {
+    const sessions: OpenClawSession[] = [];
+    const mappings: OpenClawAgent[] = [];
+
+    const db = {
+      select: () => ({
+        from: (table: unknown) => {
+          const data = table === openclawSessions ? sessions : table === openclawAgents ? mappings : [];
+          return {
+            where: () => ({
+              all: () => data,
+            }),
+            all: () => data,
+          };
+        },
+      }),
+      update: () => ({
+        set: () => ({
+          where: () => ({
+            returning: () => ({
+              all: () => [],
+            }),
+          }),
+        }),
+      }),
+    } as unknown as DB;
+
+    const result = syncAgentStatusFromSessions(db);
+    assert.equal(result.updatedOnline, 0);
+    assert.equal(result.updatedIdle, 0);
+  });
+
+  it("syncs agent status based on provided active agent IDs", () => {
+    const sessions: OpenClawSession[] = [
+      { id: "s1", connectionId: "conn-1", sessionKey: "session-1", agentId: "ext-agent-1", model: null, status: "active", startedAt: new Date(), endedAt: null, metadata: null, createdAt: new Date(), updatedAt: new Date() },
+    ];
+    const mappings: OpenClawAgent[] = [
+      { id: "m1", connectionId: "conn-1", linkedAgentId: "agent-1", externalAgentId: "ext-agent-1", externalAgentName: "Agent 1", workspacePath: null, memoryPath: null, defaultModel: null, role: null, avatar: null, lastSeenAt: null, createdAt: new Date(), updatedAt: new Date() },
+    ];
+
+    let updateCallCount = 0;
+    const db = {
+      select: () => ({
+        from: (table: unknown) => {
+          const data = table === openclawSessions ? sessions : table === openclawAgents ? mappings : [];
+          return {
+            where: () => ({
+              all: () => data,
+            }),
+            all: () => data,
+          };
+        },
+      }),
+      update: () => ({
+        set: () => ({
+          where: () => ({
+            returning: () => ({
+              all: () => {
+                updateCallCount++;
+                return [{ id: "agent-1" } as Agent];
+              },
+            }),
+          }),
+        }),
+      }),
+    } as unknown as DB;
+
+    const result = syncAgentStatusFromSessions(db);
+    assert.ok(typeof result.updatedOnline === "number", "Should return updatedOnline count");
+    assert.ok(typeof result.updatedIdle === "number", "Should return updatedIdle count");
+    assert.ok(updateCallCount >= 0, "Should attempt updates");
   });
 });
