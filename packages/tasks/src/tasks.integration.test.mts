@@ -27,6 +27,7 @@ const {
   getBlockersForTask,
   isTaskBlocked,
   getBlockedTaskIds,
+  deleteTask,
 } = await import("@clawops/tasks");
 
 let db: DB;
@@ -434,5 +435,66 @@ describe("getBlockedTaskIds", () => {
   it("returns empty set for empty input", () => {
     const result = getBlockedTaskIds(db, []);
     assert.strictEqual(result.size, 0);
+  });
+});
+
+describe("deleteTask", () => {
+  it("deletes a task and returns the deleted row", () => {
+    const task = createTask(db, { title: "To be deleted" });
+    const deleted = deleteTask(db, task.id);
+
+    assert.ok(deleted);
+    assert.strictEqual(deleted.id, task.id);
+    assert.strictEqual(getTask(db, task.id), null);
+  });
+
+  it("returns null for nonexistent task ID", () => {
+    const result = deleteTask(db, "nonexistent-id");
+    assert.strictEqual(result, null);
+  });
+
+  it("cascades deletion to artifacts", () => {
+    const task = createTask(db, { title: "Task with artifacts" });
+    completeTask(db, task.id, {
+      summary: "Done",
+      artifacts: [{ label: "PR", value: "https://github.com/pr/1" }],
+    });
+
+    const fetched = getTask(db, task.id);
+    assert.ok(fetched);
+    assert.strictEqual(fetched.artifacts.length, 1);
+
+    deleteTask(db, task.id);
+
+    const reFetched = getTask(db, task.id);
+    assert.strictEqual(reFetched, null);
+  });
+
+  it("cascades deletion to task relations", () => {
+    const parent = createTask(db, { title: "Parent" });
+    const child = createTask(db, { title: "Child" });
+    const relation = createTaskRelation(db, {
+      fromTaskId: parent.id,
+      toTaskId: child.id,
+      type: "blocks",
+    });
+
+    assert.strictEqual(listTaskRelations(db, parent.id).length, 1);
+
+    deleteTask(db, parent.id);
+
+    assert.strictEqual(listTaskRelations(db, child.id).length, 0);
+
+    deleteTaskRelation(db, relation.id);
+  });
+
+  it("can delete a task after marking it done", () => {
+    const task = createTask(db, { title: "Done then deleted" });
+    const done = completeTask(db, task.id, { summary: "Done" });
+    assert.strictEqual(done.status, "done");
+
+    const deleted = deleteTask(db, task.id);
+    assert.ok(deleted);
+    assert.strictEqual(getTask(db, task.id), null);
   });
 });
