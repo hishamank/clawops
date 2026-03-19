@@ -35,6 +35,8 @@ export interface TaskBoardProps {
   projectMap?: Map<string, string>;
   blockedTaskIds?: Set<string>;
   columns?: TaskStatus[];
+  onTaskDone?: (taskId: string) => void;
+  onTaskDelete?: (taskId: string) => void;
 }
 
 export function TaskBoard({
@@ -43,6 +45,8 @@ export function TaskBoard({
   projectMap,
   blockedTaskIds,
   columns = defaultColumns,
+  onTaskDone,
+  onTaskDelete,
 }: TaskBoardProps): React.JSX.Element {
   const grouped = new Map<TaskStatus, Task[]>();
   for (const col of columns) {
@@ -87,6 +91,8 @@ export function TaskBoard({
                     showProject={false}
                     blocked={blockedTaskIds?.has(task.id)}
                     compact
+                    onTaskDone={onTaskDone}
+                    onTaskDelete={onTaskDelete}
                   />
                 ))
               )}

@@ -52,7 +52,7 @@ export function TasksView({
     });
   };
 
-  const nonDoneCount = tasks.filter(
+  const nonDoneCount = optimisticTasks.filter(
     (t) => t.status !== "done" && t.status !== "cancelled",
   ).length;
 

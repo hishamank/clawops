@@ -103,8 +103,11 @@ export interface MarkDoneResult {
 export async function markTaskDoneAction(taskId: string): Promise<MarkDoneResult> {
   try {
     const db = getDb();
+    let found = false;
     db.transaction((tx) => {
       const task = updateTask(tx, taskId, { status: "done" });
+      if (!task) return;
+      found = true;
       tx.insert(events)
         .values({
           action: "task.done",
@@ -125,6 +128,7 @@ export async function markTaskDoneAction(taskId: string): Promise<MarkDoneResult
         metadata: JSON.stringify({ status: "done" }),
       });
     });
+    if (!found) return { error: "Task not found" };
     return { id: taskId };
   } catch {
     return { error: "Failed to mark task as done" };
@@ -139,8 +143,11 @@ export interface DeleteTaskResult {
 export async function deleteTaskAction(taskId: string): Promise<DeleteTaskResult> {
   try {
     const db = getDb();
+    let deleted = false;
     db.transaction((tx) => {
-      deleteTask(tx, taskId);
+      const result = deleteTask(tx, taskId);
+      if (!result) return;
+      deleted = true;
       tx.insert(events)
         .values({
           action: "task.deleted",
@@ -158,6 +165,7 @@ export async function deleteTaskAction(taskId: string): Promise<DeleteTaskResult
         entityId: taskId,
       });
     });
+    if (!deleted) return { error: "Task not found" };
     return { id: taskId };
   } catch {
     return { error: "Failed to delete task" };

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { TaskPriority, TaskStatus } from "@clawops/domain";
 import { events, createActivityEvent } from "@clawops/core";
 import { getTask, updateTask, deleteTask } from "@clawops/tasks";
-import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
+import { getAgentIdFromApiKey, getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
 
 const taskStatusEnum = z.nativeEnum(TaskStatus);
 const taskPriorityEnum = z.nativeEnum(TaskPriority);
@@ -84,12 +84,16 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  const authResult = requireAgentId(_req);
+  if (authResult instanceof NextResponse) return authResult;
+  const agentId = authResult;
+
   try {
     const { id } = idParams.parse(await params);
     const db = getDb();
-    const agentId = getAgentIdFromApiKey(_req) ?? undefined;
-    db.transaction((tx) => {
-      deleteTask(tx, id);
+    const deleted = db.transaction((tx) => {
+      const result = deleteTask(tx, id);
+      if (!result) return null;
       tx.insert(events)
         .values({
           action: "task.deleted",
@@ -100,14 +104,16 @@ export async function DELETE(
         })
         .run();
       createActivityEvent(tx, {
-        source: agentId ? "agent" : "user",
+        source: "user",
         type: "task.deleted",
         title: "Task deleted",
         entityType: "task",
         entityId: id,
         agentId,
       });
+      return result;
     });
+    if (!deleted) return jsonError(404, "Task not found", "TASK_NOT_FOUND");
     return new NextResponse(null, { status: 204 });
   } catch (err) {
     return jsonError(500, err instanceof Error ? err.message : "Failed to delete task", "INTERNAL_ERROR");
