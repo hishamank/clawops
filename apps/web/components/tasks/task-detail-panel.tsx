@@ -80,7 +80,7 @@ export function TaskDetailPanel({
     setErrorMessage(null);
     prevTitle.current = task.title;
     prevDescription.current = task.description ?? "";
-  }, [task.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [task.id, task.title, task.description, task.status, task.priority, task.assigneeId, task.projectId, task.dueDate]);
 
   // Escape to close
   useEffect(() => {
