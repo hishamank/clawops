@@ -36,8 +36,6 @@ export default async function TasksPage({ searchParams }: PageProps): Promise<Re
   ];
 
   const allTasks = allTasksRaw.map(mapTask);
-  const agentMap   = new Map<string, string>(agents.map((a) => [a.id, a.name]));
-  const projectMap = new Map<string, string>(projects.map((p) => [p.id, p.name]));
 
   const blockedTaskIds = getBlockedTaskIds(db, allTasksRaw.map((t) => t.id));
 
