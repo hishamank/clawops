@@ -99,6 +99,8 @@ export function TaskCard({
             <Checkbox
               checked={optimisticDone}
               onCheckedChange={handleDoneToggle}
+              onClick={(e: React.MouseEvent) => e.stopPropagation()}
+              onKeyDown={(e: React.KeyboardEvent) => e.stopPropagation()}
               aria-label={`Mark "${task.title}" as done`}
               className="shrink-0"
             />
