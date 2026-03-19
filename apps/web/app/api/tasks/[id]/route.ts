@@ -16,9 +16,9 @@ const updateTaskBody = z.object({
   description: z.string().optional(),
   status: taskStatusEnum.optional(),
   priority: taskPriorityEnum.optional(),
-  assigneeId: z.string().optional(),
-  projectId: z.string().optional(),
-  dueDate: z.string().datetime().optional(),
+  assigneeId: z.string().nullable().optional(),
+  projectId: z.string().nullable().optional(),
+  dueDate: z.string().datetime().nullable().optional(),
   templateId: z.string().nullable().optional(),
   stageId: z.string().nullable().optional(),
   properties: z.record(z.string(), z.unknown()).nullable().optional(),
@@ -47,7 +47,7 @@ export async function PATCH(
     const task = db.transaction((tx) => {
       const t = updateTask(tx, id, {
         ...body,
-        dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
+        dueDate: body.dueDate === null ? null : body.dueDate ? new Date(body.dueDate) : undefined,
       });
       if (!t) return null;
       tx.insert(events)

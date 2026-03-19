@@ -160,8 +160,8 @@ interface UpdateTaskInput {
   status?: Task["status"];
   priority?: Task["priority"];
   assigneeId?: string | null;
-  projectId?: string;
-  dueDate?: Date;
+  projectId?: string | null;
+  dueDate?: Date | null;
   completedAt?: Date | null;
   templateId?: string | null;
   stageId?: string | null;

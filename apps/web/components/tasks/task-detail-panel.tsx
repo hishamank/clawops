@@ -63,11 +63,12 @@ export function TaskDetailPanel({
 
   const panelRef = useRef<HTMLDivElement>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  // Track the previous values to avoid saving unchanged fields
+  // Track the previous values to avoid saving unchanged fields.
+  // Updated only after a successful save so failed saves can be retried.
   const prevTitle = useRef(task.title);
   const prevDescription = useRef(task.description ?? "");
 
-  // Reset state when a different task is selected
+  // Reset state only when switching to a different task
   useEffect(() => {
     setTitle(task.title);
     setDescription(task.description ?? "");
@@ -80,16 +81,31 @@ export function TaskDetailPanel({
     setErrorMessage(null);
     prevTitle.current = task.title;
     prevDescription.current = task.description ?? "";
-  }, [task.id, task.title, task.description, task.status, task.priority, task.assigneeId, task.projectId, task.dueDate]);
+  }, [task.id]);
+
+  // Clean up saved-status timer on unmount
+  useEffect(() => {
+    return () => clearTimeout(savedTimerRef.current);
+  }, []);
+
+  // Blur active element before closing to trigger pending saves
+  const closePanel = useCallback(() => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && panelRef.current?.contains(active)) {
+      active.blur();
+    }
+    // Small delay to let blur handlers fire before closing
+    setTimeout(onClose, 0);
+  }, [onClose]);
 
   // Escape to close
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent): void {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") closePanel();
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [closePanel]);
 
   const saveField = useCallback(
     async (field: string, value: string | null) => {
@@ -104,8 +120,8 @@ export function TaskDetailPanel({
           // Convert YYYY-MM-DD to ISO 8601 datetime
           body[field] = new Date(value + "T00:00:00.000Z").toISOString();
         } else if (field === "dueDate" && !value) {
-          // Clearing due date: send empty string (API handles it)
-          body[field] = "";
+          // Send null to clear the due date
+          body[field] = null;
         } else {
           body[field] = value;
         }
@@ -124,15 +140,17 @@ export function TaskDetailPanel({
         setSaveStatus("saved");
         savedTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
         onTaskUpdated();
+        return true;
       } catch (err) {
         setSaveStatus("error");
         setErrorMessage(err instanceof Error ? err.message : "Failed to save");
+        return false;
       }
     },
     [task.id, onTaskUpdated],
   );
 
-  const handleTitleBlur = () => {
+  const handleTitleBlur = async () => {
     const trimmed = title.trim();
     if (!trimmed) {
       // Revert — title is required
@@ -140,15 +158,15 @@ export function TaskDetailPanel({
       return;
     }
     if (trimmed === prevTitle.current) return;
-    prevTitle.current = trimmed;
     setTitle(trimmed);
-    saveField("title", trimmed);
+    const ok = await saveField("title", trimmed);
+    if (ok) prevTitle.current = trimmed;
   };
 
-  const handleDescriptionBlur = () => {
+  const handleDescriptionBlur = async () => {
     if (description === prevDescription.current) return;
-    prevDescription.current = description;
-    saveField("description", description);
+    const ok = await saveField("description", description);
+    if (ok) prevDescription.current = description;
   };
 
   const handleStatusChange = (value: TaskStatus) => {
@@ -163,12 +181,14 @@ export function TaskDetailPanel({
 
   const handleAssigneeChange = (value: string) => {
     setAssigneeId(value);
-    saveField("assigneeId", value || "");
+    // Send null to clear FK field rather than empty string
+    saveField("assigneeId", value || null);
   };
 
   const handleProjectChange = (value: string) => {
     setProjectId(value);
-    saveField("projectId", value || "");
+    // Send null to clear FK field rather than empty string
+    saveField("projectId", value || null);
   };
 
   const handleDueDateChange = (value: string) => {
@@ -184,7 +204,7 @@ export function TaskDetailPanel({
       {/* Backdrop */}
       <div
         className="fixed inset-0 z-40 bg-black/30"
-        onClick={onClose}
+        onClick={closePanel}
         aria-hidden="true"
       />
 
@@ -219,7 +239,7 @@ export function TaskDetailPanel({
           <Button
             variant="ghost"
             size="icon-sm"
-            onClick={onClose}
+            onClick={closePanel}
             aria-label="Close panel"
           >
             <X className="h-4 w-4" />

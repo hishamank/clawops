@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useOptimistic } from "react";
 import { CheckCircle2 } from "lucide-react";
@@ -55,14 +55,21 @@ export function TasksView({
     setSelectedTaskId(taskId);
   };
 
+  const taskWasEdited = useRef(false);
+
   const handlePanelClose = () => {
     setSelectedTaskId(null);
+    // Refresh once when closing, rather than after every field save
+    if (taskWasEdited.current) {
+      taskWasEdited.current = false;
+      startTransition(() => {
+        router.refresh();
+      });
+    }
   };
 
   const handleTaskUpdated = () => {
-    startTransition(() => {
-      router.refresh();
-    });
+    taskWasEdited.current = true;
   };
 
   const handleTaskDone = (taskId: string) => {
