@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { TaskPriority, TaskStatus } from "@clawops/domain";
 import { events, createActivityEvent } from "@clawops/core";
-import { getTask, updateTask } from "@clawops/tasks";
+import { getTask, updateTask, deleteTask } from "@clawops/tasks";
 import { getAgentIdFromApiKey, getDb, jsonError } from "@/lib/server/runtime";
 
 const taskStatusEnum = z.nativeEnum(TaskStatus);
@@ -77,5 +77,39 @@ export async function PATCH(
   } catch (err) {
     if (err instanceof z.ZodError) return jsonError(400, err.message, "VALIDATION_ERROR");
     return jsonError(500, err instanceof Error ? err.message : "Failed to update task", "INTERNAL_ERROR");
+  }
+}
+
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
+  try {
+    const { id } = idParams.parse(await params);
+    const db = getDb();
+    const agentId = getAgentIdFromApiKey(_req) ?? undefined;
+    db.transaction((tx) => {
+      deleteTask(tx, id);
+      tx.insert(events)
+        .values({
+          action: "task.deleted",
+          entityType: "task",
+          entityId: id,
+          agentId,
+          meta: null,
+        })
+        .run();
+      createActivityEvent(tx, {
+        source: agentId ? "agent" : "user",
+        type: "task.deleted",
+        title: "Task deleted",
+        entityType: "task",
+        entityId: id,
+        agentId,
+      });
+    });
+    return new NextResponse(null, { status: 204 });
+  } catch (err) {
+    return jsonError(500, err instanceof Error ? err.message : "Failed to delete task", "INTERNAL_ERROR");
   }
 }
