@@ -4,6 +4,7 @@ import { Activity, Plug, Clock4 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatsCard } from "@/components/stats-card";
+import { SyncButton } from "./sync-button";
 import { cn } from "@/lib/utils";
 import { timeAgo } from "@/lib/time";
 import { getDb } from "@/lib/server/runtime";
@@ -75,11 +76,14 @@ export default async function OpenClawPage(): Promise<React.JSX.Element> {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight">OpenClaw</h1>
-        <p className="mt-1 text-muted-foreground">
-          Monitor connections, syncs, sessions, cron jobs, and tracked files.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">OpenClaw</h1>
+          <p className="mt-1 text-muted-foreground">
+            Monitor connections, syncs, sessions, cron jobs, and tracked files.
+          </p>
+        </div>
+        <SyncButton disabled={connections.length === 0} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
