@@ -28,14 +28,14 @@ export function TaskCard({
   showSpec = true,
   blocked = false,
   href,
-  compact = false,
+  compact = true,
 }: TaskCardProps): React.JSX.Element {
   const target = href ?? `/tasks/${task.id}`;
 
   return (
     <Link href={target}>
-      <Card className="transition-colors hover:bg-accent/50 cursor-pointer">
-        <CardContent className={cn("flex items-center gap-4", compact ? "py-2" : "py-3")}>
+      <Card className="transition-colors hover:bg-accent/50 cursor-pointer py-2">
+        <CardContent className={cn("flex items-center gap-4", compact ? "py-0" : "py-2")}>
           <PriorityBadge priority={task.priority} />
           <span className="text-sm font-medium truncate min-w-0 flex-1">
             {task.title}
