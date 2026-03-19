@@ -246,7 +246,6 @@ export default async function IdeaDetailPage({ params }: PageProps): Promise<Rea
                   tasks={tasks}
                   showAssignee={false}
                   showProject={false}
-                  compact
                 />
               )}
             </CardContent>

@@ -89,7 +89,6 @@ export function TaskPanel({
             tasks={filtered}
             showAssignee={false}
             showProject={false}
-            compact
             emptyMessage="No matching tasks"
             emptyDescription="Try a different filter."
           />

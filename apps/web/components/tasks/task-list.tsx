@@ -10,7 +10,6 @@ export interface TaskListProps {
   showAssignee?: boolean;
   showProject?: boolean;
   showSpec?: boolean;
-  compact?: boolean;
   limit?: number;
   emptyIcon?: React.ComponentType<{ className?: string }>;
   emptyMessage?: string;
@@ -25,7 +24,6 @@ export function TaskList({
   showAssignee,
   showProject,
   showSpec,
-  compact,
   limit,
   emptyIcon: EmptyIcon = ListTodo,
   emptyMessage = "No tasks yet",
@@ -44,7 +42,7 @@ export function TaskList({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
       {displayed.map((task) => (
         <TaskCard
           key={task.id}
@@ -55,7 +53,7 @@ export function TaskList({
           showProject={showProject}
           showSpec={showSpec}
           blocked={blockedTaskIds?.has(task.id)}
-          compact={compact}
+          compact
         />
       ))}
     </div>

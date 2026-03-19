@@ -258,7 +258,6 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             blockedTaskIds={blockedIds}
             showAssignee
             showProject={false}
-            compact
             emptyMessage="No tasks yet."
             emptyDescription="Tasks will appear here once created for this project."
           />
