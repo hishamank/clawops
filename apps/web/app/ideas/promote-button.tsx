@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUpRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getApiKey } from "@/lib/auth";
 
 interface PromoteButtonProps {
   ideaId: string;
@@ -19,8 +20,15 @@ export function PromoteButton({ ideaId, disabled, disabledReason }: PromoteButto
   async function handlePromote(): Promise<void> {
     setError(null);
     try {
+      const apiKey = getApiKey();
+      const headers: Record<string, string> = {};
+      if (apiKey) {
+        headers["x-api-key"] = apiKey;
+      }
+
       const res = await fetch(`/api/ideas/${ideaId}/promote`, {
         method: "POST",
+        headers,
       });
       if (!res.ok) {
         setError("Failed to promote");

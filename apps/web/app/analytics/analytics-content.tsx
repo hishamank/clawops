@@ -122,7 +122,7 @@ export function AnalyticsContent(): React.JSX.Element {
     setError(null);
     try {
       const apiKey = getApiKey();
-      const authHeaders: HeadersInit = {};
+      const authHeaders: Record<string, string> = {};
       if (apiKey) {
         authHeaders["x-api-key"] = apiKey;
       }

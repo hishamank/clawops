@@ -34,7 +34,7 @@ export function SyncButton({ disabled = false }: SyncButtonProps): React.JSX.Ele
 
     try {
       const apiKey = getApiKey();
-      const headers: HeadersInit = { "Content-Type": "application/json" };
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (apiKey) {
         headers["x-api-key"] = apiKey;
       }
