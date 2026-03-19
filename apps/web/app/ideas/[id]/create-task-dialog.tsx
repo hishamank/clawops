@@ -41,14 +41,14 @@ export function CreateTaskDialog({ ideaId, variant = "default", size = "default"
 
   if (open) {
     return (
-      <Card className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 bg-card p-4">
-        <div className="w-full max-w-md">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle>Create Linked Task</CardTitle>
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
-              <div className="space-y-2 gap-1.5">
+              <div className="flex flex-col gap-1.5">
                 <label htmlFor="title" className="text-sm font-medium">
                   Title
                 </label>
@@ -61,7 +61,7 @@ export function CreateTaskDialog({ ideaId, variant = "default", size = "default"
                   required
                 />
               </div>
-              <div className="space-y-2 gap-1.5">
+              <div className="flex flex-col gap-1.5">
                 <label htmlFor="description" className="text-sm font-medium">
                   Description
                 </label>
@@ -74,7 +74,7 @@ export function CreateTaskDialog({ ideaId, variant = "default", size = "default"
                   rows={4}
                 />
               </div>
-              <div className="space-y-2 gap-1.5">
+              <div className="flex flex-col gap-1.5">
                 <label htmlFor="priority" className="text-sm font-medium">
                   Priority
                 </label>
@@ -100,8 +100,8 @@ export function CreateTaskDialog({ ideaId, variant = "default", size = "default"
               </div>
             </CardContent>
           </form>
-        </div>
-      </Card>
+        </Card>
+      </div>
     );
   }
 
