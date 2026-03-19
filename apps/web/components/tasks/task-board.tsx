@@ -35,6 +35,7 @@ export interface TaskBoardProps {
   projectMap?: Map<string, string>;
   blockedTaskIds?: Set<string>;
   columns?: TaskStatus[];
+  onTaskClick?: (taskId: string) => void;
   onTaskDone?: (taskId: string) => void;
   onTaskDelete?: (taskId: string) => void;
 }
@@ -45,6 +46,7 @@ export function TaskBoard({
   projectMap,
   blockedTaskIds,
   columns = defaultColumns,
+  onTaskClick,
   onTaskDone,
   onTaskDelete,
 }: TaskBoardProps): React.JSX.Element {
@@ -91,6 +93,7 @@ export function TaskBoard({
                     showProject={false}
                     blocked={blockedTaskIds?.has(task.id)}
                     compact
+                    onTaskClick={onTaskClick}
                     onTaskDone={onTaskDone}
                     onTaskDelete={onTaskDelete}
                   />

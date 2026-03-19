@@ -14,6 +14,7 @@ export interface TaskListProps {
   emptyIcon?: React.ComponentType<{ className?: string }>;
   emptyMessage?: string;
   emptyDescription?: string;
+  onTaskClick?: (taskId: string) => void;
   onTaskDone?: (taskId: string) => void;
   onTaskDelete?: (taskId: string) => void;
 }
@@ -30,6 +31,7 @@ export function TaskList({
   emptyIcon: EmptyIcon = ListTodo,
   emptyMessage = "No tasks yet",
   emptyDescription = "Tasks will appear here as they are created.",
+  onTaskClick,
   onTaskDone,
   onTaskDelete,
 }: TaskListProps): React.JSX.Element {
@@ -58,6 +60,7 @@ export function TaskList({
             showSpec={showSpec}
             blocked={blockedTaskIds?.has(task.id)}
             compact
+            onTaskClick={onTaskClick}
             onTaskDone={onTaskDone}
             onTaskDelete={onTaskDelete}
           />

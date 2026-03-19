@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { getCostsByTemplate } from "@clawops/analytics";
 import { getDb, jsonError } from "@/lib/server/runtime";
 
-export async function GET(req: Request): Promise<NextResponse> {
+export async function GET(_req: Request): Promise<NextResponse> {
   try {
     const db = getDb();
     const breakdown = getCostsByTemplate(db).map((r) => ({
