@@ -1,12 +1,13 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useOptimistic } from "react";
 import { CheckCircle2 } from "lucide-react";
 import type { Task } from "@/lib/types";
 import { TaskList } from "@/components/tasks/task-list";
 import { TaskBoard } from "@/components/tasks/task-board";
+import { TaskDetailPanel } from "@/components/tasks/task-detail-panel";
 
 interface Agent { id: string; name: string }
 interface Project { id: string; name: string }
@@ -28,6 +29,7 @@ export function TasksView({
 }: TasksViewProps): React.JSX.Element {
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   const agentMap = new Map(agents.map((a) => [a.id, a.name]));
   const projectMap = new Map(projects.map((p) => [p.id, p.name]));
@@ -45,6 +47,24 @@ export function TasksView({
     },
   );
 
+  const selectedTask = selectedTaskId
+    ? optimisticTasks.find((t) => t.id === selectedTaskId) ?? null
+    : null;
+
+  const handleTaskClick = (taskId: string) => {
+    setSelectedTaskId(taskId);
+  };
+
+  const handlePanelClose = () => {
+    setSelectedTaskId(null);
+  };
+
+  const handleTaskUpdated = () => {
+    startTransition(() => {
+      router.refresh();
+    });
+  };
+
   const handleTaskDone = (taskId: string) => {
     setOptimisticTasks({ taskId, action: "done" });
     startTransition(() => {
@@ -53,38 +73,51 @@ export function TasksView({
   };
 
   const handleTaskDelete = (taskId: string) => {
+    if (selectedTaskId === taskId) setSelectedTaskId(null);
     setOptimisticTasks({ taskId, action: "delete" });
     startTransition(() => {
       router.refresh();
     });
   };
 
-  if (view === "board") {
-    return (
-      <TaskBoard
-        tasks={optimisticTasks}
-        agentMap={agentMap}
-        projectMap={projectMap}
-        blockedTaskIds={blockedSet}
-        onTaskDone={handleTaskDone}
-        onTaskDelete={handleTaskDelete}
-      />
-    );
-  }
-
   return (
-    <TaskList
-      tasks={optimisticTasks}
-      agentMap={agentMap}
-      projectMap={projectMap}
-      blockedTaskIds={blockedSet}
-      showAssignee
-      showProject
-      emptyIcon={CheckCircle2}
-      emptyMessage="All done!"
-      emptyDescription="Every task is complete. Great work!"
-      onTaskDone={handleTaskDone}
-      onTaskDelete={handleTaskDelete}
-    />
+    <>
+      {view === "board" ? (
+        <TaskBoard
+          tasks={optimisticTasks}
+          agentMap={agentMap}
+          projectMap={projectMap}
+          blockedTaskIds={blockedSet}
+          onTaskClick={handleTaskClick}
+          onTaskDone={handleTaskDone}
+          onTaskDelete={handleTaskDelete}
+        />
+      ) : (
+        <TaskList
+          tasks={optimisticTasks}
+          agentMap={agentMap}
+          projectMap={projectMap}
+          blockedTaskIds={blockedSet}
+          showAssignee
+          showProject
+          emptyIcon={CheckCircle2}
+          emptyMessage="All done!"
+          emptyDescription="Every task is complete. Great work!"
+          onTaskClick={handleTaskClick}
+          onTaskDone={handleTaskDone}
+          onTaskDelete={handleTaskDelete}
+        />
+      )}
+
+      {selectedTask && (
+        <TaskDetailPanel
+          task={selectedTask}
+          agents={agents}
+          projects={projects}
+          onClose={handlePanelClose}
+          onTaskUpdated={handleTaskUpdated}
+        />
+      )}
+    </>
   );
 }
