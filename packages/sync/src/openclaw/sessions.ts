@@ -367,7 +367,7 @@ export function getActiveSessionAgentIds(
 
   const sessionConditions: SQL[] = [
     eq(openclawSessions.status, "active"),
-    gte(openclawSessions.startedAt, cutoff),
+    gte(openclawSessions.updatedAt, cutoff),
   ];
 
   if (options.connectionId) {
@@ -388,10 +388,18 @@ export function getActiveSessionAgentIds(
     return new Set();
   }
 
+  const mappingConditions: SQL[] = [
+    inArray(openclawAgents.externalAgentId, externalAgentIds),
+  ];
+
+  if (options.connectionId) {
+    mappingConditions.push(eq(openclawAgents.connectionId, options.connectionId));
+  }
+
   const agentMappings = db
     .select({ linkedAgentId: openclawAgents.linkedAgentId })
     .from(openclawAgents)
-    .where(inArray(openclawAgents.externalAgentId, externalAgentIds))
+    .where(and(...mappingConditions))
     .all();
 
   return new Set(
@@ -407,10 +415,18 @@ export function syncAgentStatusFromSessions(
 ): SyncAgentStatusResult {
   const activeAgentIds = getActiveSessionAgentIds(db, options);
 
-  const allLinkedAgents = db
+  const linkedAgentsConditions: SQL[] = [];
+  if (options.connectionId) {
+    linkedAgentsConditions.push(eq(openclawAgents.connectionId, options.connectionId));
+  }
+
+  const allLinkedAgentsQuery = db
     .select({ agentId: openclawAgents.linkedAgentId })
-    .from(openclawAgents)
-    .all();
+    .from(openclawAgents);
+
+  const allLinkedAgents = linkedAgentsConditions.length > 0
+    ? allLinkedAgentsQuery.where(and(...linkedAgentsConditions)).all()
+    : allLinkedAgentsQuery.all();
 
   const linkedAgentIds = allLinkedAgents
     .map((m) => m.agentId)
