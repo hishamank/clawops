@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getApiKey } from "@/lib/auth";
 
 export function CreateProjectDialog(): React.JSX.Element {
   const router = useRouter();
@@ -20,7 +21,7 @@ export function CreateProjectDialog(): React.JSX.Element {
     e.preventDefault();
     setError(null);
     startTransition(async () => {
-      const apiKey = localStorage.getItem("apiKey");
+      const apiKey = getApiKey();
       if (!apiKey) {
         setError("Not authenticated. Please log in.");
         return;
