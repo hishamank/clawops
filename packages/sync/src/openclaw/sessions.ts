@@ -467,3 +467,10 @@ export function syncAgentStatusFromSessions(
 
   return { updatedOnline: onlineUpdated, updatedIdle: idleUpdated };
 }
+
+export function countActiveAgentsBySessions(
+  db: DBOrTx,
+  windowMinutes: number = 30,
+): number {
+  return getActiveSessionAgentIds(db, { windowMinutes }).size;
+}

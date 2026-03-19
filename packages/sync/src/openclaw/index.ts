@@ -27,6 +27,7 @@ export {
   syncWorkspaceFiles,
 } from "./files.js";
 export {
+  countActiveAgentsBySessions,
   fetchActiveSessions,
   listSessions,
   syncSessions,
