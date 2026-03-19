@@ -160,7 +160,7 @@ export function Sidebar({ counts }: { counts: SidebarCounts }): React.JSX.Elemen
       {/* ── Logo + toggle ── */}
       <div
         className={cn(
-          "flex h-14 shrink-0 items-center border-b border-[rgba(255,255,255,0.06)]",
+          "relative flex h-14 shrink-0 items-center border-b border-[rgba(255,255,255,0.06)]",
           collapsed ? "justify-center px-0" : "justify-between px-4",
         )}
       >
