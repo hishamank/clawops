@@ -468,6 +468,13 @@ describe("deleteTask", () => {
 
     const reFetched = getTask(db, task.id);
     assert.strictEqual(reFetched, null);
+
+    const remainingArtifacts = db.select().from(schema.artifacts).all();
+    assert.strictEqual(
+      remainingArtifacts.filter((a) => a.taskId === task.id).length,
+      0,
+      "No artifacts should remain for the deleted task",
+    );
   });
 
   it("cascades deletion to task relations", () => {

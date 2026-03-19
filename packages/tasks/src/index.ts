@@ -162,6 +162,7 @@ interface UpdateTaskInput {
   assigneeId?: string | null;
   projectId?: string;
   dueDate?: Date;
+  completedAt?: Date | null;
   templateId?: string | null;
   stageId?: string | null;
   properties?: Record<string, unknown> | null;
@@ -381,18 +382,24 @@ export function removeTaskResourceLink(
 }
 
 export function deleteTask(db: DBOrTx, id: string): Task | null {
-  db.update(usageLogs).set({ taskId: null }).where(eq(usageLogs.taskId, id)).run();
-  db.update(activityEvents).set({ taskId: null }).where(eq(activityEvents.taskId, id)).run();
-  db.delete(taskRelations).where(eq(taskRelations.fromTaskId, id)).run();
-  db.delete(taskRelations).where(eq(taskRelations.toTaskId, id)).run();
-  db.delete(resourceLinks)
-    .where(and(eq(resourceLinks.entityType, "task"), eq(resourceLinks.entityId, id)))
-    .run();
-  db.delete(artifacts).where(eq(artifacts.taskId, id)).run();
-  const rows = db
-    .delete(tasks)
-    .where(eq(tasks.id, id))
-    .returning()
-    .all();
-  return rows[0] ?? null;
+  const exec = (tx: typeof db) => {
+    tx.update(usageLogs).set({ taskId: null }).where(eq(usageLogs.taskId, id)).run();
+    tx.update(activityEvents).set({ taskId: null }).where(eq(activityEvents.taskId, id)).run();
+    tx.delete(taskRelations).where(eq(taskRelations.fromTaskId, id)).run();
+    tx.delete(taskRelations).where(eq(taskRelations.toTaskId, id)).run();
+    tx.delete(resourceLinks)
+      .where(and(eq(resourceLinks.entityType, "task"), eq(resourceLinks.entityId, id)))
+      .run();
+    tx.delete(artifacts).where(eq(artifacts.taskId, id)).run();
+    const rows = tx
+      .delete(tasks)
+      .where(eq(tasks.id, id))
+      .returning()
+      .all();
+    return rows[0] ?? null;
+  };
+  if ("transaction" in db && typeof db.transaction === "function") {
+    return db.transaction(exec);
+  }
+  return exec(db);
 }

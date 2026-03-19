@@ -105,7 +105,7 @@ export async function markTaskDoneAction(taskId: string): Promise<MarkDoneResult
     const db = getDb();
     let found = false;
     db.transaction((tx) => {
-      const task = updateTask(tx, taskId, { status: "done" });
+      const task = updateTask(tx, taskId, { status: "done", completedAt: new Date() });
       if (!task) return;
       found = true;
       tx.insert(events)

@@ -104,7 +104,7 @@ export async function DELETE(
         })
         .run();
       createActivityEvent(tx, {
-        source: "user",
+        source: agentId ? "agent" : "user",
         type: "task.deleted",
         title: "Task deleted",
         entityType: "task",
@@ -116,6 +116,7 @@ export async function DELETE(
     if (!deleted) return jsonError(404, "Task not found", "TASK_NOT_FOUND");
     return new NextResponse(null, { status: 204 });
   } catch (err) {
+    if (err instanceof z.ZodError) return jsonError(400, err.message, "VALIDATION_ERROR");
     return jsonError(500, err instanceof Error ? err.message : "Failed to delete task", "INTERNAL_ERROR");
   }
 }
