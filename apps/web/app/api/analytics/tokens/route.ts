@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getTokenSummary } from "@clawops/analytics";
-import { getDb, jsonError, parseSearch, requireAgentId } from "@/lib/server/runtime";
+import { getDb, jsonError, parseSearch } from "@/lib/server/runtime";
 
 const tokenQuery = z.object({
   agentId: z.string().optional(),
@@ -13,9 +13,6 @@ const tokenQuery = z.object({
 });
 
 export async function GET(req: Request): Promise<NextResponse> {
-  const auth = requireAgentId(req);
-  if (auth instanceof NextResponse) return auth;
-
   try {
     const filters = parseSearch(req, tokenQuery);
     const summary = getTokenSummary(getDb(), {

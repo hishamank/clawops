@@ -3,14 +3,11 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCostsByAgent, getCostsByModel, getCostsByProject } from "@clawops/analytics";
-import { getDb, jsonError, parseSearch, requireAgentId } from "@/lib/server/runtime";
+import { getDb, jsonError, parseSearch } from "@/lib/server/runtime";
 
 const costQuery = z.object({ groupBy: z.enum(["agent", "model", "project"]).optional() });
 
 export async function GET(req: Request): Promise<NextResponse> {
-  const auth = requireAgentId(req);
-  if (auth instanceof NextResponse) return auth;
-
   try {
     const { groupBy } = parseSearch(req, costQuery);
     const db = getDb();

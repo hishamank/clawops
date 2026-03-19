@@ -2,12 +2,9 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { getCostsByTemplate } from "@clawops/analytics";
-import { getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
+import { getDb, jsonError } from "@/lib/server/runtime";
 
 export async function GET(req: Request): Promise<NextResponse> {
-  const auth = requireAgentId(req);
-  if (auth instanceof NextResponse) return auth;
-
   try {
     const db = getDb();
     const breakdown = getCostsByTemplate(db).map((r) => ({
