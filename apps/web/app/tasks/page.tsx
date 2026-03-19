@@ -1,8 +1,7 @@
 import type { Task } from "@/lib/types";
-import { TaskList } from "@/components/tasks/task-list";
-import { TaskBoard } from "@/components/tasks/task-board";
 import { TaskFilterBar } from "@/components/tasks/task-filter-bar";
 import { CreateTaskDialog } from "@/components/tasks/create-task-dialog";
+import { TasksView } from "./tasks-view";
 import { listTasks, getBlockedTaskIds } from "@clawops/tasks";
 import { listAgents } from "@clawops/agents";
 import { listProjects } from "@clawops/projects";
@@ -30,7 +29,6 @@ export default async function TasksPage({ searchParams }: PageProps): Promise<Re
   const VALID_STATUSES: Task["status"][] = ["backlog", "todo", "in-progress", "review", "done", "cancelled"];
   const VALID_PRIORITIES: Task["priority"][] = ["low", "medium", "high", "urgent"];
 
-  // Fetch everything once; filter in memory (SQLite is local — no perf concern)
   const [allTasksRaw, agents, projects] = [
     listTasks(db),
     listAgents(db).map(mapAgent),
@@ -38,13 +36,11 @@ export default async function TasksPage({ searchParams }: PageProps): Promise<Re
   ];
 
   const allTasks = allTasksRaw.map(mapTask);
-  const agentMap   = new Map(agents.map((a) => [a.id, a.name]));
-  const projectMap = new Map(projects.map((p) => [p.id, p.name]));
+  const agentMap   = new Map<string, string>(agents.map((a) => [a.id, a.name]));
+  const projectMap = new Map<string, string>(projects.map((p) => [p.id, p.name]));
 
-  // Compute blocked status for ALL tasks in one DB call
   const blockedTaskIds = getBlockedTaskIds(db, allTasksRaw.map((t) => t.id));
 
-  // Per-status counts (for tab badges)
   const nonTerminal = allTasks.filter((t) => t.status !== "done" && t.status !== "cancelled");
   const counts = {
     all:           allTasks.length,
@@ -56,7 +52,6 @@ export default async function TasksPage({ searchParams }: PageProps): Promise<Re
     done:          allTasks.filter((t) => t.status === "done").length,
   };
 
-  // Apply filters
   let filteredTasks = allTasks;
 
   if (status === "blocked") {
@@ -74,7 +69,6 @@ export default async function TasksPage({ searchParams }: PageProps): Promise<Re
 
   return (
     <div className="space-y-5">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-[#ededef]">Tasks</h1>
@@ -85,7 +79,6 @@ export default async function TasksPage({ searchParams }: PageProps): Promise<Re
         />
       </div>
 
-      {/* Filter bar with live counts */}
       <TaskFilterBar
         basePath="/tasks"
         current={{ status, priority, assigneeId, view }}
@@ -94,24 +87,13 @@ export default async function TasksPage({ searchParams }: PageProps): Promise<Re
         showViewToggle
       />
 
-      {/* Task view */}
-      {view === "board" ? (
-        <TaskBoard
-          tasks={filteredTasks}
-          agentMap={agentMap}
-          projectMap={projectMap}
-          blockedTaskIds={blockedTaskIds}
-        />
-      ) : (
-        <TaskList
-          tasks={filteredTasks}
-          agentMap={agentMap}
-          projectMap={projectMap}
-          blockedTaskIds={blockedTaskIds}
-          showAssignee
-          showProject
-        />
-      )}
+      <TasksView
+        tasks={filteredTasks}
+        agentMap={agentMap}
+        projectMap={projectMap}
+        blockedTaskIds={blockedTaskIds}
+        view={view as "list" | "board"}
+      />
     </div>
   );
 }
