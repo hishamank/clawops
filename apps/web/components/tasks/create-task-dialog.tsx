@@ -191,7 +191,7 @@ export function CreateTaskDialog({
                 </div>
               )}
 
-              <div className="space-y-2">
+              <div className="flex flex-col gap-1.5">
                 <label htmlFor="title" className="text-sm font-medium">
                   Title <span className="text-red-500">*</span>
                 </label>
@@ -209,7 +209,7 @@ export function CreateTaskDialog({
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="flex flex-col gap-1.5">
                 <label htmlFor="project" className="text-sm font-medium">
                   Project
                 </label>
@@ -230,7 +230,7 @@ export function CreateTaskDialog({
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
+                <div className="flex flex-col gap-1.5">
                   <label htmlFor="complexity" className="text-sm font-medium">
                     Complexity
                   </label>
@@ -251,7 +251,7 @@ export function CreateTaskDialog({
                   </select>
                 </div>
 
-                <div className="space-y-2">
+                <div className="flex flex-col gap-1.5">
                   <label htmlFor="priority" className="text-sm font-medium">
                     Priority
                   </label>
@@ -272,7 +272,7 @@ export function CreateTaskDialog({
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="flex flex-col gap-1.5">
                 <label htmlFor="description" className="text-sm font-medium">
                   Description
                 </label>
@@ -287,7 +287,7 @@ export function CreateTaskDialog({
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="flex flex-col gap-1.5">
                 <label htmlFor="issueUrl" className="text-sm font-medium">
                   Issue URL
                 </label>
