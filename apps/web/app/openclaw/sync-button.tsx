@@ -44,7 +44,7 @@ export function SyncButton({ disabled = false }: SyncButtonProps): React.JSX.Ele
       if (!response.ok) {
         toast.error(
           "Sync failed",
-          data.message || "Failed to run sync. Please try again."
+          data.error || "Failed to run sync. Please try again."
         );
         return;
       }

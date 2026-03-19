@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { reconcileConnection, listOpenClawConnections } from "@clawops/sync";
+import { createActivityEvent, events } from "@clawops/core";
 import { getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
 
 const bodySchema = z.object({
@@ -12,6 +13,22 @@ const bodySchema = z.object({
 
 function getGatewayToken(req: Request): string | undefined {
   return req.headers.get("x-openclaw-gateway-token")?.trim() || undefined;
+}
+
+async function parseBodyOrEmpty(req: Request): Promise<z.infer<typeof bodySchema>> {
+  const contentType = req.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    return {};
+  }
+  try {
+    const text = await req.text();
+    if (!text.trim()) {
+      return {};
+    }
+    return bodySchema.parse(JSON.parse(text));
+  } catch {
+    return {};
+  }
 }
 
 export async function POST(req: Request): Promise<NextResponse> {
@@ -29,21 +46,44 @@ export async function POST(req: Request): Promise<NextResponse> {
     }
 
     const connection = connections[0];
-
-    let body: z.infer<typeof bodySchema>;
-    try {
-      body = bodySchema.parse(await req.json());
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        return jsonError(400, err.message, "VALIDATION_ERROR");
-      }
-      return jsonError(400, "Invalid request body", "VALIDATION_ERROR");
-    }
+    const body = await parseBodyOrEmpty(req);
 
     const result = await reconcileConnection(db, connection.id, {
       mode: body.mode,
       gatewayToken: body.gatewayToken ?? getGatewayToken(req),
       actorAgentId: auth ?? undefined,
+    });
+
+    db.insert(events)
+      .values({
+        action: "sync.run",
+        entityType: "sync_run",
+        entityId: result.syncRunId,
+        agentId: auth,
+        meta: JSON.stringify({
+          connectionId: connection.id,
+          mode: body.mode ?? "full",
+        }),
+      })
+      .run();
+
+    createActivityEvent(db, {
+      source: "agent",
+      type: "sync.run",
+      title: `Sync triggered for ${connection.name}`,
+      entityType: "sync_run",
+      entityId: result.syncRunId,
+      agentId: auth,
+      metadata: JSON.stringify({
+        connectionId: connection.id,
+        connectionName: connection.name,
+        mode: body.mode ?? "full",
+        counts: {
+          agents: result.agentCount,
+          cronJobs: result.cronJobCount,
+          workspaces: result.workspaceCount,
+        },
+      }),
     });
 
     return NextResponse.json({
