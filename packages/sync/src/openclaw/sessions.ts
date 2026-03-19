@@ -472,19 +472,5 @@ export function countActiveAgentsBySessions(
   db: DBOrTx,
   windowMinutes: number = 30,
 ): number {
-  const threshold = new Date(Date.now() - windowMinutes * 60 * 1000);
-
-  const result = db
-    .select({ count: sql<number>`count(distinct ${openclawAgents.linkedAgentId})` })
-    .from(openclawSessions)
-    .innerJoin(openclawAgents, eq(openclawSessions.connectionId, openclawAgents.connectionId))
-    .where(
-      and(
-        eq(openclawSessions.status, "active"),
-        sql`${openclawSessions.startedAt} >= ${threshold}`,
-      ),
-    )
-    .get();
-
-  return result?.count ?? 0;
+  return getActiveSessionAgentIds(db, { windowMinutes }).size;
 }
