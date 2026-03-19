@@ -11,6 +11,7 @@ import {
   upsertSessions,
   getActiveSessionAgentIds,
   syncAgentStatusFromSessions,
+  countActiveAgentsBySessions,
   type FetchedOpenClawSession,
 } from "./sessions.js";
 
@@ -661,5 +662,92 @@ describe("syncAgentStatusFromSessions", () => {
     assert.ok(typeof result.updatedOnline === "number", "Should return updatedOnline count");
     assert.ok(typeof result.updatedIdle === "number", "Should return updatedIdle count");
     assert.ok(updateCallCount >= 0, "Should attempt updates");
+  });
+});
+
+describe("countActiveAgentsBySessions", () => {
+  it("returns 0 when no active sessions exist", () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          innerJoin: () => ({
+            where: () => ({
+              get: () => ({ count: 0 }),
+            }),
+          }),
+        }),
+      }),
+    } as unknown as DB;
+
+    const result = countActiveAgentsBySessions(db);
+    assert.equal(result, 0);
+  });
+
+  it("counts unique agents with active sessions", () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          innerJoin: () => ({
+            where: () => ({
+              get: () => ({ count: 3 }),
+            }),
+          }),
+        }),
+      }),
+    } as unknown as DB;
+
+    const result = countActiveAgentsBySessions(db);
+    assert.equal(result, 3);
+  });
+
+  it("uses default window of 30 minutes", () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          innerJoin: () => ({
+            where: () => ({
+              get: () => ({ count: 1 }),
+            }),
+          }),
+        }),
+      }),
+    } as unknown as DB;
+
+    const result = countActiveAgentsBySessions(db);
+    assert.equal(result, 1);
+  });
+
+  it("uses custom window minutes when specified", () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          innerJoin: () => ({
+            where: () => ({
+              get: () => ({ count: 1 }),
+            }),
+          }),
+        }),
+      }),
+    } as unknown as DB;
+
+    const result = countActiveAgentsBySessions(db, 60);
+    assert.equal(result, 1);
+  });
+
+  it("returns 0 when get returns undefined", () => {
+    const db = {
+      select: () => ({
+        from: () => ({
+          innerJoin: () => ({
+            where: () => ({
+              get: () => undefined,
+            }),
+          }),
+        }),
+      }),
+    } as unknown as DB;
+
+    const result = countActiveAgentsBySessions(db);
+    assert.equal(result, 0);
   });
 });
