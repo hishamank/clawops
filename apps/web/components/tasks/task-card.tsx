@@ -23,6 +23,7 @@ export interface TaskCardProps {
   blocked?: boolean;
   href?: string;
   compact?: boolean;
+  onTaskClick?: (taskId: string) => void;
   onTaskDone?: (taskId: string) => void;
   onTaskDelete?: (taskId: string) => void;
 }
@@ -37,6 +38,7 @@ export function TaskCard({
   blocked = false,
   href,
   compact = true,
+  onTaskClick,
   onTaskDone,
   onTaskDelete,
 }: TaskCardProps): React.JSX.Element {
@@ -82,13 +84,21 @@ export function TaskCard({
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (e.defaultPrevented) return;
-    router.push(target);
+    if (onTaskClick) {
+      onTaskClick(task.id);
+    } else {
+      router.push(target);
+    }
   };
 
   const handleCardKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      router.push(target);
+      if (onTaskClick) {
+        onTaskClick(task.id);
+      } else {
+        router.push(target);
+      }
     }
   };
 
