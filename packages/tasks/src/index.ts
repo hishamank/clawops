@@ -1,6 +1,6 @@
 import { eq, and, inArray, isNull, asc } from "drizzle-orm";
 import type { DBOrTx, Task, Artifact, ResourceLink } from "@clawops/core";
-import { tasks, artifacts, usageLogs, resourceLinks } from "@clawops/core";
+import { tasks, artifacts, usageLogs, resourceLinks, taskRelations, activityEvents } from "@clawops/core";
 import { calcCost } from "@clawops/domain";
 import { getBlockedTaskIds } from "./relations.js";
 
@@ -162,6 +162,7 @@ interface UpdateTaskInput {
   assigneeId?: string | null;
   projectId?: string;
   dueDate?: Date;
+  completedAt?: Date | null;
   templateId?: string | null;
   stageId?: string | null;
   properties?: Record<string, unknown> | null;
@@ -378,4 +379,27 @@ export function removeTaskResourceLink(
     .returning()
     .all();
   return deletedRows[0] ?? null;
+}
+
+export function deleteTask(db: DBOrTx, id: string): Task | null {
+  const exec = (tx: typeof db) => {
+    tx.update(usageLogs).set({ taskId: null }).where(eq(usageLogs.taskId, id)).run();
+    tx.update(activityEvents).set({ taskId: null }).where(eq(activityEvents.taskId, id)).run();
+    tx.delete(taskRelations).where(eq(taskRelations.fromTaskId, id)).run();
+    tx.delete(taskRelations).where(eq(taskRelations.toTaskId, id)).run();
+    tx.delete(resourceLinks)
+      .where(and(eq(resourceLinks.entityType, "task"), eq(resourceLinks.entityId, id)))
+      .run();
+    tx.delete(artifacts).where(eq(artifacts.taskId, id)).run();
+    const rows = tx
+      .delete(tasks)
+      .where(eq(tasks.id, id))
+      .returning()
+      .all();
+    return rows[0] ?? null;
+  };
+  if ("transaction" in db && typeof db.transaction === "function") {
+    return db.transaction(exec);
+  }
+  return exec(db);
 }

@@ -14,6 +14,8 @@ export interface TaskListProps {
   emptyIcon?: React.ComponentType<{ className?: string }>;
   emptyMessage?: string;
   emptyDescription?: string;
+  onTaskDone?: (taskId: string) => void;
+  onTaskDelete?: (taskId: string) => void;
 }
 
 export function TaskList({
@@ -28,6 +30,8 @@ export function TaskList({
   emptyIcon: EmptyIcon = ListTodo,
   emptyMessage = "No tasks yet",
   emptyDescription = "Tasks will appear here as they are created.",
+  onTaskDone,
+  onTaskDelete,
 }: TaskListProps): React.JSX.Element {
   const displayed = limit ? tasks.slice(0, limit) : tasks;
 
@@ -42,20 +46,23 @@ export function TaskList({
   }
 
   return (
-    <div className="space-y-1">
+    <ul className="space-y-1" role="list">
       {displayed.map((task) => (
-        <TaskCard
-          key={task.id}
-          task={task}
-          agentMap={agentMap}
-          projectMap={projectMap}
-          showAssignee={showAssignee}
-          showProject={showProject}
-          showSpec={showSpec}
-          blocked={blockedTaskIds?.has(task.id)}
-          compact
-        />
+        <li key={task.id}>
+          <TaskCard
+            task={task}
+            agentMap={agentMap}
+            projectMap={projectMap}
+            showAssignee={showAssignee}
+            showProject={showProject}
+            showSpec={showSpec}
+            blocked={blockedTaskIds?.has(task.id)}
+            compact
+            onTaskDone={onTaskDone}
+            onTaskDelete={onTaskDelete}
+          />
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }

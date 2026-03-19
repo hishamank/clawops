@@ -1,9 +1,12 @@
 "use server";
 
-import { createTask, addTaskResourceLink } from "@clawops/tasks";
+import { z } from "zod";
+import { createTask, addTaskResourceLink, updateTask, deleteTask } from "@clawops/tasks";
 import { events, createActivityEvent } from "@clawops/core";
 import { getDb } from "@/lib/server/runtime";
 import type { TaskPriority } from "@clawops/domain";
+
+const taskIdSchema = z.string().min(1);
 
 export interface CreateTaskInput {
   title: string;
@@ -92,5 +95,86 @@ export async function createTaskAction(
     return { id: task.id };
   } catch {
     return { error: "Failed to create task" };
+  }
+}
+
+export interface MarkDoneResult {
+  id?: string;
+  error?: string;
+}
+
+export async function markTaskDoneAction(taskId: string): Promise<MarkDoneResult> {
+  const parsed = taskIdSchema.safeParse(taskId);
+  if (!parsed.success) return { error: "Invalid task ID" };
+  try {
+    const db = getDb();
+    let found = false;
+    db.transaction((tx) => {
+      const task = updateTask(tx, taskId, { status: "done", completedAt: new Date() });
+      if (!task) return;
+      found = true;
+      tx.insert(events)
+        .values({
+          action: "task.done",
+          entityType: "task",
+          entityId: task.id,
+          agentId: null,
+          meta: null,
+        })
+        .run();
+      createActivityEvent(tx, {
+        source: "user",
+        type: "task.done",
+        title: `Task marked done: ${task.title}`,
+        entityType: "task",
+        entityId: task.id,
+        projectId: task.projectId ?? undefined,
+        taskId: task.id,
+        metadata: JSON.stringify({ status: "done" }),
+      });
+    });
+    if (!found) return { error: "Task not found" };
+    return { id: taskId };
+  } catch {
+    return { error: "Failed to mark task as done" };
+  }
+}
+
+export interface DeleteTaskResult {
+  id?: string;
+  error?: string;
+}
+
+export async function deleteTaskAction(taskId: string): Promise<DeleteTaskResult> {
+  const parsed = taskIdSchema.safeParse(taskId);
+  if (!parsed.success) return { error: "Invalid task ID" };
+  try {
+    const db = getDb();
+    let deleted = false;
+    db.transaction((tx) => {
+      const result = deleteTask(tx, taskId);
+      if (!result) return;
+      deleted = true;
+      tx.insert(events)
+        .values({
+          action: "task.deleted",
+          entityType: "task",
+          entityId: taskId,
+          agentId: null,
+          meta: null,
+        })
+        .run();
+      createActivityEvent(tx, {
+        source: "user",
+        type: "task.deleted",
+        title: "Task deleted",
+        entityType: "task",
+        entityId: taskId,
+      });
+    });
+    if (!deleted) return { error: "Task not found" };
+    return { id: taskId };
+  } catch {
+    return { error: "Failed to delete task" };
   }
 }
