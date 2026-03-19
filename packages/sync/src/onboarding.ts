@@ -85,6 +85,32 @@ function defaultConnectionName(rootPath: string): string {
   return `OpenClaw ${baseName}`;
 }
 
+function normalizeScheduleFromSync(schedule: unknown): {
+  kind: string;
+  expr: string;
+  raw: string;
+} {
+  if (typeof schedule === "string") {
+    return { kind: "cron", expr: schedule, raw: JSON.stringify(schedule) };
+  }
+
+  if (typeof schedule === "object" && schedule !== null && !Array.isArray(schedule)) {
+    const obj = schedule as Record<string, unknown>;
+
+    if (typeof obj["cron"] === "string") {
+      return { kind: "cron", expr: obj["cron"] as string, raw: JSON.stringify(schedule) };
+    }
+    if (typeof obj["every"] === "string") {
+      return { kind: "every", expr: obj["every"] as string, raw: JSON.stringify(schedule) };
+    }
+    if (typeof obj["at"] === "string") {
+      return { kind: "at", expr: obj["at"] as string, raw: JSON.stringify(schedule) };
+    }
+  }
+
+  return { kind: "cron", expr: "", raw: JSON.stringify(schedule) };
+}
+
 function validateOpenClawDir(
   openclawDir: string,
   dependencies: Pick<OnboardingDependencies, "existsSync" | "readdirSync">,
@@ -226,17 +252,20 @@ export async function onboardOpenClaw(
       dependencies.upsertCronJobs(
         tx,
         connection.connection.id,
-        cronJobs.map((job) => ({
-          id: job.id,
-          name: job.name,
-          enabled: job.enabled,
-          scheduleKind: "cron",
-          scheduleExpr: job.schedule,
-          sessionTarget: "main",
-          scheduleRaw: JSON.stringify(job.schedule),
-          lastRunAt: job.lastRunAt ? new Date(job.lastRunAt) : null,
-          nextRunAt: null,
-        })),
+        cronJobs.map((job) => {
+          const parsed = normalizeScheduleFromSync(job.schedule);
+          return {
+            id: job.id,
+            name: job.name,
+            enabled: job.enabled,
+            scheduleKind: parsed.kind,
+            scheduleExpr: parsed.expr,
+            scheduleRaw: parsed.raw,
+            sessionTarget: "main",
+            lastRunAt: job.lastRunAt ? new Date(job.lastRunAt) : null,
+            nextRunAt: null,
+          };
+        }),
       );
 
       dependencies.finishSyncRunWithTx(tx, run.id, {

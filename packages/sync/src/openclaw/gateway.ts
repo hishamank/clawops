@@ -40,7 +40,7 @@ export async function fetchGatewayCronJobs(
     return (jobs as Record<string, unknown>[]).map((j) => ({
       id: String(j["id"] ?? ""),
       name: String(j["name"] ?? ""),
-      schedule: JSON.stringify(j["schedule"] ?? {}),
+      schedule: j["schedule"] ?? "",
       enabled: Boolean(j["enabled"] ?? true),
       lastRunAt: j["state"] ? String((j["state"] as Record<string, unknown>)["lastRunAtMs"] ?? "") : undefined,
       model: j["payload"] ? String((j["payload"] as Record<string, unknown>)["model"] ?? "") : undefined,
