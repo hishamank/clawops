@@ -47,14 +47,19 @@ export function TaskCard({
   const [optimisticDone, setOptimisticDone] = useState(isDone);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [doneError, setDoneError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const handleDoneToggle = () => {
     if (optimisticDone) return;
     setOptimisticDone(true);
+    setDoneError(null);
     startTransition(async () => {
       const result = await markTaskDoneAction(task.id);
       if (result.error) {
         setOptimisticDone(false);
+        setDoneError(result.error);
+        setTimeout(() => setDoneError(null), 3000);
       } else {
         onTaskDone?.(task.id);
       }
@@ -62,9 +67,14 @@ export function TaskCard({
   };
 
   const handleDeleteConfirm = () => {
+    setDeleteError(null);
     startTransition(async () => {
       const result = await deleteTaskAction(task.id);
-      if (!result.error) {
+      if (result.error) {
+        setShowDeleteConfirm(false);
+        setDeleteError(result.error);
+        setTimeout(() => setDeleteError(null), 3000);
+      } else {
         onTaskDelete?.(task.id);
       }
     });
@@ -105,15 +115,20 @@ export function TaskCard({
               className="shrink-0"
             />
             <PriorityBadge priority={task.priority} />
-            <span
-              className={cn(
-                "text-sm font-medium truncate min-w-0 flex-1",
-                optimisticDone && "line-through text-muted-foreground",
+            <span className="flex flex-col min-w-0 flex-1">
+              <span
+                className={cn(
+                  "text-sm font-medium truncate",
+                  optimisticDone && "line-through text-muted-foreground",
+                )}
+              >
+                {task.title}
+              </span>
+              {doneError && (
+                <span className="text-xs text-destructive truncate">{doneError}</span>
               )}
-            >
-              {task.title}
             </span>
-            <StatusBadge status={task.status} />
+            <StatusBadge status={optimisticDone ? "done" : task.status} />
             {blocked && <Ban className="h-4 w-4 text-rose-400 shrink-0" />}
             {showSpec && task.specContent && (
               <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -144,7 +159,7 @@ export function TaskCard({
           "absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 transition-all duration-200 ease-out z-10",
           showDeleteConfirm
             ? "opacity-100 translate-x-0"
-            : "opacity-0 translate-x-2 group-hover:opacity-100 group-hover:translate-x-0",
+            : "invisible group-hover:visible group-hover:translate-x-0 translate-x-2",
         )}
         onClick={(e) => e.stopPropagation()}
       >
@@ -180,6 +195,13 @@ export function TaskCard({
           </Button>
         )}
       </div>
+      {deleteError && (
+        <div className="absolute left-0 top-full mt-1 z-20">
+          <span className="text-xs text-destructive bg-background border border-destructive/30 rounded px-2 py-0.5 shadow-sm">
+            {deleteError}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

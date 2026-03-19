@@ -8,23 +8,30 @@ import type { Task } from "@/lib/types";
 import { TaskList } from "@/components/tasks/task-list";
 import { TaskBoard } from "@/components/tasks/task-board";
 
+interface Agent { id: string; name: string }
+interface Project { id: string; name: string }
+
 interface TasksViewProps {
   tasks: Task[];
-  agentMap: Map<string, string>;
-  projectMap: Map<string, string>;
-  blockedTaskIds: Set<string>;
+  agents: Agent[];
+  projects: Project[];
+  blockedTaskIds: string[];
   view: "list" | "board";
 }
 
 export function TasksView({
   tasks,
-  agentMap,
-  projectMap,
+  agents,
+  projects,
   blockedTaskIds,
   view,
 }: TasksViewProps): React.JSX.Element {
   const router = useRouter();
   const [, startTransition] = useTransition();
+
+  const agentMap = new Map(agents.map((a) => [a.id, a.name]));
+  const projectMap = new Map(projects.map((p) => [p.id, p.name]));
+  const blockedSet = new Set(blockedTaskIds);
 
   const [optimisticTasks, setOptimisticTasks] = useOptimistic(
     tasks,
@@ -52,17 +59,13 @@ export function TasksView({
     });
   };
 
-  const nonDoneCount = optimisticTasks.filter(
-    (t) => t.status !== "done" && t.status !== "cancelled",
-  ).length;
-
   if (view === "board") {
     return (
       <TaskBoard
         tasks={optimisticTasks}
         agentMap={agentMap}
         projectMap={projectMap}
-        blockedTaskIds={blockedTaskIds}
+        blockedTaskIds={blockedSet}
         onTaskDone={handleTaskDone}
         onTaskDelete={handleTaskDelete}
       />
@@ -74,16 +77,12 @@ export function TasksView({
       tasks={optimisticTasks}
       agentMap={agentMap}
       projectMap={projectMap}
-      blockedTaskIds={blockedTaskIds}
+      blockedTaskIds={blockedSet}
       showAssignee
       showProject
       emptyIcon={CheckCircle2}
       emptyMessage="All done!"
-      emptyDescription={
-        nonDoneCount === 0
-          ? "Every task is complete. Great work!"
-          : "Tasks will appear here as they are created."
-      }
+      emptyDescription="Every task is complete. Great work!"
       onTaskDone={handleTaskDone}
       onTaskDelete={handleTaskDelete}
     />

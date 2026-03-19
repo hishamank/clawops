@@ -1,9 +1,12 @@
 "use server";
 
+import { z } from "zod";
 import { createTask, addTaskResourceLink, updateTask, deleteTask } from "@clawops/tasks";
 import { events, createActivityEvent } from "@clawops/core";
 import { getDb } from "@/lib/server/runtime";
 import type { TaskPriority } from "@clawops/domain";
+
+const taskIdSchema = z.string().min(1);
 
 export interface CreateTaskInput {
   title: string;
@@ -101,6 +104,8 @@ export interface MarkDoneResult {
 }
 
 export async function markTaskDoneAction(taskId: string): Promise<MarkDoneResult> {
+  const parsed = taskIdSchema.safeParse(taskId);
+  if (!parsed.success) return { error: "Invalid task ID" };
   try {
     const db = getDb();
     let found = false;
@@ -141,6 +146,8 @@ export interface DeleteTaskResult {
 }
 
 export async function deleteTaskAction(taskId: string): Promise<DeleteTaskResult> {
+  const parsed = taskIdSchema.safeParse(taskId);
+  if (!parsed.success) return { error: "Invalid task ID" };
   try {
     const db = getDb();
     let deleted = false;

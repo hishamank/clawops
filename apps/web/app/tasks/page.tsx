@@ -89,10 +89,10 @@ export default async function TasksPage({ searchParams }: PageProps): Promise<Re
 
       <TasksView
         tasks={filteredTasks}
-        agentMap={agentMap}
-        projectMap={projectMap}
-        blockedTaskIds={blockedTaskIds}
-        view={view as "list" | "board"}
+        agents={agents}
+        projects={projects}
+        blockedTaskIds={[...blockedTaskIds]}
+        view={view === "board" ? "board" : "list"}
       />
     </div>
   );
