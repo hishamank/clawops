@@ -58,7 +58,7 @@ export function CreateProjectDialog(): React.JSX.Element {
 
   if (open) {
     return (
-      <Card className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <Card className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 bg-card p-4">
         <div className="w-full max-w-md">
           <CardHeader>
             <CardTitle>Create New Project</CardTitle>
@@ -70,7 +70,7 @@ export function CreateProjectDialog(): React.JSX.Element {
                   {error}
                 </div>
               )}
-              <div className="space-y-2">
+              <div className="space-y-2 gap-1.5">
                 <label htmlFor="name" className="text-sm font-medium">
                   Name <span className="text-rose-400">*</span>
                 </label>
@@ -83,7 +83,7 @@ export function CreateProjectDialog(): React.JSX.Element {
                   required
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 gap-1.5">
                 <label htmlFor="description" className="text-sm font-medium">
                   Description
                 </label>
@@ -96,7 +96,7 @@ export function CreateProjectDialog(): React.JSX.Element {
                   rows={4}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 gap-1.5">
                 <label htmlFor="repoUrl" className="text-sm font-medium">
                   Repo URL
                 </label>
@@ -109,7 +109,7 @@ export function CreateProjectDialog(): React.JSX.Element {
                   placeholder="https://github.com/owner/repo"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 gap-1.5">
                 <label htmlFor="directoryPath" className="text-sm font-medium">
                   Directory Path
                 </label>

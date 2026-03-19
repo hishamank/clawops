@@ -126,7 +126,7 @@ export function CreateIdeaDialog(): React.JSX.Element {
 
   if (open) {
     return (
-      <Card className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <Card className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 bg-card p-4">
         <div className="w-full max-w-md">
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -141,7 +141,7 @@ export function CreateIdeaDialog(): React.JSX.Element {
                   {error}
                 </div>
               )}
-              <div className="space-y-2">
+              <div className="space-y-2 gap-1.5">
                 <Label htmlFor="title">Title <span className="text-destructive">*</span></Label>
                 <Input
                   id="title"
@@ -152,7 +152,7 @@ export function CreateIdeaDialog(): React.JSX.Element {
                   autoFocus
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 gap-1.5">
                 <Label htmlFor="description">Description</Label>
                 <Textarea
                   id="description"
@@ -162,7 +162,7 @@ export function CreateIdeaDialog(): React.JSX.Element {
                   rows={4}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 gap-1.5">
                 <Label htmlFor="tags">Tags</Label>
                 <Input
                   id="tags"
@@ -171,7 +171,7 @@ export function CreateIdeaDialog(): React.JSX.Element {
                   placeholder="ux, research, feature (comma-separated)"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 gap-1.5">
                 <Label htmlFor="project">Project</Label>
                 <Select
                   id="project"
