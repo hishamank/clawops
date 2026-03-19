@@ -293,6 +293,10 @@ export async function writeTrackedFile(
   token: string,
   filePath: string,
   content: string,
+  options?: {
+    workspacePath?: string;
+    relativePath?: string;
+  },
 ): Promise<WriteTrackedFileResult | null> {
   const { body } = await requestGatewayAction(
     gatewayUrl,
@@ -300,7 +304,12 @@ export async function writeTrackedFile(
     "/api/workspace/files",
     {
       method: "POST",
-      body: { filePath, content },
+      body: {
+        filePath,
+        content,
+        ...(options?.workspacePath ? { workspacePath: options.workspacePath } : {}),
+        ...(options?.relativePath ? { relativePath: options.relativePath } : {}),
+      },
       actionName: `write tracked OpenClaw file "${filePath}"`,
     },
   );
@@ -355,6 +364,10 @@ export async function writeTrackedOpenClawFile(
     resolveGatewayToken(connection, input.gatewayToken),
     input.relativePath,
     input.content,
+    {
+      workspacePath: input.workspacePath,
+      relativePath: input.relativePath,
+    },
   );
 }
 
@@ -412,6 +425,10 @@ export async function revertTrackedOpenClawFile(
     resolveGatewayToken(connection, input.gatewayToken),
     file.relativePath,
     revision.content,
+    {
+      workspacePath: file.workspacePath,
+      relativePath: file.relativePath,
+    },
   );
 
   return {

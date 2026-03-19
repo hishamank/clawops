@@ -143,6 +143,12 @@ function pickModelAlias(value: unknown, modelId: string | undefined): string | u
   return pickString(modelConfig["alias"]);
 }
 
+function pickIdentityField(content: string, field: string): string | undefined {
+  const escapedField = field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = content.match(new RegExp(`\\*\\*${escapedField}:\\*\\*\\s*(.+)`));
+  return pickString(match?.[1]);
+}
+
 export function scanOpenClaw(options: OpenClawScanOptions = {}): {
   agents: SyncAgent[];
   workspaces: SyncWorkspace[];
@@ -249,9 +255,10 @@ export function scanOpenClaw(options: OpenClawScanOptions = {}): {
 
     // Read identity from IDENTITY.md
     const identityContent = readFileOptional(path.join(workspacePath, "IDENTITY.md")) ?? "";
-    const nameMatch = identityContent.match(/\*\*Name:\*\*\s*(.+)/);
+    const identityName = pickIdentityField(identityContent, "Name");
+    const identityAvatar = pickIdentityField(identityContent, "Avatar");
     const agentName =
-      pickString(merged["name"], asRecord(merged["identity"])["name"], nameMatch?.[1], agentId) ?? agentId;
+      pickString(merged["name"], asRecord(merged["identity"])["name"], identityName, agentId) ?? agentId;
     const model = pickString(
       pickModel(perAgentConfig["model"]),
       asRecord(perAgentConfig["llm"])["model"],
@@ -264,6 +271,7 @@ export function scanOpenClaw(options: OpenClawScanOptions = {}): {
     const role = pickString(merged["role"], merged["agentRole"]);
     const framework = pickString(merged["framework"], merged["platform"], "openclaw");
     const avatar = pickString(
+      identityAvatar,
       merged["avatar"],
       asRecord(merged["identity"])["avatar"],
       merged["avatarUrl"],

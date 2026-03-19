@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { events } from "@clawops/core";
+import { events, parseJsonObject } from "@clawops/core";
 import {
   getOpenClawConnection,
   updateOpenClawConnection,
@@ -71,13 +71,27 @@ export async function PATCH(
     const db = getDb();
 
     const updated = db.transaction((tx) => {
+      const existing = getOpenClawConnection(tx, id);
+      if (!existing) {
+        return null;
+      }
+
+      const nextMeta = {
+        ...parseJsonObject(existing.meta),
+        ...(body.meta ?? {}),
+        ...(body.gatewayToken ? { gatewayToken: body.gatewayToken } : {}),
+      };
+
       const connection = updateOpenClawConnection(tx, id, {
         name: body.name,
         gatewayUrl: body.gatewayUrl,
         status: body.status,
         syncMode: body.syncMode,
         hasGatewayToken: body.gatewayToken ? true : undefined,
-        meta: body.meta,
+        meta:
+          body.meta !== undefined || body.gatewayToken
+            ? nextMeta
+            : undefined,
         lastSyncedAt:
           body.lastSyncedAt === undefined
             ? undefined

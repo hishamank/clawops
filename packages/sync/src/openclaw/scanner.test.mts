@@ -98,6 +98,18 @@ describe("scanOpenClaw()", () => {
     assert.equal(agent.modelAlias, "sonnet");
   });
 
+  it("reads avatar from IDENTITY.md", () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "workspace-rick", "IDENTITY.md"),
+      "# IDENTITY\n- **Name:** Rick\n- **Avatar:** https://example.com/rick.png\n",
+    );
+
+    const result = scanOpenClaw({ openclawDir: tmpDir });
+    const agent = result.agents.find((entry) => entry.id === "rick");
+    assert.ok(agent);
+    assert.equal(agent.avatar, "https://example.com/rick.png");
+  });
+
   it("returns empty agents array gracefully if directory does not exist", () => {
     const result = scanOpenClaw({ openclawDir: "/nonexistent/path/xyz" });
     // Returns default "main" agent when no workspaces found

@@ -1,6 +1,8 @@
-import { Database, Shield, Info, CheckCircle2, XCircle, Keyboard } from "lucide-react";
+import { Database, Shield, Info, CheckCircle2, XCircle, Keyboard, Plug, KeyRound } from "lucide-react";
 import { getDb } from "@/lib/server/runtime";
 import { agents } from "@clawops/core";
+import { listOpenClawConnections } from "@clawops/sync";
+import { OpenClawTokenForm } from "@/components/settings/openclaw-token-form";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -59,6 +61,7 @@ const keyboardShortcuts = [
 
 export default async function SettingsPage(): Promise<React.JSX.Element> {
   const connected = await checkConnection();
+  const openclawConnections = listOpenClawConnections(getDb());
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -100,6 +103,57 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
             Next.js 15 · App Router — no separate API key required for dashboard reads.
           </span>
         </Row>
+      </Section>
+
+      <Section icon={Plug} title="OpenClaw">
+        {openclawConnections.length === 0 ? (
+          <div className="py-4 text-sm text-[#6b7080]">
+            No OpenClaw connections yet. Run onboarding or sync to register one.
+          </div>
+        ) : (
+          <div className="space-y-4 py-4">
+            {openclawConnections.map((connection) => (
+              <div
+                key={connection.id}
+                className="rounded-xl border border-white/8 bg-[#07070f] p-4"
+              >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-semibold text-[#ededef]">{connection.name}</h3>
+                    <p className="text-xs text-[#6b7080]">{connection.rootPath}</p>
+                    <p className="text-xs text-[#6b7080]">
+                      {connection.gatewayUrl ?? "No gateway URL configured"}
+                    </p>
+                  </div>
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium",
+                      connection.hasGatewayToken
+                        ? "bg-emerald-500/10 text-emerald-400"
+                        : "bg-amber-500/10 text-amber-400",
+                    )}
+                  >
+                    {connection.hasGatewayToken ? (
+                      <><CheckCircle2 className="h-3 w-3" /> Connected</>
+                    ) : (
+                      <><KeyRound className="h-3 w-3" /> Token missing</>
+                    )}
+                  </span>
+                </div>
+
+                <div className="mt-4">
+                  <p className="mb-2 text-xs text-[#6b7080]">
+                    Save the gateway token here so ClawOps can write changes back to this OpenClaw connection.
+                  </p>
+                  <OpenClawTokenForm
+                    connectionId={connection.id}
+                    hasGatewayToken={connection.hasGatewayToken}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </Section>
 
       {/* Keyboard shortcuts */}

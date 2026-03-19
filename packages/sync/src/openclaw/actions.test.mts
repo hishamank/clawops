@@ -5,6 +5,7 @@ import {
   triggerAgent,
   updateCronJob,
   writeTrackedFile,
+  writeTrackedOpenClawFile,
 } from "./actions.js";
 
 const originalFetch = globalThis.fetch;
@@ -135,5 +136,56 @@ describe("writeTrackedFile", () => {
         error.status === 502 &&
         error.message.includes("network request failed"),
     );
+  });
+});
+
+describe("writeTrackedOpenClawFile", () => {
+  it("sends workspacePath and relativePath for tracked file writes", async () => {
+    let request: Request | null = null;
+
+    globalThis.fetch = async (input, init) => {
+      request = new Request(input, init);
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    };
+
+    const db = {
+      select() {
+        return {
+          from() {
+            return {
+              where() {
+                return {
+                  get() {
+                    return {
+                      id: "conn-1",
+                      gatewayUrl: "https://gateway.example.test",
+                      meta: JSON.stringify({ gatewayToken: "secret-token" }),
+                    };
+                  },
+                };
+              },
+            };
+          },
+        };
+      },
+    };
+
+    await writeTrackedOpenClawFile(db as never, {
+      connectionId: "conn-1",
+      relativePath: "IDENTITY.md",
+      workspacePath: "/tmp/openclaw/workspace-rick",
+      content: "# IDENTITY\n",
+    });
+
+    assert.ok(request);
+    assert.deepEqual(await request.json(), {
+      filePath: "IDENTITY.md",
+      workspacePath: "/tmp/openclaw/workspace-rick",
+      relativePath: "IDENTITY.md",
+      content: "# IDENTITY\n",
+    });
   });
 });

@@ -5,6 +5,7 @@ import path from "node:path";
 import { z } from "zod";
 import { events } from "@clawops/core";
 import {
+  getOpenClawConnectionByRootPath,
   listOpenClawConnections,
   upsertOpenClawConnection,
 } from "@clawops/sync";
@@ -63,6 +64,11 @@ export async function POST(req: Request): Promise<NextResponse> {
     const body = upsertConnectionBody.parse(await req.json());
     const db = getDb();
     const result = db.transaction((tx) => {
+      const existing = getOpenClawConnectionByRootPath(tx, body.rootPath);
+      const nextMeta = {
+        ...(body.meta ?? {}),
+        ...(body.gatewayToken ? { gatewayToken: body.gatewayToken } : {}),
+      };
       const upserted = upsertOpenClawConnection(tx, {
         name: body.name ?? defaultConnectionName(body.rootPath),
         rootPath: body.rootPath,
@@ -70,7 +76,10 @@ export async function POST(req: Request): Promise<NextResponse> {
         status: body.status,
         syncMode: body.syncMode,
         hasGatewayToken: body.gatewayToken ? true : undefined,
-        meta: body.meta,
+        meta:
+          Object.keys(nextMeta).length > 0 || existing
+            ? nextMeta
+            : undefined,
       });
 
       tx.insert(events)

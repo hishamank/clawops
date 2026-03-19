@@ -31,6 +31,21 @@ export interface UpdateOpenClawConnectionInput {
   lastSyncedAt?: Date | null;
 }
 
+function parseConnectionMeta(meta: string | null): Record<string, unknown> {
+  if (!meta) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(meta) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
 function buildConnectionUpdateValues(
   input: UpsertOpenClawConnectionInput | UpdateOpenClawConnectionInput,
   existing: OpenClawConnection,
@@ -38,6 +53,14 @@ function buildConnectionUpdateValues(
   OpenClawConnection,
   "name" | "gatewayUrl" | "status" | "syncMode" | "hasGatewayToken" | "meta" | "lastSyncedAt"
 > & { updatedAt: Date } {
+  const nextMeta =
+    input.meta === undefined
+      ? existing.meta
+      : toJsonObject({
+          ...parseConnectionMeta(existing.meta),
+          ...input.meta,
+        });
+
   return {
     name: input.name ?? existing.name,
     gatewayUrl:
@@ -45,7 +68,7 @@ function buildConnectionUpdateValues(
     status: input.status ?? existing.status,
     syncMode: input.syncMode ?? existing.syncMode,
     hasGatewayToken: input.hasGatewayToken ?? existing.hasGatewayToken,
-    meta: input.meta ? toJsonObject(input.meta) : existing.meta,
+    meta: nextMeta,
     lastSyncedAt:
       input.lastSyncedAt === undefined
         ? existing.lastSyncedAt

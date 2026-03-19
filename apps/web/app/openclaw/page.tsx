@@ -34,12 +34,6 @@ const syncStatusStyles: Record<string, string> = {
   running: "text-indigo-500",
 };
 
-const connectionStatusStyles: Record<string, string> = {
-  active: "text-emerald-500 focus:text-emerald-500",
-  disconnected: "text-amber-500 focus:text-amber-500",
-  error: "text-rose-500 focus:text-rose-500",
-};
-
 const sessionStatusStyles: Record<string, string> = {
   active: "text-emerald-500",
   ended: "text-muted-foreground",
@@ -147,18 +141,27 @@ export default async function OpenClawPage(): Promise<React.JSX.Element> {
                         <Badge
                           variant="outline"
                           className={cn(
-                            connectionStatusStyles[connection.status] ?? "text-muted-foreground",
-                            "text-xs capitalize"
+                            connection.hasGatewayToken
+                              ? "text-emerald-500 focus:text-emerald-500"
+                              : "text-amber-500 focus:text-amber-500",
+                            "text-xs"
                           )}
                         >
-                          {connection.status}
+                          {connection.hasGatewayToken ? "Connected" : "Not connected"}
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground">{connection.rootPath}</p>
                       {gatewayDisplay && (
                         <p className="text-xs text-muted-foreground">{gatewayDisplay}</p>
                       )}
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {connection.hasGatewayToken
+                          ? "Gateway token configured"
+                          : "Gateway token missing. Add it in Settings."}
+                      </p>
                       <div className="mt-2 text-xs text-muted-foreground">
+                        <span className="capitalize">{connection.status}</span>
+                        {" · "}
                         {connection.lastSyncedAt
                           ? `Last synced ${renderTimeAgo(connection.lastSyncedAt)}`
                           : "Never synced yet"}

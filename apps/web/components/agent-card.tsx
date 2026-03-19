@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
+import { AgentAvatar } from "@/components/agents/agent-avatar";
 import { cn } from "@/lib/utils";
 import { timeAgo } from "@/lib/time";
 import type { Agent } from "@/lib/types";
@@ -18,15 +19,6 @@ const statusLabel: Record<Agent["status"], string> = {
   offline: "Offline",
 };
 
-function getInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
-
 interface AgentCardProps {
   agent: Agent;
   activeTasks?: number;
@@ -39,9 +31,12 @@ export function AgentCard({ agent, activeTasks }: AgentCardProps): React.JSX.Ele
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
             {/* Avatar */}
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#5e6ad2]/10 font-semibold text-sm text-[#5e6ad2]">
-              {agent.avatar ?? getInitials(agent.name)}
-            </div>
+            <AgentAvatar
+              name={agent.name}
+              avatar={agent.avatar}
+              className="h-10 w-10 shrink-0 rounded-xl bg-[#5e6ad2]/10"
+              textClassName="font-semibold text-sm text-[#5e6ad2]"
+            />
 
             {/* Details */}
             <div className="min-w-0 flex-1">

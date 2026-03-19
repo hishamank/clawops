@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TaskList } from "@/components/tasks/task-list";
 import { TaskFilterBar } from "@/components/tasks/task-filter-bar";
 import { AgentTabBar } from "@/components/agents/agent-tab-bar";
+import { AgentAvatarEditor } from "@/components/agents/agent-avatar-editor";
 import { cn } from "@/lib/utils";
 import { getAgent as getAgentById, getOpenClawMappingByAgentId } from "@clawops/agents";
 import { listTasks, getTask, getBlockedTaskIds } from "@clawops/tasks";
@@ -57,10 +58,6 @@ const statusDot: Record<Agent["status"], string> = {
 const statusLabel: Record<Agent["status"], string> = {
   online: "Active", busy: "Busy", idle: "Idle", offline: "Offline",
 };
-
-function getInitials(name: string): string {
-  return name.split(/\s+/).map((w) => w[0]).join("").toUpperCase().slice(0, 2);
-}
 
 function parseSkills(skills: string | null): string[] {
   if (!skills) return [];
@@ -254,9 +251,12 @@ export default async function AgentProfile({ params, searchParams }: PageProps):
 
       {/* Identity strip */}
       <div className="flex items-start gap-4">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#5e6ad2]/10 text-xl font-bold text-[#5e6ad2]">
-          {agent.avatar ?? getInitials(agent.name)}
-        </div>
+        <AgentAvatarEditor
+          agentId={agent.id}
+          agentName={agent.name}
+          currentAvatar={agent.avatar}
+          hasOpenClawMapping={Boolean(openclawMapping)}
+        />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-semibold tracking-tight text-[#ededef]">{agent.name}</h1>

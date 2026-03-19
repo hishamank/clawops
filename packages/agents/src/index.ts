@@ -13,6 +13,15 @@ interface CreateAgentInput {
   avatar?: string;
 }
 
+function normalizeAvatar(avatar: string | null | undefined): string | null {
+  if (typeof avatar !== "string") {
+    return avatar ?? null;
+  }
+
+  const normalized = avatar.trim();
+  return normalized ? normalized : null;
+}
+
 interface InitAgentInput {
   name: string;
   model: string;
@@ -298,6 +307,47 @@ export function updateAgentSkills(
   }
 
   return agent;
+}
+
+/**
+ * Updates an agent's avatar.
+ * Mirrors the avatar to the linked OpenClaw mapping for convenience reads.
+ * @param db - Database instance
+ * @param id - The agent ID
+ * @param avatar - Avatar URL or reference, or null to clear it
+ * @returns The updated agent
+ * @throws Error if agent not found
+ */
+export function updateAgentAvatar(
+  db: DBOrTx,
+  id: string,
+  avatar: string | null,
+): Agent {
+  const normalizedAvatar = normalizeAvatar(avatar);
+
+  return db.transaction((tx) => {
+    const agent = tx
+      .update(agents)
+      .set({ avatar: normalizedAvatar })
+      .where(eq(agents.id, id))
+      .returning()
+      .get();
+
+    if (!agent) {
+      throw new Error(`Agent not found: ${id}`);
+    }
+
+    tx
+      .update(openclawAgents)
+      .set({
+        avatar: normalizedAvatar,
+        updatedAt: new Date(),
+      })
+      .where(eq(openclawAgents.linkedAgentId, id))
+      .run();
+
+    return agent;
+  });
 }
 
 /**
