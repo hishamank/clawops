@@ -62,7 +62,7 @@ export function TaskDetailPanel({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const panelRef = useRef<HTMLDivElement>(null);
-  const savedTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // Track the previous values to avoid saving unchanged fields
   const prevTitle = useRef(task.title);
   const prevDescription = useRef(task.description ?? "");
