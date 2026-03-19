@@ -5,6 +5,7 @@ import { RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/toast";
 import { useRouter } from "next/navigation";
+import { getApiKey } from "@/lib/auth";
 
 interface SyncButtonProps {
   disabled?: boolean;
@@ -32,11 +33,15 @@ export function SyncButton({ disabled = false }: SyncButtonProps): React.JSX.Ele
     setIsLoading(true);
 
     try {
+      const apiKey = getApiKey();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (apiKey) {
+        headers["x-api-key"] = apiKey;
+      }
+
       const response = await fetch("/api/sync/run", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
       });
 
       const data = await response.json();

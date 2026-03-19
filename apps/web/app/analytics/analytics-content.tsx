@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { TimelineChart } from "@/components/analytics/timeline-chart";
 import { FilterControls, type AnalyticsFilters } from "@/components/analytics/filter-controls";
 import { cn } from "@/lib/utils";
+import { getApiKey } from "@/lib/auth";
 
 interface CostBreakdownItem {
   name: string;
@@ -120,15 +121,21 @@ export function AnalyticsContent(): React.JSX.Element {
     setIsLoading(true);
     setError(null);
     try {
-      const summaryRes = await fetch("/api/analytics/tokens");
+      const apiKey = getApiKey();
+      const authHeaders: Record<string, string> = {};
+      if (apiKey) {
+        authHeaders["x-api-key"] = apiKey;
+      }
+
+      const summaryRes = await fetch("/api/analytics/tokens", { headers: authHeaders });
       if (!summaryRes.ok) throw new Error(`Token summary: ${summaryRes.status}`);
       const summary = await summaryRes.json();
 
       const [agentRes, modelRes, projectRes, templateRes] = await Promise.all([
-        fetch("/api/analytics/costs?groupBy=agent"),
-        fetch("/api/analytics/costs?groupBy=model"),
-        fetch("/api/analytics/costs?groupBy=project"),
-        fetch("/api/analytics/costs/by-template"),
+        fetch("/api/analytics/costs?groupBy=agent", { headers: authHeaders }),
+        fetch("/api/analytics/costs?groupBy=model", { headers: authHeaders }),
+        fetch("/api/analytics/costs?groupBy=project", { headers: authHeaders }),
+        fetch("/api/analytics/costs/by-template", { headers: authHeaders }),
       ]);
 
       const errors: string[] = [];
@@ -150,8 +157,8 @@ export function AnalyticsContent(): React.JSX.Element {
 
       if (appliedFilters) {
         const [tokRes, costRes] = await Promise.all([
-          fetch(`/api/analytics/tokens/timeline?from=${appliedFilters.from}&to=${appliedFilters.to}&granularity=${appliedFilters.granularity}`),
-          fetch(`/api/analytics/costs/timeline?from=${appliedFilters.from}&to=${appliedFilters.to}&granularity=${appliedFilters.granularity}`),
+          fetch(`/api/analytics/tokens/timeline?from=${appliedFilters.from}&to=${appliedFilters.to}&granularity=${appliedFilters.granularity}`, { headers: authHeaders }),
+          fetch(`/api/analytics/costs/timeline?from=${appliedFilters.from}&to=${appliedFilters.to}&granularity=${appliedFilters.granularity}`, { headers: authHeaders }),
         ]);
         if (tokRes.ok)  setTokenTimeline(await tokRes.json());
         if (costRes.ok) setCostTimeline(await costRes.json());

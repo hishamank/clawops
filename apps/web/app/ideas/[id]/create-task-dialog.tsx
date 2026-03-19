@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getApiKey } from "@/lib/auth";
 
 interface CreateTaskDialogProps {
   ideaId: string;
@@ -23,9 +24,15 @@ export function CreateTaskDialog({ ideaId, variant = "default", size = "default"
   async function handleSubmit(e: React.FormEvent): Promise<void> {
     e.preventDefault();
     startTransition(async () => {
+      const apiKey = getApiKey();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (apiKey) {
+        headers["x-api-key"] = apiKey;
+      }
+
       const response = await fetch(`/api/ideas/${ideaId}/tasks`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ title, description, priority }),
       });
 
