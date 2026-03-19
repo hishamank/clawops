@@ -1,6 +1,6 @@
 import { eq, and, inArray, isNull, asc } from "drizzle-orm";
 import type { DBOrTx, Task, Artifact, ResourceLink } from "@clawops/core";
-import { tasks, artifacts, usageLogs, resourceLinks } from "@clawops/core";
+import { tasks, artifacts, usageLogs, resourceLinks, taskRelations } from "@clawops/core";
 import { calcCost } from "@clawops/domain";
 import { getBlockedTaskIds } from "./relations.js";
 
@@ -378,4 +378,19 @@ export function removeTaskResourceLink(
     .returning()
     .all();
   return deletedRows[0] ?? null;
+}
+
+export function deleteTask(db: DBOrTx, id: string): Task | null {
+  db.delete(taskRelations).where(eq(taskRelations.fromTaskId, id)).run();
+  db.delete(taskRelations).where(eq(taskRelations.toTaskId, id)).run();
+  db.delete(resourceLinks)
+    .where(and(eq(resourceLinks.entityType, "task"), eq(resourceLinks.entityId, id)))
+    .run();
+  db.delete(artifacts).where(eq(artifacts.taskId, id)).run();
+  const deleted = db
+    .delete(tasks)
+    .where(eq(tasks.id, id))
+    .returning()
+    .all();
+  return deleted[0] ?? null;
 }
