@@ -4,7 +4,7 @@ import { z } from "zod";
 import { createTask, addTaskResourceLink, updateTask, deleteTask } from "@clawops/tasks";
 import { events, createActivityEvent } from "@clawops/core";
 import { getDb } from "@/lib/server/runtime";
-import type { TaskPriority } from "@clawops/domain";
+import { TaskStatus, type TaskPriority } from "@clawops/domain";
 
 const taskIdSchema = z.string().min(1);
 
@@ -176,5 +176,58 @@ export async function deleteTaskAction(taskId: string): Promise<DeleteTaskResult
     return { id: taskId };
   } catch {
     return { error: "Failed to delete task" };
+  }
+}
+
+export interface UpdateStatusResult {
+  id?: string;
+  error?: string;
+}
+
+const taskStatusSchema = z.nativeEnum(TaskStatus);
+
+export async function updateTaskStatusAction(
+  taskId: string,
+  newStatus: TaskStatus,
+): Promise<UpdateStatusResult> {
+  const idParsed = taskIdSchema.safeParse(taskId);
+  if (!idParsed.success) return { error: "Invalid task ID" };
+  const statusParsed = taskStatusSchema.safeParse(newStatus);
+  if (!statusParsed.success) return { error: "Invalid status" };
+  const status = statusParsed.data;
+  try {
+    const db = getDb();
+    let found = false;
+    db.transaction((tx) => {
+      const task = updateTask(tx, taskId, {
+        status,
+        completedAt: status === "done" ? new Date() : null,
+      });
+      if (!task) return;
+      found = true;
+      tx.insert(events)
+        .values({
+          action: "task.status-changed",
+          entityType: "task",
+          entityId: task.id,
+          agentId: null,
+          meta: JSON.stringify({ status }),
+        })
+        .run();
+      createActivityEvent(tx, {
+        source: "user",
+        type: "task.status-changed",
+        title: `Task status changed to ${status}: ${task.title}`,
+        entityType: "task",
+        entityId: task.id,
+        projectId: task.projectId ?? undefined,
+        taskId: task.id,
+        metadata: JSON.stringify({ status }),
+      });
+    });
+    if (!found) return { error: "Task not found" };
+    return { id: taskId };
+  } catch {
+    return { error: "Failed to update task status" };
   }
 }

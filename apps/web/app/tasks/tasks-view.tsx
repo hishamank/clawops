@@ -4,10 +4,13 @@ import { useState, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useOptimistic } from "react";
 import { CheckCircle2 } from "lucide-react";
+import type { TaskStatus } from "@clawops/domain";
 import type { Task } from "@/lib/types";
 import { TaskList } from "@/components/tasks/task-list";
 import { TaskBoard } from "@/components/tasks/task-board";
 import { TaskDetailPanel } from "@/components/tasks/task-detail-panel";
+import { useToast } from "@/components/toast";
+import { updateTaskStatusAction } from "./actions";
 
 interface Agent { id: string; name: string }
 interface Project { id: string; name: string }
@@ -28,6 +31,7 @@ export function TasksView({
   view,
 }: TasksViewProps): React.JSX.Element {
   const router = useRouter();
+  const toast = useToast();
   const [, startTransition] = useTransition();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
@@ -35,14 +39,30 @@ export function TasksView({
   const projectMap = new Map(projects.map((p) => [p.id, p.name]));
   const blockedSet = new Set(blockedTaskIds);
 
+  type OptimisticAction =
+    | { taskId: string; action: "done" | "delete" }
+    | { taskId: string; action: "status-change"; newStatus: TaskStatus };
+
   const [optimisticTasks, setOptimisticTasks] = useOptimistic(
     tasks,
-    (state, { taskId, action }: { taskId: string; action: "done" | "delete" }) => {
-      if (action === "delete") {
-        return state.filter((t) => t.id !== taskId);
+    (state, update: OptimisticAction) => {
+      if (update.action === "delete") {
+        return state.filter((t) => t.id !== update.taskId);
       }
+      if (update.action === "status-change") {
+        return state.map((t) =>
+          t.id === update.taskId
+            ? {
+                ...t,
+                status: update.newStatus,
+                completedAt: update.newStatus === "done" ? new Date().toISOString() : null,
+              }
+            : t,
+        );
+      }
+      // "done"
       return state.map((t) =>
-        t.id === taskId ? { ...t, status: "done" as const } : t,
+        t.id === update.taskId ? { ...t, status: "done" as const } : t,
       );
     },
   );
@@ -87,6 +107,17 @@ export function TasksView({
     });
   };
 
+  const handleTaskStatusChange = (taskId: string, newStatus: TaskStatus) => {
+    setOptimisticTasks({ taskId, action: "status-change", newStatus });
+    startTransition(async () => {
+      const result = await updateTaskStatusAction(taskId, newStatus);
+      if (result.error) {
+        toast.error("Failed to move task", result.error);
+      }
+      router.refresh();
+    });
+  };
+
   return (
     <>
       {view === "board" ? (
@@ -98,6 +129,7 @@ export function TasksView({
           onTaskClick={handleTaskClick}
           onTaskDone={handleTaskDone}
           onTaskDelete={handleTaskDelete}
+          onTaskStatusChange={handleTaskStatusChange}
         />
       ) : (
         <TaskList
