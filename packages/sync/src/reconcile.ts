@@ -5,7 +5,7 @@ import {
   type SyncRunItem,
   type WorkspaceFile,
 } from "@clawops/core";
-import { syncSessions } from "./openclaw/sessions.js";
+import { syncSessions, syncAgentStatusFromSessions } from "./openclaw/sessions.js";
 import { syncCronJobs } from "@clawops/habits";
 import { NotFoundError } from "@clawops/domain";
 import { syncWorkspaceFiles, type WorkspaceFileSyncResult } from "./openclaw/files.js";
@@ -116,6 +116,10 @@ async function reconcileSessions(
   options?: ReconcileOptions,
 ): Promise<{ agentCount: number; addedCount: number; updatedCount: number; items: FinishSyncRunItemInput[] }> {
   const sessions = await syncSessions(db, connection, options?.gatewayToken);
+
+  syncAgentStatusFromSessions(db, {
+    connectionId: connection.id,
+  });
 
   const activeSessions = sessions.filter((s) => s.status === "active");
   const endedSessions = sessions.filter((s) => s.status === "ended");

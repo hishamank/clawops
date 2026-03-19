@@ -8,11 +8,15 @@ export {
   fetchActiveSessions,
   listSessions as listOpenClawSessions,
   syncSessions,
+  syncAgentStatusFromSessions,
+  getActiveSessionAgentIds,
   upsertSessions,
   type FetchedOpenClawSession,
   type OpenClawSessionFilters,
   type OpenClawSessionRecord,
   type OpenClawSessionStatus,
+  type SyncAgentStatusOptions,
+  type SyncAgentStatusResult,
 } from "./openclaw/sessions.js";
 export {
   OpenClawActionError,
