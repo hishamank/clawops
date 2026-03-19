@@ -160,7 +160,7 @@ export function Sidebar({ counts }: { counts: SidebarCounts }): React.JSX.Elemen
       {/* ── Logo + toggle ── */}
       <div
         className={cn(
-          "flex h-14 shrink-0 items-center border-b border-[rgba(255,255,255,0.06)]",
+          "relative flex h-14 shrink-0 items-center border-b border-[rgba(255,255,255,0.06)]",
           collapsed ? "justify-center px-0" : "justify-between px-4",
         )}
       >
@@ -185,7 +185,7 @@ export function Sidebar({ counts }: { counts: SidebarCounts }): React.JSX.Elemen
           className={cn(
             "flex h-6 w-6 items-center justify-center rounded-md",
             "text-[#6b7080] transition-colors hover:bg-white/8 hover:text-[#ededef]",
-            collapsed && "mt-2 absolute top-4 left-1/2 -translate-x-1/2",
+            collapsed ? "absolute -right-3 top-4" : "ml-auto",
           )}
         >
           {collapsed
