@@ -52,6 +52,9 @@ const BASE_ITEM: SyncRunItem = {
   createdAt: new Date("2026-03-11T00:00:01.000Z"),
 };
 
+const syncSessionsTokens: Array<string | undefined> = [];
+const syncCronJobTokens: string[] = [];
+
 interface SelectChain<T> {
   from: () => SelectChain<T>;
   where: () => SelectChain<T>;
@@ -166,8 +169,9 @@ mock.module("@clawops/core", {
 
 mock.module("./openclaw/sessions.js", {
   namedExports: {
-    syncSessions: () =>
-      Promise.resolve([
+    syncSessions: (_db: DB, _connection: OpenClawConnection, token?: string) => {
+      syncSessionsTokens.push(token);
+      return Promise.resolve([
         {
           id: "session-1",
           connectionId: "conn-1",
@@ -181,15 +185,17 @@ mock.module("./openclaw/sessions.js", {
           createdAt: new Date("2026-03-11T00:00:00.000Z"),
           updatedAt: new Date("2026-03-11T00:00:00.000Z"),
         },
-      ] as OpenClawSession[]),
+      ] as OpenClawSession[]);
+    },
     syncAgentStatusFromSessions: () => ({ updatedOnline: 0, updatedIdle: 0 }),
   },
 });
 
 mock.module("@clawops/habits", {
   namedExports: {
-    syncCronJobs: () =>
-      Promise.resolve([
+    syncCronJobs: (_db: DB, _connection: OpenClawConnection, token: string) => {
+      syncCronJobTokens.push(token);
+      return Promise.resolve([
         {
           id: "habit-1",
           connectionId: "conn-1",
@@ -210,7 +216,8 @@ mock.module("@clawops/habits", {
           lastSyncedAt: new Date("2026-03-11T00:00:00.000Z"),
           createdAt: new Date("2026-03-11T00:00:00.000Z"),
         },
-      ] as Habit[]),
+      ] as Habit[]);
+    },
   },
 });
 
@@ -273,6 +280,22 @@ mock.module("./connections.js", {
 const { reconcile, reconcileConnection } = await import("./reconcile.js");
 
 describe("reconcile", () => {
+  it("uses the stored connection gateway token for full reconcile when no override is provided", async () => {
+    syncCronJobTokens.length = 0;
+    delete process.env["OPENCLAW_GATEWAY_TOKEN"];
+
+    await reconcile(
+      makeDb(),
+      {
+        ...BASE_CONNECTION,
+        meta: JSON.stringify({ gatewayToken: "stored-gateway-token" }),
+      },
+      { mode: "full" },
+    );
+
+    assert.deepEqual(syncCronJobTokens, ["stored-gateway-token"]);
+  });
+
   it("runs a full reconciliation and returns the result", async () => {
     let transactionCount = 0;
     let insertItemCount = 0;

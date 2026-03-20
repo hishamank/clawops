@@ -158,11 +158,16 @@ function parseGatewaySessions(data: unknown): FetchedOpenClawSession[] {
 }
 
 function resolveGatewayToken(connection: OpenClawConnection, tokenOverride?: string): string {
-  const token = tokenOverride?.trim() || process.env["OPENCLAW_GATEWAY_TOKEN"]?.trim();
+  const meta = parseJsonObject(connection.meta);
+  const storedToken = meta["gatewayToken"];
+  const token =
+    tokenOverride?.trim()
+    || (typeof storedToken === "string" && storedToken.trim() ? storedToken.trim() : undefined)
+    || process.env["OPENCLAW_GATEWAY_TOKEN"]?.trim();
 
   if (connection.hasGatewayToken && !token) {
     throw new Error(
-      `OPENCLAW_GATEWAY_TOKEN is required to sync sessions for connection ${connection.id}`,
+      `A gateway token is required to sync sessions for connection ${connection.id}`,
     );
   }
 

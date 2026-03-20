@@ -183,6 +183,36 @@ describe("normalizeSession", () => {
 });
 
 describe("syncSessions", () => {
+  it("uses the stored connection gateway token when no override or env token is provided", async () => {
+    const originalFetch = globalThis.fetch;
+    let authorizationHeader: string | null = null;
+
+    globalThis.fetch = async (_input, init) => {
+      const headers = init?.headers as Record<string, string> | undefined;
+      authorizationHeader = headers?.["Authorization"] ?? null;
+
+      return {
+        ok: true,
+        json: async () => ({ sessions: [] }),
+      } as Response;
+    };
+
+    try {
+      await syncSessions(
+        makeDb({ previouslyActive: [] }),
+        {
+          ...makeConnection(),
+          hasGatewayToken: true,
+          meta: JSON.stringify({ gatewayToken: "stored-gateway-token" }),
+        },
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    assert.equal(authorizationHeader, "Bearer stored-gateway-token");
+  });
+
   it("does not mark active sessions as ended when fetching gateway sessions fails", async () => {
     let transactionCount = 0;
     let updateCount = 0;

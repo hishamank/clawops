@@ -333,7 +333,7 @@ export function AnalyticsContent(): React.JSX.Element {
     setIsSyncing(true);
     setSyncState({
       status: "syncing",
-      message: "Syncing OpenClaw sessions and imported usage...",
+      message: "Syncing imported OpenClaw usage...",
       completedAt: syncState.completedAt,
     });
 
@@ -343,7 +343,7 @@ export function AnalyticsContent(): React.JSX.Element {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ mode: "full" }),
+        body: JSON.stringify({ mode: "usage" }),
       });
 
       const data = await response.json() as {

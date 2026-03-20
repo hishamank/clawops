@@ -6,6 +6,7 @@ import {
   habits,
   openclawAgents,
   openclawConnections,
+  parseJsonObject,
   type DBOrTx,
   type Habit,
   type OpenClawConnection,
@@ -159,7 +160,12 @@ function normalizeCronJob(job: Record<string, unknown>): OpenClawCronJob {
 }
 
 function resolveGatewayToken(connection: OpenClawConnection, token?: string): string {
-  const resolved = token ?? process.env["OPENCLAW_GATEWAY_TOKEN"];
+  const meta = parseJsonObject(connection.meta);
+  const storedToken = meta["gatewayToken"];
+  const resolved =
+    token
+    ?? (typeof storedToken === "string" && storedToken.trim() ? storedToken.trim() : undefined)
+    ?? process.env["OPENCLAW_GATEWAY_TOKEN"];
 
   if (!resolved) {
     throw new Error(
