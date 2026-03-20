@@ -110,6 +110,11 @@ export async function POST(req: Request): Promise<NextResponse> {
 }
 
 export async function GET(_req: Request): Promise<NextResponse> {
+  const actorAgentId = requireAgentId(_req);
+  if (actorAgentId instanceof NextResponse) {
+    return actorAgentId;
+  }
+
   try {
     const db = getDb();
     const connections = listOpenClawConnections(db);

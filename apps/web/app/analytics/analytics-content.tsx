@@ -57,6 +57,11 @@ interface SyncState {
   completedAt: string | null;
 }
 
+interface UnsupportedBreakdowns {
+  project: boolean;
+  template: boolean;
+}
+
 function getDefaultAnalyticsFilters(): AnalyticsFilters {
   const to = new Date();
   const from = new Date();
@@ -107,7 +112,21 @@ function BreakdownRow({ item, maxCost }: { item: CostBreakdownItem; maxCost: num
   );
 }
 
-function BreakdownList({ items }: { items: CostBreakdownItem[] }): React.JSX.Element {
+function BreakdownList({
+  items,
+  unsupported = false,
+}: {
+  items: CostBreakdownItem[];
+  unsupported?: boolean;
+}): React.JSX.Element {
+  if (unsupported) {
+    return (
+      <p className="py-6 text-center text-xs text-[#6b7080]">
+        This breakdown is not available yet for imported OpenClaw session usage.
+      </p>
+    );
+  }
+
   const maxCost = items.length > 0 ? Math.max(...items.map((i) => i.totalCost)) : 0;
   if (items.length === 0) {
     return <p className="py-6 text-center text-xs text-[#6b7080]">No data for this breakdown.</p>;
@@ -119,7 +138,21 @@ function BreakdownList({ items }: { items: CostBreakdownItem[] }): React.JSX.Ele
   );
 }
 
-function TemplateBreakdownList({ items }: { items: TemplateBreakdownItem[] }): React.JSX.Element {
+function TemplateBreakdownList({
+  items,
+  unsupported = false,
+}: {
+  items: TemplateBreakdownItem[];
+  unsupported?: boolean;
+}): React.JSX.Element {
+  if (unsupported) {
+    return (
+      <p className="py-6 text-center text-xs text-[#6b7080]">
+        Task template cost attribution has not been mapped from imported session usage yet.
+      </p>
+    );
+  }
+
   const maxCost = items.length > 0 ? Math.max(...items.map((i) => i.totalCost)) : 0;
   if (items.length === 0) {
     return (
@@ -224,6 +257,10 @@ export function AnalyticsContent(): React.JSX.Element {
     message: "Preparing analytics sync.",
     completedAt: null,
   });
+  const [unsupportedBreakdowns, setUnsupportedBreakdowns] = useState<UnsupportedBreakdowns>({
+    project: false,
+    template: false,
+  });
   const hasBootstrappedRef = useRef(false);
 
   const fetchData = useCallback(async (appliedFilters: AnalyticsFilters): Promise<void> => {
@@ -249,11 +286,13 @@ export function AnalyticsContent(): React.JSX.Element {
       fetch(`/api/analytics/costs/timeline?from=${encodeURIComponent(appliedFilters.from)}&to=${encodeURIComponent(appliedFilters.to)}&granularity=${appliedFilters.granularity}`),
     ]);
 
+    const projectUnsupported = projectRes.status === 501;
+    const templateUnsupported = templateRes.status === 501;
     const failed: string[] = [];
     if (!agentRes.ok) failed.push(`agent: ${agentRes.status}`);
     if (!modelRes.ok) failed.push(`model: ${modelRes.status}`);
-    if (!projectRes.ok) failed.push(`project: ${projectRes.status}`);
-    if (!templateRes.ok) failed.push(`template: ${templateRes.status}`);
+    if (!projectRes.ok && !projectUnsupported) failed.push(`project: ${projectRes.status}`);
+    if (!templateRes.ok && !templateUnsupported) failed.push(`template: ${templateRes.status}`);
     if (!tokenTimelineRes.ok) failed.push(`token timeline: ${tokenTimelineRes.status}`);
     if (!costTimelineRes.ok) failed.push(`cost timeline: ${costTimelineRes.status}`);
 
@@ -271,8 +310,8 @@ export function AnalyticsContent(): React.JSX.Element {
     ] = await Promise.all([
       agentRes.json() as Promise<CostBreakdownItem[]>,
       modelRes.json() as Promise<CostBreakdownItem[]>,
-      projectRes.json() as Promise<CostBreakdownItem[]>,
-      templateRes.json() as Promise<TemplateBreakdownItem[]>,
+      projectUnsupported ? Promise.resolve([]) : projectRes.json() as Promise<CostBreakdownItem[]>,
+      templateUnsupported ? Promise.resolve([]) : templateRes.json() as Promise<TemplateBreakdownItem[]>,
       tokenTimelineRes.json() as Promise<TokenTimelinePoint[]>,
       costTimelineRes.json() as Promise<CostTimelinePoint[]>,
     ]);
@@ -284,6 +323,10 @@ export function AnalyticsContent(): React.JSX.Element {
     setByTemplate(byTemplateData);
     setTokenTimeline(tokenTimelineData);
     setCostTimeline(costTimelineData);
+    setUnsupportedBreakdowns({
+      project: projectUnsupported,
+      template: templateUnsupported,
+    });
   }, []);
 
   const runSync = useCallback(async (): Promise<void> => {
@@ -502,7 +545,7 @@ export function AnalyticsContent(): React.JSX.Element {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-5">
-                  <BreakdownList items={items} />
+                  <BreakdownList items={items} unsupported={label === "By Project" && unsupportedBreakdowns.project} />
                 </CardContent>
               </Card>
             ))}
@@ -515,7 +558,7 @@ export function AnalyticsContent(): React.JSX.Element {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-5">
-              <TemplateBreakdownList items={byTemplate} />
+              <TemplateBreakdownList items={byTemplate} unsupported={unsupportedBreakdowns.template} />
             </CardContent>
           </Card>
         </>

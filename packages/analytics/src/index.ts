@@ -81,6 +81,20 @@ interface CostByGroup {
   count: number;
 }
 
+export class UnsupportedAnalyticsBreakdownError extends Error {
+  readonly breakdown: "project" | "template";
+
+  constructor(breakdown: "project" | "template") {
+    super(
+      breakdown === "project"
+        ? "Project breakdown is not available for imported OpenClaw session usage yet"
+        : "Template breakdown is not available for imported OpenClaw session usage yet",
+    );
+    this.name = "UnsupportedAnalyticsBreakdownError";
+    this.breakdown = breakdown;
+  }
+}
+
 /**
  * Aggregate usage costs grouped by agent ID.
  *
@@ -145,7 +159,7 @@ export function getCostsByModel(db: DBOrTx): CostByGroup[] {
  * @returns An array of cost summaries, one per project.
  */
 export function getCostsByProject(_db: DBOrTx): CostByGroup[] {
-  return [];
+  throw new UnsupportedAnalyticsBreakdownError("project");
 }
 
 // ── Time-series types ──────────────────────────────────────────────────────
@@ -345,7 +359,7 @@ interface CostByTemplate {
 }
 
 export function getCostsByTemplate(_db: DBOrTx): CostByTemplate[] {
-  return [];
+  throw new UnsupportedAnalyticsBreakdownError("template");
 }
 
 export function getTokensByTemplate(db: DBOrTx): CostByTemplate[] {

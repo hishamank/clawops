@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useCallback, useEffect, useState } from "react";
 import { Plus, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,17 +17,23 @@ const initialState: CreateIdeaActionState = {};
 
 export function CreateIdeaDialog({ projects }: { projects: Project[] }): React.JSX.Element {
   const [open, setOpen] = useState(false);
+  const [formVersion, setFormVersion] = useState(0);
   const [state, formAction, isPending] = useActionState(createIdeaAction, initialState);
+
+  const closeDialog = useCallback((): void => {
+    setOpen(false);
+    setFormVersion((current) => current + 1);
+  }, []);
 
   useEffect(() => {
     if (state.success) {
-      setOpen(false);
+      closeDialog();
     }
-  }, [state.success]);
+  }, [closeDialog, state.success]);
 
   if (open) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div key={formVersion} className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -88,9 +94,7 @@ export function CreateIdeaDialog({ projects }: { projects: Project[] }): React.J
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => {
-                    setOpen(false);
-                  }}
+                  onClick={closeDialog}
                 >
                   Cancel
                 </Button>

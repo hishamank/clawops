@@ -1,4 +1,4 @@
-import { beforeEach, describe, it } from "node:test";
+import { afterEach, beforeEach, describe, it } from "node:test";
 import assert from "node:assert";
 import fs from "node:fs";
 import os from "node:os";
@@ -107,6 +107,14 @@ beforeEach(() => {
       startedAt: new Date("2026-03-19T09:00:00.000Z"),
     })
     .run();
+});
+
+afterEach(() => {
+  if (!supportsBetterSqlite || !rootPath) {
+    return;
+  }
+
+  fs.rmSync(rootPath, { recursive: true, force: true });
 });
 
 describe("syncSessionUsage", () => {

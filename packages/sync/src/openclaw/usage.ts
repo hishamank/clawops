@@ -8,6 +8,7 @@ import {
   openclawSessionUsageCursors,
   openclawSessionUsageEntries,
   openclawSessions,
+  sql,
   toJsonObject,
   type DBOrTx,
   type OpenClawConnection,
@@ -37,6 +38,7 @@ interface SessionMapping {
 }
 
 interface ParsedUsageLine {
+  rawEntry: JsonRecord;
   eventTimestamp: Date;
   provider: string;
   model: string;
@@ -225,6 +227,7 @@ function parseUsageLine(
   }
 
   return {
+    rawEntry: entry,
     eventTimestamp,
     provider,
     model,
@@ -380,6 +383,21 @@ function insertUsageEntry(
   return inserted !== undefined;
 }
 
+function runInTransaction<T>(
+  db: DBOrTx,
+  callback: (tx: DBOrTx) => T,
+): T {
+  const transactionalDb = db as DBOrTx & {
+    transaction?: <TResult>(fn: (tx: DBOrTx) => TResult) => TResult;
+  };
+
+  if (typeof transactionalDb.transaction === "function") {
+    return transactionalDb.transaction((tx) => callback(tx));
+  }
+
+  return callback(db);
+}
+
 export function syncSessionUsage(
   db: DBOrTx,
   connection: OpenClawConnection,
@@ -406,80 +424,87 @@ export function syncSessionUsage(
       ? agentMappings.get(file.externalAgentId)
       : undefined;
 
-    let importedForFile = 0;
-    let skippedForFile = 0;
-    let lineNumber = startLineNumber;
+    const fileResult = runInTransaction(db, (tx) => {
+      let importedForFile = 0;
+      let skippedForFile = 0;
+      let lineNumber = startLineNumber;
 
-    for (const parsedLine of parsedLines) {
-      lineNumber += 1;
+      for (const parsedLine of parsedLines) {
+        lineNumber += 1;
 
-      if (!parsedLine.line.trim()) {
-        continue;
+        if (!parsedLine.line.trim()) {
+          continue;
+        }
+
+        const usageLine = parseUsageLine(parsedLine.line, file.sessionFilePath, modelAliases);
+        if (!usageLine) {
+          skippedForFile += 1;
+          continue;
+        }
+
+        const sessionKey = getSessionKey(file.absolutePath, usageLine.rawEntry);
+        const sessionMapping = sessionMappings.get(sessionKey);
+
+        const inserted = insertUsageEntry(tx, {
+          connectionId: connection.id,
+          openclawAgentId: agentMapping?.id ?? null,
+          linkedAgentId: agentMapping?.linkedAgentId ?? null,
+          sessionId: sessionMapping?.id ?? null,
+          externalAgentId: file.externalAgentId,
+          externalAgentName: agentMapping?.externalAgentName ?? file.externalAgentId,
+          sessionKey,
+          sessionFilePath: file.sessionFilePath,
+          eventFingerprint: usageLine.fingerprint,
+          eventTimestamp: usageLine.eventTimestamp,
+          provider: usageLine.provider,
+          model: usageLine.model,
+          modelAlias: usageLine.modelAlias ?? null,
+          tokensIn: usageLine.tokensIn,
+          tokensOut: usageLine.tokensOut,
+          cacheRead: usageLine.cacheRead,
+          cacheWrite: usageLine.cacheWrite,
+          totalTokens: usageLine.totalTokens,
+          cost: usageLine.cost,
+          messageType: usageLine.messageType,
+          rawUsage: usageLine.rawUsage ? toJsonObject(usageLine.rawUsage) : null,
+          rawMessage: usageLine.rawMessage ? toJsonObject(usageLine.rawMessage) : null,
+        });
+
+        if (inserted) {
+          importedForFile += 1;
+        }
       }
 
-      const usageLine = parseUsageLine(parsedLine.line, file.sessionFilePath, modelAliases);
-      if (!usageLine) {
-        skippedLineCount += 1;
-        skippedForFile += 1;
-        continue;
-      }
+      upsertCursor(
+        tx,
+        connection.id,
+        file.sessionFilePath,
+        file.externalAgentId,
+        stat.size,
+        stat.mtimeMs,
+        stat.size,
+        lineNumber,
+      );
 
-      const rawEntry = JSON.parse(parsedLine.line) as JsonRecord;
-      const sessionKey = getSessionKey(file.absolutePath, rawEntry);
-      const sessionMapping = sessionMappings.get(sessionKey);
+      return {
+        importedForFile,
+        skippedForFile,
+        lineNumber,
+      };
+    });
 
-      const inserted = insertUsageEntry(db, {
-        connectionId: connection.id,
-        openclawAgentId: agentMapping?.id ?? null,
-        linkedAgentId: agentMapping?.linkedAgentId ?? null,
-        sessionId: sessionMapping?.id ?? null,
-        externalAgentId: file.externalAgentId,
-        externalAgentName: agentMapping?.externalAgentName ?? file.externalAgentId,
-        sessionKey,
-        sessionFilePath: file.sessionFilePath,
-        eventFingerprint: usageLine.fingerprint,
-        eventTimestamp: usageLine.eventTimestamp,
-        provider: usageLine.provider,
-        model: usageLine.model,
-        modelAlias: usageLine.modelAlias ?? null,
-        tokensIn: usageLine.tokensIn,
-        tokensOut: usageLine.tokensOut,
-        cacheRead: usageLine.cacheRead,
-        cacheWrite: usageLine.cacheWrite,
-        totalTokens: usageLine.totalTokens,
-        cost: usageLine.cost,
-        messageType: usageLine.messageType,
-        rawUsage: usageLine.rawUsage ? toJsonObject(usageLine.rawUsage) : null,
-        rawMessage: usageLine.rawMessage ? toJsonObject(usageLine.rawMessage) : null,
-      });
-
-      if (inserted) {
-        importedCount += 1;
-        importedForFile += 1;
-      }
-    }
-
+    importedCount += fileResult.importedForFile;
+    skippedLineCount += fileResult.skippedForFile;
     if (rescanned) {
       rescannedFileCount += 1;
     }
 
-    upsertCursor(
-      db,
-      connection.id,
-      file.sessionFilePath,
-      file.externalAgentId,
-      stat.size,
-      stat.mtimeMs,
-      stat.size,
-      lineNumber,
-    );
-
     processedFiles.push({
       sessionFilePath: file.sessionFilePath,
       externalAgentId: file.externalAgentId,
-      importedCount: importedForFile,
+      importedCount: fileResult.importedForFile,
       scannedLineCount: parsedLines.length,
-      skippedLineCount: skippedForFile,
+      skippedLineCount: fileResult.skippedForFile,
       rescanned,
     });
   }
@@ -504,27 +529,23 @@ export function getImportedUsageSummary(
   db: DBOrTx,
   connectionId: string,
 ): ImportedUsageSummary {
-  const rows = db
+  const result = db
     .select({
-      totalTokensIn: openclawSessionUsageEntries.tokensIn,
-      totalTokensOut: openclawSessionUsageEntries.tokensOut,
-      totalCost: openclawSessionUsageEntries.cost,
+      totalTokensIn: sql<number>`coalesce(sum(${openclawSessionUsageEntries.tokensIn}), 0)`,
+      totalTokensOut: sql<number>`coalesce(sum(${openclawSessionUsageEntries.tokensOut}), 0)`,
+      totalCost: sql<number>`coalesce(sum(${openclawSessionUsageEntries.cost}), 0)`,
+      count: sql<number>`count(*)`,
     })
     .from(openclawSessionUsageEntries)
     .where(eq(openclawSessionUsageEntries.connectionId, connectionId))
-    .all();
+    .get();
 
-  return rows.reduce<ImportedUsageSummary>((summary, row) => ({
-    totalTokensIn: summary.totalTokensIn + row.totalTokensIn,
-    totalTokensOut: summary.totalTokensOut + row.totalTokensOut,
-    totalCost: summary.totalCost + row.totalCost,
-    count: summary.count + 1,
-  }), {
-    totalTokensIn: 0,
-    totalTokensOut: 0,
-    totalCost: 0,
-    count: 0,
-  });
+  return {
+    totalTokensIn: Number(result?.totalTokensIn ?? 0),
+    totalTokensOut: Number(result?.totalTokensOut ?? 0),
+    totalCost: Number(result?.totalCost ?? 0),
+    count: Number(result?.count ?? 0),
+  };
 }
 
 export function listImportedUsageEntries(

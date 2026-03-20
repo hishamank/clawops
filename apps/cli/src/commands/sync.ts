@@ -200,7 +200,8 @@ export const syncCmd = new Command("sync")
       addedAgents.length === 0 &&
       removedAgents.length === 0 &&
       installed === 0 &&
-      registryCreated === 0;
+      registryCreated === 0 &&
+      (usageSync === null || (usageSync.addedCount === 0 && usageSync.updatedCount === 0));
 
     if (isJson) {
       console.log(JSON.stringify(jsonResult, null, 2));
