@@ -16,9 +16,9 @@ export interface SyncAgent {
 export interface SyncCronJob {
   id: string;
   name: string;
-  schedule: string;
+  schedule: unknown;
   enabled: boolean;
-  lastRunAt?: string;
+  lastRunAt?: number;
   model?: string;
 }
 

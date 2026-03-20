@@ -85,6 +85,70 @@ function defaultConnectionName(rootPath: string): string {
   return `OpenClaw ${baseName}`;
 }
 
+function normalizeScheduleFromSync(schedule: unknown): {
+  kind: string | null;
+  expr: string | null;
+  raw: string | null;
+} {
+  if (schedule == null) {
+    return { kind: null, expr: null, raw: null };
+  }
+
+  if (typeof schedule === "string") {
+    try {
+      const parsed = JSON.parse(schedule);
+      if (typeof parsed === "string") {
+        return normalizeScheduleFromSync(parsed);
+      }
+      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+        return normalizeScheduleFromSync(parsed);
+      }
+    } catch {
+      // Not JSON, treat as raw cron expression
+    }
+    return { kind: "cron", expr: schedule, raw: JSON.stringify(schedule) };
+  }
+
+  if (typeof schedule !== "object" || Array.isArray(schedule)) {
+    return {
+      kind: null,
+      expr: String(schedule),
+      raw: JSON.stringify(schedule),
+    };
+  }
+
+  const obj = schedule as Record<string, unknown>;
+  const kindCandidate = obj["kind"] ?? obj["type"] ?? obj["mode"];
+  const exprCandidate =
+    obj["expr"] ??
+    obj["expression"] ??
+    obj["cron"] ??
+    obj["value"] ??
+    obj["every"] ??
+    obj["at"];
+
+  let inferredKind: string | null =
+    typeof kindCandidate === "string" && kindCandidate.length > 0
+      ? kindCandidate
+      : null;
+
+  if (!inferredKind) {
+    if (typeof obj["cron"] === "string") {
+      inferredKind = "cron";
+    } else if (typeof obj["every"] === "string") {
+      inferredKind = "every";
+    } else if (typeof obj["at"] === "string") {
+      inferredKind = "at";
+    }
+  }
+
+  return {
+    kind: inferredKind,
+    expr: typeof exprCandidate === "string" ? exprCandidate : null,
+    raw: JSON.stringify(schedule),
+  };
+}
+
 function validateOpenClawDir(
   openclawDir: string,
   dependencies: Pick<OnboardingDependencies, "existsSync" | "readdirSync">,
@@ -226,17 +290,20 @@ export async function onboardOpenClaw(
       dependencies.upsertCronJobs(
         tx,
         connection.connection.id,
-        cronJobs.map((job) => ({
-          id: job.id,
-          name: job.name,
-          enabled: job.enabled,
-          scheduleKind: "cron",
-          scheduleExpr: job.schedule,
-          sessionTarget: "main",
-          scheduleRaw: JSON.stringify(job.schedule),
-          lastRunAt: job.lastRunAt ? new Date(job.lastRunAt) : null,
-          nextRunAt: null,
-        })),
+        cronJobs.map((job) => {
+          const parsed = normalizeScheduleFromSync(job.schedule);
+          return {
+            id: job.id,
+            name: job.name,
+            enabled: job.enabled,
+            scheduleKind: parsed.kind,
+            scheduleExpr: parsed.expr,
+            scheduleRaw: parsed.raw,
+            sessionTarget: "main",
+            lastRunAt: job.lastRunAt ? new Date(job.lastRunAt) : null,
+            nextRunAt: null,
+          };
+        }),
       );
 
       dependencies.finishSyncRunWithTx(tx, run.id, {
