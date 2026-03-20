@@ -86,10 +86,14 @@ function defaultConnectionName(rootPath: string): string {
 }
 
 function normalizeScheduleFromSync(schedule: unknown): {
-  kind: string;
-  expr: string;
-  raw: string;
+  kind: string | null;
+  expr: string | null;
+  raw: string | null;
 } {
+  if (schedule == null) {
+    return { kind: null, expr: null, raw: null };
+  }
+
   if (typeof schedule === "string") {
     try {
       const parsed = JSON.parse(schedule);
@@ -102,21 +106,44 @@ function normalizeScheduleFromSync(schedule: unknown): {
     return { kind: "cron", expr: schedule, raw: JSON.stringify(schedule) };
   }
 
-  if (typeof schedule === "object" && schedule !== null && !Array.isArray(schedule)) {
-    const obj = schedule as Record<string, unknown>;
+  if (typeof schedule !== "object" || Array.isArray(schedule)) {
+    return {
+      kind: null,
+      expr: String(schedule),
+      raw: JSON.stringify(schedule),
+    };
+  }
 
+  const obj = schedule as Record<string, unknown>;
+  const kindCandidate = obj["kind"] ?? obj["type"] ?? obj["mode"];
+  const exprCandidate =
+    obj["expr"] ??
+    obj["expression"] ??
+    obj["cron"] ??
+    obj["value"] ??
+    obj["every"] ??
+    obj["at"];
+
+  let inferredKind: string | null =
+    typeof kindCandidate === "string" && kindCandidate.length > 0
+      ? kindCandidate
+      : null;
+
+  if (!inferredKind) {
     if (typeof obj["cron"] === "string") {
-      return { kind: "cron", expr: obj["cron"] as string, raw: JSON.stringify(schedule) };
-    }
-    if (typeof obj["every"] === "string") {
-      return { kind: "every", expr: obj["every"] as string, raw: JSON.stringify(schedule) };
-    }
-    if (typeof obj["at"] === "string") {
-      return { kind: "at", expr: obj["at"] as string, raw: JSON.stringify(schedule) };
+      inferredKind = "cron";
+    } else if (typeof obj["every"] === "string") {
+      inferredKind = "every";
+    } else if (typeof obj["at"] === "string") {
+      inferredKind = "at";
     }
   }
 
-  return { kind: "cron", expr: "", raw: JSON.stringify(schedule) };
+  return {
+    kind: inferredKind,
+    expr: typeof exprCandidate === "string" ? exprCandidate : null,
+    raw: JSON.stringify(schedule),
+  };
 }
 
 function validateOpenClawDir(

@@ -104,6 +104,9 @@ describe("onboardOpenClaw", () => {
           fetchGatewayCronJobsCalls.push({ gatewayUrl, gatewayToken });
           return [
             { id: "cron-1", name: "Daily sync", schedule: "0 0 * * *", enabled: true },
+            { id: "cron-2", name: "Every 15m", schedule: { every: "15m" }, enabled: true },
+            { id: "cron-3", name: "At 8am", schedule: { kind: "at", value: "08:00" }, enabled: false },
+            { id: "cron-4", name: "Missing schedule", schedule: null, enabled: true },
           ];
         },
         syncWorkspaceFiles: async (_db: unknown, connection: Record<string, unknown>) => {
@@ -133,7 +136,7 @@ describe("onboardOpenClaw", () => {
     assert.equal(result.connectionId, "conn-1");
     assert.equal(result.syncRunId, "run-1");
     assert.equal(result.agents.length, 1);
-    assert.equal(result.cronJobs.length, 1);
+    assert.equal(result.cronJobs.length, 4);
     assert.equal(startSyncRunCalls.length, 1);
     assert.equal(upsertConnectionCalls.length, 1);
     assert.equal(initAgentCalls.length, 1);
@@ -159,5 +162,16 @@ describe("onboardOpenClaw", () => {
       eventsInserted.map((event) => event["action"]),
       ["openclaw.connection.created", "agent.registered", "sync.run.completed"],
     );
+
+    const upsertCall = upsertCronJobsCalls[0];
+    const jobs = upsertCall.jobs as Array<Record<string, unknown>>;
+    assert.equal(jobs[0].scheduleKind, "cron");
+    assert.equal(jobs[0].scheduleExpr, "0 0 * * *");
+    assert.equal(jobs[1].scheduleKind, "every");
+    assert.equal(jobs[1].scheduleExpr, "15m");
+    assert.equal(jobs[2].scheduleKind, "at");
+    assert.equal(jobs[2].scheduleExpr, "08:00");
+    assert.equal(jobs[3].scheduleKind, null);
+    assert.equal(jobs[3].scheduleExpr, null);
   });
 });
