@@ -91,6 +91,14 @@ function normalizeScheduleFromSync(schedule: unknown): {
   raw: string;
 } {
   if (typeof schedule === "string") {
+    try {
+      const parsed = JSON.parse(schedule);
+      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+        return normalizeScheduleFromSync(parsed);
+      }
+    } catch {
+      // Not JSON, treat as raw cron expression
+    }
     return { kind: "cron", expr: schedule, raw: JSON.stringify(schedule) };
   }
 
