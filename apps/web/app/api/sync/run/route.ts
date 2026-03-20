@@ -109,7 +109,7 @@ export async function POST(req: Request): Promise<NextResponse> {
   }
 }
 
-export async function GET(req: Request): Promise<NextResponse> {
+export async function GET(_req: Request): Promise<NextResponse> {
   try {
     const db = getDb();
     const connections = listOpenClawConnections(db);
