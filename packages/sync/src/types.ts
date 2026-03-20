@@ -18,7 +18,7 @@ export interface SyncCronJob {
   name: string;
   schedule: unknown;
   enabled: boolean;
-  lastRunAt?: string;
+  lastRunAt?: number;
   model?: string;
 }
 

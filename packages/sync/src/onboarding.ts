@@ -97,6 +97,9 @@ function normalizeScheduleFromSync(schedule: unknown): {
   if (typeof schedule === "string") {
     try {
       const parsed = JSON.parse(schedule);
+      if (typeof parsed === "string") {
+        return normalizeScheduleFromSync(parsed);
+      }
       if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
         return normalizeScheduleFromSync(parsed);
       }
