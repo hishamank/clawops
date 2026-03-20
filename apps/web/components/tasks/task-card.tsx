@@ -23,6 +23,7 @@ export interface TaskCardProps {
   blocked?: boolean;
   href?: string;
   compact?: boolean;
+  dragging?: boolean;
   onTaskClick?: (taskId: string) => void;
   onTaskDone?: (taskId: string) => void;
   onTaskDelete?: (taskId: string) => void;
@@ -38,6 +39,7 @@ export function TaskCard({
   blocked = false,
   href,
   compact = true,
+  dragging = false,
   onTaskClick,
   onTaskDone,
   onTaskDelete,
@@ -83,7 +85,7 @@ export function TaskCard({
   };
 
   const handleCardClick = (e: React.MouseEvent) => {
-    if (e.defaultPrevented) return;
+    if (e.defaultPrevented || dragging) return;
     if (onTaskClick) {
       onTaskClick(task.id);
     } else {
