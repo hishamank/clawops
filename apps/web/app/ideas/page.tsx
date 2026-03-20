@@ -7,8 +7,9 @@ import { IdeaFilterTabs } from "./filter-tabs";
 import { PromoteButton } from "./promote-button";
 import { CreateIdeaDialog } from "./create-idea-dialog";
 import { listIdeas, listIdeaTasks } from "@clawops/ideas";
+import { listProjects } from "@clawops/projects";
 import { getDb } from "@/lib/server/runtime";
-import { mapIdea } from "@/lib/mappers";
+import { mapIdea, mapProject } from "@/lib/mappers";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -54,6 +55,10 @@ function parseTags(tags: string | null): string[] {
 }
 
 interface IdeaWithCount extends Idea { taskCount: number }
+interface IdeaDialogProject {
+  id: string;
+  name: string;
+}
 
 // ─── Idea card ────────────────────────────────────────────────────────────────
 
@@ -134,6 +139,13 @@ async function getIdeas(): Promise<IdeaWithCount[]> {
   return ideas.map((idea) => ({ ...idea, taskCount: listIdeaTasks(db, idea.id).length }));
 }
 
+async function getIdeaDialogProjects(): Promise<IdeaDialogProject[]> {
+  return listProjects(getDb()).map((project) => {
+    const mapped = mapProject(project);
+    return { id: mapped.id, name: mapped.name };
+  });
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function IdeasPage({ searchParams }: PageProps): Promise<React.JSX.Element> {
@@ -141,7 +153,10 @@ export default async function IdeasPage({ searchParams }: PageProps): Promise<Re
   const status = typeof sp?.status === "string" ? sp.status : undefined;
 
   // Fetch all ideas once; derive filtered view in memory
-  const allIdeas = await getIdeas();
+  const [allIdeas, dialogProjects] = await Promise.all([
+    getIdeas(),
+    getIdeaDialogProjects(),
+  ]);
   const activeIdeas =
     status && status !== "all"
       ? allIdeas.filter((i) => i.status === status)
@@ -163,7 +178,7 @@ export default async function IdeasPage({ searchParams }: PageProps): Promise<Re
           <h1 className="text-2xl font-semibold tracking-tight text-[#ededef]">Ideas</h1>
           <p className="mt-0.5 text-sm text-[#6b7080]">Captured insights from your agent fleet</p>
         </div>
-        <CreateIdeaDialog />
+        <CreateIdeaDialog projects={dialogProjects} />
       </div>
 
       {/* Filter tabs */}

@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { getCostsByTemplate } from "@clawops/analytics";
+import { UnsupportedAnalyticsBreakdownError, getCostsByTemplate } from "@clawops/analytics";
 import { getDb, jsonError } from "@/lib/server/runtime";
 
 export async function GET(_req: Request): Promise<NextResponse> {
@@ -18,6 +18,9 @@ export async function GET(_req: Request): Promise<NextResponse> {
 
     return NextResponse.json(breakdown);
   } catch (err) {
+    if (err instanceof UnsupportedAnalyticsBreakdownError) {
+      return jsonError(501, err.message, "ANALYTICS_BREAKDOWN_UNSUPPORTED");
+    }
     if (err instanceof Error) {
       return jsonError(500, err.message, "INTERNAL_ERROR");
     }

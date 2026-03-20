@@ -163,6 +163,97 @@ export const openclawSessions = sqliteTable(
   }),
 );
 
+export const openclawSessionUsageEntries = sqliteTable(
+  "openclaw_session_usage_entries",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    connectionId: text("connection_id")
+      .notNull()
+      .references(() => openclawConnections.id, { onDelete: "cascade" }),
+    openclawAgentId: text("openclaw_agent_id").references(() => openclawAgents.id, {
+      onDelete: "set null",
+    }),
+    linkedAgentId: text("linked_agent_id").references(() => agents.id, {
+      onDelete: "set null",
+    }),
+    sessionId: text("session_id").references(() => openclawSessions.id, {
+      onDelete: "set null",
+    }),
+    externalAgentId: text("external_agent_id"),
+    externalAgentName: text("external_agent_name"),
+    sessionKey: text("session_key").notNull(),
+    sessionFilePath: text("session_file_path").notNull(),
+    eventFingerprint: text("event_fingerprint").notNull(),
+    eventTimestamp: integer("event_timestamp", { mode: "timestamp" }).notNull(),
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    modelAlias: text("model_alias"),
+    tokensIn: integer("tokens_in").notNull().default(0),
+    tokensOut: integer("tokens_out").notNull().default(0),
+    cacheRead: integer("cache_read").notNull().default(0),
+    cacheWrite: integer("cache_write").notNull().default(0),
+    totalTokens: integer("total_tokens").notNull().default(0),
+    cost: real("cost").notNull().default(0),
+    messageType: text("message_type"),
+    rawUsage: text("raw_usage"),
+    rawMessage: text("raw_message"),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (table) => ({
+    connectionFingerprintUnique: uniqueIndex(
+      "openclaw_session_usage_entries_connection_fingerprint_unique",
+    ).on(table.connectionId, table.eventFingerprint),
+    connectionTimestampIdx: index("idx_openclaw_session_usage_entries_connection_timestamp").on(
+      table.connectionId,
+      table.eventTimestamp,
+    ),
+    linkedAgentTimestampIdx: index("idx_openclaw_session_usage_entries_agent_timestamp").on(
+      table.linkedAgentId,
+      table.eventTimestamp,
+    ),
+    modelTimestampIdx: index("idx_openclaw_session_usage_entries_model_timestamp").on(
+      table.model,
+      table.eventTimestamp,
+    ),
+  }),
+);
+
+export const openclawSessionUsageCursors = sqliteTable(
+  "openclaw_session_usage_cursors",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    connectionId: text("connection_id")
+      .notNull()
+      .references(() => openclawConnections.id, { onDelete: "cascade" }),
+    externalAgentId: text("external_agent_id"),
+    sessionFilePath: text("session_file_path").notNull(),
+    fileSizeBytes: integer("file_size_bytes").notNull().default(0),
+    fileMtimeMs: integer("file_mtime_ms").notNull().default(0),
+    lastByteOffset: integer("last_byte_offset").notNull().default(0),
+    lastLineNumber: integer("last_line_number").notNull().default(0),
+    lastSyncedAt: integer("last_synced_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (table) => ({
+    connectionSessionFileUnique: uniqueIndex(
+      "openclaw_session_usage_cursors_connection_session_file_unique",
+    ).on(table.connectionId, table.sessionFilePath),
+  }),
+);
+
 // ── Agent Messages ───────────────────────────────────────────────────────────
 
 export const agentMessages = sqliteTable(
@@ -592,7 +683,7 @@ export const syncRunItems = sqliteTable("sync_run_items", {
     .notNull()
     .references(() => syncRuns.id),
   itemType: text("item_type", {
-    enum: ["agent", "workspace", "cron_job"],
+    enum: ["agent", "workspace", "cron_job", "usage"],
   }).notNull(),
   itemExternalId: text("item_external_id").notNull(),
   changeType: text("change_type", {
@@ -796,6 +887,10 @@ export type WorkspaceFile = typeof workspaceFiles.$inferSelect;
 export type NewWorkspaceFile = typeof workspaceFiles.$inferInsert;
 export type OpenClawSession = typeof openclawSessions.$inferSelect;
 export type NewOpenClawSession = typeof openclawSessions.$inferInsert;
+export type OpenClawSessionUsageEntry = typeof openclawSessionUsageEntries.$inferSelect;
+export type NewOpenClawSessionUsageEntry = typeof openclawSessionUsageEntries.$inferInsert;
+export type OpenClawSessionUsageCursor = typeof openclawSessionUsageCursors.$inferSelect;
+export type NewOpenClawSessionUsageCursor = typeof openclawSessionUsageCursors.$inferInsert;
 export type AgentMessage = typeof agentMessages.$inferSelect;
 export type NewAgentMessage = typeof agentMessages.$inferInsert;
 export type WorkspaceFileRevision = typeof workspaceFileRevisions.$inferSelect;

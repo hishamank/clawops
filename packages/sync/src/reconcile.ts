@@ -6,6 +6,7 @@ import {
   type WorkspaceFile,
 } from "@clawops/core";
 import { syncSessions, syncAgentStatusFromSessions } from "./openclaw/sessions.js";
+import { syncSessionUsage } from "./openclaw/usage.js";
 import { syncCronJobs } from "@clawops/habits";
 import { NotFoundError } from "@clawops/domain";
 import { syncWorkspaceFiles, type WorkspaceFileSyncResult } from "./openclaw/files.js";
@@ -14,7 +15,7 @@ import { finishSyncRunWithTx, startSyncRun, type FinishSyncRunItemInput } from "
 /**
  * Reconciliation mode - controls which modules are synchronized.
  */
-export type ReconcileMode = "full" | "sessions" | "cron" | "files";
+export type ReconcileMode = "full" | "sessions" | "cron" | "files" | "usage";
 
 /**
  * Options for reconciliation runs.
@@ -22,10 +23,11 @@ export type ReconcileMode = "full" | "sessions" | "cron" | "files";
 export interface ReconcileOptions {
   /**
    * Scope of reconciliation.
-   * - "full": reconcile all modules (sessions, cron jobs, workspace files)
+   * - "full": reconcile all modules (sessions, cron jobs, workspace files, usage)
    * - "sessions": reconcile only OpenClaw sessions
    * - "cron": reconcile only cron jobs
    * - "files": reconcile only workspace files
+   * - "usage": reconcile only imported session usage analytics
    */
   mode?: ReconcileMode;
   /**
@@ -211,6 +213,39 @@ async function reconcileFiles(
 }
 
 /**
+ * Reconcile imported OpenClaw session usage analytics.
+ */
+async function reconcileUsage(
+  db: DBOrTx,
+  connection: OpenClawConnection,
+): Promise<{ addedCount: number; updatedCount: number; items: FinishSyncRunItemInput[] }> {
+  const result = syncSessionUsage(db, connection);
+
+  const items: FinishSyncRunItemInput[] = result.processedFiles.map((file) => ({
+    itemType: "usage" as const,
+    itemExternalId: file.sessionFilePath,
+    changeType: file.importedCount > 0 ? "added" as const : "seen" as const,
+    summary:
+      file.importedCount > 0
+        ? `Imported ${file.importedCount} usage entries from ${file.sessionFilePath}`
+        : `Scanned ${file.sessionFilePath} for usage updates`,
+    meta: {
+      externalAgentId: file.externalAgentId,
+      importedCount: file.importedCount,
+      scannedLineCount: file.scannedLineCount,
+      skippedLineCount: file.skippedLineCount,
+      rescanned: file.rescanned,
+    },
+  }));
+
+  return {
+    addedCount: result.importedCount,
+    updatedCount: result.rescannedFileCount,
+    items,
+  };
+}
+
+/**
  * Execute reconciliation for a specific mode.
  */
 async function executeReconcileMode(
@@ -259,6 +294,14 @@ async function executeReconcileMode(
     addedCount += fileResult.addedCount;
     updatedCount += fileResult.updatedCount;
     items.push(...fileResult.items);
+  }
+
+  // Reconcile imported usage analytics
+  if (shouldRunFull || ctx.mode === "usage") {
+    const usageResult = await reconcileUsage(db, ctx.connection);
+    addedCount += usageResult.addedCount;
+    updatedCount += usageResult.updatedCount;
+    items.push(...usageResult.items);
   }
 
   return {

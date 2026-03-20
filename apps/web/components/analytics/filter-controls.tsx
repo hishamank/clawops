@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -12,6 +12,7 @@ interface Agent {
 interface FilterControlsProps {
   onFilterChange: (filters: AnalyticsFilters) => void;
   agents?: Agent[];
+  initialFilters?: AnalyticsFilters;
 }
 
 export interface AnalyticsFilters {
@@ -34,36 +35,62 @@ function getDefaultDateRange(): { from: string; to: string } {
   const from = new Date();
   from.setDate(from.getDate() - 30);
   return {
-    from: from.toISOString(),
-    to: to.toISOString(),
+    from: from.toISOString().slice(0, 10),
+    to: to.toISOString().slice(0, 10),
   };
+}
+
+function toInputDate(value: string): string {
+  return value.includes("T") ? value.slice(0, 10) : value;
+}
+
+function toFilterIso(value: string, boundary: "start" | "end"): string {
+  const suffix = boundary === "start" ? "T00:00:00.000Z" : "T23:59:59.999Z";
+  return new Date(`${value}${suffix}`).toISOString();
 }
 
 export function FilterControls({
   onFilterChange,
   agents = [],
+  initialFilters,
 }: FilterControlsProps): React.JSX.Element {
-  const defaultRange = getDefaultDateRange();
-  const [filters, setFilters] = useState<AnalyticsFilters>({
-    from: defaultRange.from,
-    to: defaultRange.to,
-    granularity: "day",
+  const [filters, setFilters] = useState<AnalyticsFilters>(() => {
+    if (initialFilters) {
+      return {
+        ...initialFilters,
+        from: toInputDate(initialFilters.from),
+        to: toInputDate(initialFilters.to),
+      };
+    }
+
+    const defaultRange = getDefaultDateRange();
+    return {
+      from: defaultRange.from,
+      to: defaultRange.to,
+      granularity: "day",
+    };
   });
 
-  useEffect(() => {
-    onFilterChange(filters);
-  }, [filters, onFilterChange]);
-
   const handleApply = () => {
-    onFilterChange(filters);
+    onFilterChange({
+      ...filters,
+      from: toFilterIso(filters.from, "start"),
+      to: toFilterIso(filters.to, "end"),
+    });
   };
 
   const handleReset = () => {
     const range = getDefaultDateRange();
-    setFilters({
+    const nextFilters: AnalyticsFilters = {
       from: range.from,
       to: range.to,
       granularity: "day",
+    };
+    setFilters(nextFilters);
+    onFilterChange({
+      ...nextFilters,
+      from: toFilterIso(nextFilters.from, "start"),
+      to: toFilterIso(nextFilters.to, "end"),
     });
   };
 
