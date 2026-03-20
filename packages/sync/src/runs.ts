@@ -19,7 +19,7 @@ export interface StartSyncRunInput {
 }
 
 export interface FinishSyncRunItemInput {
-  itemType: "agent" | "workspace" | "cron_job";
+  itemType: "agent" | "workspace" | "cron_job" | "usage";
   itemExternalId: string;
   changeType: "seen" | "added" | "updated" | "removed" | "failed";
   summary?: string;

@@ -238,6 +238,27 @@ mock.module("./openclaw/files.js", {
   },
 });
 
+mock.module("./openclaw/usage.js", {
+  namedExports: {
+    syncSessionUsage: () => ({
+      scannedFileCount: 1,
+      rescannedFileCount: 0,
+      importedCount: 2,
+      skippedLineCount: 0,
+      processedFiles: [
+        {
+          sessionFilePath: "agents/agent-1/sessions/session-1.jsonl",
+          externalAgentId: "agent-1",
+          importedCount: 2,
+          scannedLineCount: 2,
+          skippedLineCount: 0,
+          rescanned: false,
+        },
+      ],
+    }),
+  },
+});
+
 mock.module("./connections.js", {
   namedExports: {
     getOpenClawConnection: (db: DB, connectionId: string) => {
@@ -310,6 +331,17 @@ describe("reconcile", () => {
     assert.equal(result.agentCount, 0);
     assert.equal(result.cronJobCount, 0);
     assert.equal(result.workspaceCount, 1);
+  });
+
+  it("runs a usage-only reconciliation", async () => {
+    const result = await reconcile(makeDb(), BASE_CONNECTION, {
+      mode: "usage",
+    });
+
+    assert.equal(result.agentCount, 0);
+    assert.equal(result.cronJobCount, 0);
+    assert.equal(result.workspaceCount, 0);
+    assert.equal(result.addedCount, 2);
   });
 
   it("defaults to full reconciliation mode when not specified", async () => {

@@ -7,7 +7,7 @@ import { createActivityEvent, events } from "@clawops/core";
 import { getDb, jsonError, requireAgentId } from "@/lib/server/runtime";
 
 const bodySchema = z.object({
-  mode: z.enum(["full", "sessions", "cron", "files"]).optional(),
+  mode: z.enum(["full", "sessions", "cron", "files", "usage"]).optional(),
   gatewayToken: z.string().min(1).optional(),
 });
 
@@ -32,10 +32,8 @@ async function parseBodyOrEmpty(req: Request): Promise<z.infer<typeof bodySchema
 }
 
 export async function POST(req: Request): Promise<NextResponse> {
-  const auth = requireAgentId(req);
-  if (auth instanceof NextResponse) {
-    return auth;
-  }
+  const authResult = requireAgentId(req);
+  const actorAgentId = authResult instanceof NextResponse ? undefined : authResult;
 
   try {
     const db = getDb();
@@ -51,7 +49,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     const result = await reconcileConnection(db, connection.id, {
       mode: body.mode,
       gatewayToken: body.gatewayToken ?? getGatewayToken(req),
-      actorAgentId: auth ?? undefined,
+      actorAgentId,
     });
 
     db.insert(events)
@@ -59,7 +57,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         action: "sync.run",
         entityType: "sync_run",
         entityId: result.syncRunId,
-        agentId: auth,
+        agentId: actorAgentId ?? null,
         meta: JSON.stringify({
           connectionId: connection.id,
           mode: body.mode ?? "full",
@@ -73,7 +71,7 @@ export async function POST(req: Request): Promise<NextResponse> {
       title: `Sync triggered for ${connection.name}`,
       entityType: "sync_run",
       entityId: result.syncRunId,
-      agentId: auth,
+      agentId: actorAgentId ?? null,
       metadata: JSON.stringify({
         connectionId: connection.id,
         connectionName: connection.name,
@@ -112,11 +110,6 @@ export async function POST(req: Request): Promise<NextResponse> {
 }
 
 export async function GET(req: Request): Promise<NextResponse> {
-  const auth = requireAgentId(req);
-  if (auth instanceof NextResponse) {
-    return auth;
-  }
-
   try {
     const db = getDb();
     const connections = listOpenClawConnections(db);

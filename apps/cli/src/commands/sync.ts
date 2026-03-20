@@ -17,6 +17,7 @@ interface SyncJsonResult {
   registry: { created: number };
   skills: { installed: number; skipped: number };
   cronJobs: { total: number };
+  usage?: { imported: number; rescannedFiles: number };
 }
 
 export const syncCmd = new Command("sync")
@@ -68,6 +69,11 @@ export const syncCmd = new Command("sync")
           gatewayToken,
           includeFiles: false,
         });
+    const usageSync = onboarding
+      ? await syncMod.reconcileConnection((await import("@clawops/core/db")).db, onboarding.connectionId, {
+          mode: "usage",
+        })
+      : null;
     const discoveredAgents = onboarding?.agents ?? scan?.agents ?? [];
     const gatewayEndpoint = onboarding?.gatewayUrl ?? scan?.gatewayUrl ?? gatewayUrl ?? "";
 
@@ -181,6 +187,12 @@ export const syncCmd = new Command("sync")
       registry: { created: registryCreated },
       skills: { installed, skipped },
       cronJobs: { total: cronJobCount },
+      usage: usageSync
+        ? {
+            imported: usageSync.addedCount,
+            rescannedFiles: usageSync.updatedCount,
+          }
+        : undefined,
     };
 
     // Determine exit code
@@ -219,6 +231,11 @@ export const syncCmd = new Command("sync")
       console.log(
         `✓ Skills: ${installed} installed${skillLabel}, ${skipped} skipped`,
       );
+      if (usageSync) {
+        console.log(
+          `✓ Usage: ${usageSync.addedCount} entries imported, ${usageSync.updatedCount} files rescanned`,
+        );
+      }
 
       if (gatewayToken) {
         console.log(`✓ Cron jobs: ${cronJobCount} fetched from gateway`);

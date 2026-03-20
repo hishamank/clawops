@@ -149,12 +149,8 @@ function pickIdentityField(content: string, field: string): string | undefined {
   return pickString(match?.[1]);
 }
 
-export function scanOpenClaw(options: OpenClawScanOptions = {}): {
-  agents: SyncAgent[];
-  workspaces: SyncWorkspace[];
-  gatewayUrl: string;
-} {
-  const openclawDir = resolvePath(options.openclawDir ?? process.env["OPENCLAW_DIR"] ?? "~/.openclaw");
+export function loadOpenClawConfig(openclawDirInput?: string): OpenClawConfig {
+  const openclawDir = resolvePath(openclawDirInput ?? process.env["OPENCLAW_DIR"] ?? "~/.openclaw");
   const configPath = path.join(openclawDir, "openclaw.json");
 
   let config: OpenClawConfig = {};
@@ -164,6 +160,17 @@ export function scanOpenClaw(options: OpenClawScanOptions = {}): {
     const resolved = resolveIncludes(parsed, path.dirname(configPath));
     config = asRecord(resolved) as OpenClawConfig;
   }
+
+  return config;
+}
+
+export function scanOpenClaw(options: OpenClawScanOptions = {}): {
+  agents: SyncAgent[];
+  workspaces: SyncWorkspace[];
+  gatewayUrl: string;
+} {
+  const openclawDir = resolvePath(options.openclawDir ?? process.env["OPENCLAW_DIR"] ?? "~/.openclaw");
+  const config = loadOpenClawConfig(openclawDir);
 
   const gatewayPort = config.gateway?.port ?? 3000;
   const gatewayHost = config.gateway?.host ?? "localhost";

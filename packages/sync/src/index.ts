@@ -19,6 +19,15 @@ export {
   type SyncAgentStatusResult,
 } from "./openclaw/sessions.js";
 export {
+  getImportedUsageSummary,
+  getUsageCursor,
+  listImportedUsageEntries,
+  syncSessionUsage,
+  type ImportedUsageSummary,
+  type SessionUsageFileSyncResult,
+  type SessionUsageSyncResult,
+} from "./openclaw/usage.js";
+export {
   OpenClawActionError,
   revertTrackedOpenClawFile,
   triggerAgent,
